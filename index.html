@@ -163,7 +163,6 @@ body{background:var(--paper)}
   font-family:var(--sans);font-weight:600;font-size:.9rem;letter-spacing:.01em;line-height:1.2;
   background:none;border:0;padding:0;margin:0;color:inherit;cursor:pointer;text-align:start;
 }
-#reader .flag span{display:block;font-weight:400;font-size:.72rem;color:var(--brine)}
 #reader .bar-tools{margin-inline-start:auto;display:flex;align-items:center;gap:.4rem}
 #reader .tool{
   font-family:var(--sans);font-size:.78rem;font-weight:500;
@@ -574,6 +573,7 @@ body{background:var(--paper)}
   text-transform:uppercase;color:var(--e-muted);
 }
 #editor .menu .who{padding:.2rem .6rem .5rem;font-size:.76rem;color:var(--e-muted);word-break:break-all}
+#editor .menu .ver{padding:.25rem .6rem .35rem;margin:0;font-size:.72rem;color:var(--e-muted)}
 /* the one thing allowed to give way, so the buttons stay on one line */
 #editor .where{
   color:var(--e-muted);font-size:.9rem;
@@ -1403,7 +1403,7 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
   <div class="draftbar" id="draftbar" hidden>Preview — this is the working copy, not the published issue</div>
   <header class="bar">
     <div class="bar-in" id="barIn">
-      <button class="flag" id="flag">JRA Magazine<span id="flagsub"></span></button>
+      <button class="flag" id="flag">JRA Magazine</button>
       <div class="bar-tools">
         <select class="lang" id="langSel" hidden aria-label="Language"></select>
         <div class="sizes" role="group" id="sizeGroup" aria-label="Text size">
@@ -1747,6 +1747,14 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
    Fill in FIREBASE below, add your two admin UIDs under /admins in the
    database, and deploy database.rules.json. Nothing else to configure.
    ===================================================================== */
+/* Which version of this file a browser is actually running. Shown at the
+   foot of the editor's own menu, because the one thing a stale cache will
+   not tell you is that it is stale. Nothing else reads it: bump it by hand
+   when the file changes. It is unrelated to the database's own VERSION,
+   which governs schema upgrades and must not be moved for a cosmetic
+   change. */
+const APP_VERSION = '1.8';
+
 /* Nothing is imported at the top any more. The Firebase libraries are
    several hundred kilobytes and, loaded this way, the browser must fetch
    and parse all of them before a line of this file runs — so every
@@ -2957,7 +2965,6 @@ const WPM = 220;
 const readerEl = $('#reader');
 const main = $('#top');
 const flag = $('#flag');
-const flagsub = $('#flagsub');
 const barIn = $('#barIn');
 
 const WORDS = ['zero','one','two','three','four','five','six','seven','eight',
@@ -4057,7 +4064,6 @@ async function routeReader(hash){
      not the magazine. */
   await pages;                     // a page that fails costs a tab, not the magazine
   if(token !== routeToken) return;
-  flagsub.textContent = S().issuesHeld(arr(Reader.library.issues).length);
 
   if(parts.length === 1 && SECTIONS.includes(parts[0])){
     const where = parts[0];
@@ -4699,6 +4705,8 @@ function toggleMenu(){
   menu.append(h('hr'));
   menu.append(h('button', { role:'menuitem',
     onclick: async () => { closeMenu(); const f = await firebase(); await f.signOut(f.auth); location.hash = '#/'; } }, 'Sign out'));
+  menu.append(h('hr'));
+  menu.append(h('p', { class:'ver', text:'Version ' + APP_VERSION }));
   menu.hidden = false;
   State.menuOpen = true;
   $('#brandBtn').setAttribute('aria-expanded', 'true');
