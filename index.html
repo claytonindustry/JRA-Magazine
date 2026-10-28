@@ -42,7 +42,14 @@
   --e-bg:#f3f1ec; --e-panel:#fffdf9; --e-ink:#1d2328; --e-muted:#5d6a73;
   --e-line:#d9d4c9; --e-accent:#1f5f7a; --e-on-accent:#fff; --e-warn:#a4561b;
   --e-sel:#d8761f;
-  --mag-body:"Liberation Serif","Times New Roman",Times,"Nimbus Roman","DejaVu Serif",serif;
+  /* The three faces a page can be set in, named once. The PDF carries
+     no font files — it names what every reader already has — so these
+     are what can be promised on paper, and the same three are what a
+     block can be set in on screen. */
+  --face-serif:"Liberation Serif","Times New Roman",Times,"Nimbus Roman","DejaVu Serif",serif;
+  --face-sans:"Liberation Sans",Helvetica,Arial,"Nimbus Sans","DejaVu Sans",sans-serif;
+  --face-typewriter:"Liberation Mono","Courier New",Courier,"Nimbus Mono PS",monospace;
+  --mag-body:var(--face-serif);
   --ui:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
 
   /* The mode switch sits in this much space, in both modes, always. */
@@ -449,6 +456,14 @@ body{background:var(--paper)}
    that it does not inherit: a quotation set large would otherwise hand
    its multiplier to the paragraph inside it and be enlarged twice. */
 @property --tz{ syntax:'<number>'; inherits:false; initial-value:1 }
+/* A block saying what face it is set in is the most particular thing
+   anyone has said about it, so it outranks the rules it lands among —
+   the editor's writing box, the reader's byline, the heading face of a
+   printed page — each of which is more specific than a bare class and
+   would otherwise win. */
+.ff-serif{font-family:var(--face-serif)!important}
+.ff-sans{font-family:var(--face-sans)!important}
+.ff-typewriter{font-family:var(--face-typewriter)!important}
 .sz-xs{--tz:.8}
 .sz-s{--tz:.9}
 .sz-l{--tz:1.2}
@@ -835,6 +850,14 @@ dialog #coverBody .subhead:first-child{margin-top:.2rem}
 #editor .tsizes{display:flex;gap:2px;margin-inline-start:.3rem}
 #editor .tsizes button{min-width:2.1rem;line-height:1;font-size:.72rem;letter-spacing:.02em}
 #editor .tsizes button[aria-pressed="true"]{background:var(--e-accent);color:var(--e-on-accent);border-color:var(--e-accent)}
+/* every select in the editor is a full-width field by default, and this
+   one is a control in a row of controls */
+#editor .facesel{
+  width:auto;display:inline-block;flex:0 0 auto;
+  margin:0 0 0 .3rem;font-family:var(--ui);font-size:.76rem;
+  padding:.22rem .3rem;border:1px solid var(--e-line);border-radius:6px;
+  background:var(--e-panel);color:var(--e-ink);
+}
 #editor .fmtbar{
   margin:.7rem 0;display:flex;gap:.4rem;align-items:center;position:sticky;top:-1.1rem;
   background:var(--e-bg);padding:.45rem 0;z-index:3;border-bottom:1px solid var(--e-line);flex-wrap:wrap;
@@ -866,6 +889,10 @@ dialog #coverBody .subhead:first-child{margin-top:.2rem}
 #editor .ed:focus{border-color:var(--e-accent)}
 #editor .ed-h3{font-weight:700}
 #editor .ed-h2{font-weight:700;font-size:calc(1.3rem * var(--tz,1))}
+/* The title and the headings are set in the magazine's heading face, as
+   they will be on the page. It has to come after .ed, which carries the
+   body face and would otherwise win on being later. */
+#editor .ed-title,#editor .ed-h2,#editor .ed-h3{font-family:var(--mag-head,var(--mag-body))}
 #editor .ed-quote{font-style:italic;border-inline-start:3px solid var(--e-line);border-radius:0 6px 6px 0}
 #editor .fig.is-icon .fig-thumb{
   width:auto;max-width:5rem;max-height:5rem;object-fit:contain;
@@ -1834,7 +1861,7 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
    when the file changes. It is unrelated to the database's own VERSION,
    which governs schema upgrades and must not be moved for a cosmetic
    change. */
-const APP_VERSION = '1.12';
+const APP_VERSION = '1.13';
 
 /* Nothing is imported at the top any more. The Firebase libraries are
    several hundred kilobytes and, loaded this way, the browser must fetch
@@ -2000,11 +2027,22 @@ const DEFAULT_DESIGN = {
    what can be promised in print, and each has its italic and its bold.
    Anything beyond them would mean carrying a font inside every PDF. */
 const FACES = {
-  serif:      { label:'Serif',      css:'"Liberation Serif","Times New Roman",Times,"Nimbus Roman","DejaVu Serif",serif' },
-  sans:       { label:'Sans',       css:'"Liberation Sans",Helvetica,Arial,"Nimbus Sans","DejaVu Sans",sans-serif' },
-  typewriter: { label:'Typewriter', css:'"Liberation Mono","Courier New",Courier,"Nimbus Mono PS",monospace' }
+  serif:      { label:'Serif' },
+  sans:       { label:'Sans' },
+  typewriter: { label:'Typewriter' }
 };
-const faceCss = (k) => (FACES[k] || FACES.serif).css;
+/* the stacks themselves live in one place, at the top of the stylesheet */
+const faceCss = (k) => 'var(--face-' + (FACES[k] ? k : 'serif') + ')';
+
+/* ---------- which of them a block is set in ----------
+   A face used to belong to the magazine and so to every word in it.
+   It belongs to the block now; a block that says nothing is set in
+   whatever the magazine says, which is what the two pickers in its
+   settings go on doing. */
+const FACE_KEYS = Object.keys(FACES);
+const faceOf = (b) => FACE_KEYS.includes(b && b.face) ? b.face : '';
+const faceClass = (b) => faceOf(b) ? 'ff-' + faceOf(b) : '';
+const faceFromEl = (n) => FACE_KEYS.find(k => n.classList.contains('ff-' + k)) || null;
 
 const esc = s => String(s == null ? '' : s)
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -2695,6 +2733,8 @@ function blockClass(b){
   if(alignOf(b) !== 'left') cls.push('al-' + alignOf(b));
   const sz = tsizeClass(b);
   if(sz) cls.push(sz);
+  const ff = faceClass(b);
+  if(ff) cls.push(ff);
   if(b && b.webOnly) cls.push('web-only');
   return cls;
 }
@@ -2710,7 +2750,8 @@ function blocksHtml(doc, fallbackBase){
      showing the article, so they do not go in twice. */
   const stand = headBlock(doc, 'stand');
   const standHtml = stand ? sanitizeInline(stand.html) : sanitizeInline(doc.standfirst || '');
-  if(standHtml) out.push(`<p class="standfirst${stand && tsizeClass(stand) ? ' ' + tsizeClass(stand) : ''}">${standHtml}</p>`);
+  const standCls = stand ? [tsizeClass(stand), faceClass(stand)].filter(Boolean).join(' ') : '';
+  if(standHtml) out.push(`<p class="standfirst${standCls ? ' ' + standCls : ''}">${standHtml}</p>`);
   for(const b of bodyBlocks(doc)){
     const al = alignAttr(b);
     if(b.t === 'p'){ const s = sanitizeInline(b.html); if(s) out.push(`<p${al}>${s}</p>`); }
@@ -2741,7 +2782,8 @@ function blocksFromHtml(html, base){
        left out when the issue is edited again */
     const web = n.classList.contains('web-only');
     const sz = tsizeFromEl(n);
-    const zz = sz ? { tsize: sz } : {};
+    const ff = faceFromEl(n);
+    const zz = Object.assign(sz ? { tsize: sz } : {}, ff ? { face: ff } : {});
     if(tag === 'p'){
       const s = sanitizeInline(n.innerHTML);
       if(!s) return;
@@ -3894,6 +3936,17 @@ function hitsMarkup(hits, params, showIssue){
 }
 
 /* ---------- an article ---------- */
+/* The title and the byline arrive as words without a wrapper — the
+   reader builds the heading itself — so the size and the face they were
+   given travel beside them and are put back on here. */
+const headCls = (size, face) =>
+  [size ? 'sz-' + esc(size) : '', face ? 'ff-' + esc(face) : ''].filter(Boolean)
+    .map(c => ' ' + c).join('');
+const headAttr = (size, face) => {
+  const c = headCls(size, face).trim();
+  return c ? ` class="${c}"` : '';
+};
+
 function railMarkup(num, currentId){
   const issue = Reader.issues[num];
   return issue.contents.map(c => {
@@ -3946,8 +3999,8 @@ function renderArticle(num, id, query, mode){
         <article class="art">
           <header>
             ${bare ? '' : `<button class="crumb" id="back">← ${esc(query ? S().backToResults : S().backToContents)}</button>`}
-            <h1${a.titleSize ? ` class="sz-${esc(a.titleSize)}"` : ''}>${a.titleHtml || esc(a.title)}</h1>
-            ${a.author ? `<p class="by${a.bylineSize ? ' sz-' + esc(a.bylineSize) : ''}">${a.authorHtml || esc(a.author)}</p>` : ''}
+            <h1${headAttr(a.titleSize, a.titleFace)}>${a.titleHtml || esc(a.title)}</h1>
+            ${a.author ? `<p class="by${headCls(a.bylineSize, a.bylineFace)}">${a.authorHtml || esc(a.author)}</p>` : ''}
             <p class="meta">${esc(bare
               ? (a.words ? `${a.words.toLocaleString()} words, about ${longSpan(mins(a.words))}. ${where}.`
                          : `${S().picturePage}. ${where}.`)
@@ -5022,21 +5075,23 @@ function magNote(m){
 function sideIssue(side){
   const m = curMag();
   const card = h('section', { class:'card' }, h('h2', { text:'Magazine' }));
-  if(m){
-    card.append(h('p', { class:'openmag', text: magLabel(m) }));
-    /* Everything this magazine is made of, a press away from its name
-       rather than behind the masthead menu. */
-    card.append(h('div', { class:'fp-row', style:'margin:.1rem 0 .35rem' },
-      h('button', { class:'btn small', onclick: () => openMagSettings(m) },
-        'Magazine settings…')));
-    card.append(h('p', { class:'hint', text: magNote(m) }));
-  }else{
-    card.append(h('p', { class:'hint', text: Object.keys(State.magazines).length
-      ? 'Nothing open. Select one, or start a new magazine.'
-      : 'No magazines yet. Start one, then fill it from the pool.' }));
-  }
-  card.append(h('div', { class:'fp-row' },
-    h('button', { class:'btn small', onclick: openMagPicker }, 'Select magazine…'),
+  if(m) card.append(h('p', { class:'openmag', text: magLabel(m) }));
+  else card.append(h('p', { class:'hint', text: Object.keys(State.magazines).length
+    ? 'Nothing open. Select one, or start a new magazine.'
+    : 'No magazines yet. Start one, then fill it from the pool.' }));
+  /* Choosing one is the press that comes first, so it is the one under
+     the name — and it is drawn whether or not a magazine is open, which
+     is when it is wanted most. */
+  card.append(h('div', { class:'fp-row', style:'margin:.1rem 0 .35rem' },
+    h('button', { class:'btn small', onclick: openMagPicker }, 'Select magazine…')));
+  if(m) card.append(h('p', { class:'hint', text: magNote(m) }));
+  /* Settings are about a magazine, so with none open there is nothing
+     for them to be about: grey rather than gone, since a button that
+     comes and goes is harder to find than one that waits. */
+  const set = h('button', { class:'btn small', onclick: () => { const c = curMag(); if(c) openMagSettings(c); } },
+    'Magazine settings…');
+  set.disabled = !m;
+  card.append(h('div', { class:'fp-row' }, set,
     h('button', { class:'btn small', onclick: () => openMagSettings(null) }, '+ New magazine')));
   side.append(card);
 }
@@ -5492,10 +5547,10 @@ function openPool(m){
 function sideSettings(side){
   const card = h('section', { class:'card' }, h('h2', { text:'Settings' }));
   const list = h('ol', { class:'alist' });
-  SPANE_LABEL.forEach(([k, label, note]) => {
+  SPANE_LABEL.forEach(([k, label]) => {
     list.append(h('li', { class: k === State.spane ? 'cur' : '' },
       h('button', { class:'at', onclick: () => { location.hash = '#editor/settings/' + k; } },
-        label, h('small', { text: note }))));
+        label)));
   });
   card.append(list);
   side.append(card);
@@ -5505,10 +5560,10 @@ function sideSettings(side){
       h('button', { class:'btn small ghost', onclick: () => { location.hash = '#editor/issue'; } }, 'The magazine'))));
 }
 const SPANE_LABEL = [
-  ['gallery','Image gallery','every photograph: the featured gallery, the icons, and what stays out'],
-  ['about','About page','a page beside the library'],
-  ['links','Links page','a page beside the library'],
-  ['account','Account & settings','who is signed in, and the archive']
+  ['gallery','Image gallery'],
+  ['about','About page'],
+  ['links','Links page'],
+  ['account','Account & settings']
 ];
 
 /* ---------- the icon set, and what stays out of the gallery ----------
@@ -5668,6 +5723,13 @@ const DESIGN_FIELDS = [
 function renderWork(){
   const work = $('#work');
   work.textContent = '';
+  /* The magazine's own faces, so a block that says nothing about its
+     face is written in the one it will be set in rather than in the
+     editor's default. A block that names a face overrides this, the
+     same way it does on the page. */
+  const D = designFor(curArt());
+  work.style.setProperty('--mag-body', faceCss(D.bodyFace));
+  work.style.setProperty('--mag-head', faceCss(D.headFace));
   if(ARTICLE_TAB(State.etab)) workArticle(work);
   else if(State.etab === 'settings'){
     if(State.spane === 'about' || State.spane === 'links') workPage(work);
@@ -5890,8 +5952,17 @@ function fmtBar(){
   });
   bar.append(sizes);
 
+  /* Three faces and a fourth choice — the magazine's own — which is one
+     too many for a row of buttons and exactly right for a list. */
+  const face = h('select', { class:'facesel', 'aria-label':'Typeface', title:'Typeface' });
+  face.append(h('option', { value:'', text:'Magazine face' }));
+  FACE_KEYS.forEach(k => face.append(h('option', { value:k, text: FACES[k].label })));
+  face.onmousedown = e => e.stopPropagation();
+  face.onchange = () => setFace(face.value);
+  bar.append(face);
+
   bar.append(h('span', { class:'hint', text:'Paste text and photographs straight in. Enter starts a new paragraph.' }));
-  setTimeout(() => { markAligns(); markTsizes(); }, 0);
+  setTimeout(() => { markAligns(); markTsizes(); markFace(); }, 0);
   return bar;
 }
 
@@ -5907,6 +5978,24 @@ function markAligns(){
   $$('#editor .aligns button').forEach(x =>
     x.setAttribute('aria-pressed', String(x.dataset.align === how)));
 }
+function markFace(){
+  const b = focusedBlock();
+  const sel = $('#editor .facesel');
+  if(sel) sel.value = b ? faceOf(b) : '';
+}
+function setFace(which){
+  const b = focusedBlock();
+  if(!b) return;
+  if(FACE_KEYS.includes(which)) b.face = which; else delete b.face;
+  saveDoc({ fast:true });
+  const ed = $(`.blk[data-id="${b.id}"] .ed`);
+  if(ed){
+    FACE_KEYS.forEach(k => ed.classList.remove('ff-' + k));
+    if(faceClass(b)) ed.classList.add(faceClass(b));
+  }
+  markFace();
+}
+
 function markTsizes(){
   const b = focusedBlock();
   const how = b ? tsizeOf(b) : 'm';
@@ -6068,7 +6157,7 @@ function blockNode(b){
 
 function textNode(b){
   const ed = h('div', { class:'ed ed-' + b.t + (alignOf(b) === 'left' ? '' : ' al-' + alignOf(b)) +
-      (tsizeClass(b) ? ' ' + tsizeClass(b) : ''),
+      (tsizeClass(b) ? ' ' + tsizeClass(b) : '') + (faceClass(b) ? ' ' + faceClass(b) : ''),
     contenteditable:'true', spellcheck:'true',
     role:'textbox', 'aria-multiline':'true',
     'aria-label': isHeadBlock(b) ? HEAD_LABEL[b.t] : (KINDS[b.t] || 'Text') });
@@ -6077,7 +6166,7 @@ function textNode(b){
   /* The buttons say what this paragraph is set to, so they have to be
      told when the cursor arrives in a different one — otherwise they go
      on showing the block that was last aligned by hand. */
-  ed.addEventListener('focus', () => { State.focusBlock = b.id; markAligns(); markTsizes(); });
+  ed.addEventListener('focus', () => { State.focusBlock = b.id; markAligns(); markTsizes(); markFace(); });
   ed.addEventListener('input', () => {
     b.html = (b.t === 'h2' || b.t === 'h3') ? escapeHtml(plainText(ed.innerHTML)) : sanitizeInline(ed.innerHTML);
     if(isHeadBlock(b)){
@@ -8302,6 +8391,7 @@ function blockEl(b, m, G){
       /* The PDF is written by reading the sizes the browser settled on,
          so a block set larger needs nothing here but the class. */
       if(tsizeClass(b)) el.classList.add(tsizeClass(b));
+      if(faceClass(b)) el.classList.add(faceClass(b));
     }
   }
   return el;
@@ -8344,8 +8434,12 @@ function headEl(art, G, full){
   const t = headHtml(art, 'title') || escapeHtml(art.title || '');
   const by = headHtml(art, 'byline') || escapeHtml(art.author || '');
   const st = headHtml(art, 'stand') || sanitizeInline(art.standfirst || '');
-  const hz = (which) => { const c = tsizeClass(headBlock(art, which)); return c ? ' ' + c : ''; };
-  const hc = (which) => { const c = tsizeClass(headBlock(art, which)); return c ? ` class="${c}"` : ''; };
+  const hcls = (which) => {
+    const b = headBlock(art, which);
+    return [tsizeClass(b), faceClass(b)].filter(Boolean).join(' ');
+  };
+  const hz = (which) => { const c = hcls(which); return c ? ' ' + c : ''; };
+  const hc = (which) => { const c = hcls(which); return c ? ` class="${c}"` : ''; };
   el.innerHTML = `<h1${hc('title')}>${t || 'Untitled'}</h1>` +
     (by ? `<div class="byline${hz('byline')}">${/^\s*by\b/i.test(plainText(by)) ? '' : 'By '}${by}</div>` : '') +
     (st ? `<p class="stand${hz('stand')}">${st}</p>` : '');
@@ -9338,6 +9432,8 @@ function articlePayload(a, m){
      not written yet, so their size travels beside them. */
   const titleSize = tsizeOf(headBlock(a, 'title'));
   const bylineSize = tsizeOf(headBlock(a, 'byline'));
+  const titleFace = faceOf(headBlock(a, 'title'));
+  const bylineFace = faceOf(headBlock(a, 'byline'));
   return {
     id: pubId(a),
     /* plain, for the contents, the search index and the window title */
@@ -9348,6 +9444,8 @@ function articlePayload(a, m){
     ...(authorHtml && authorHtml !== escapeHtml(a.author || '') ? { authorHtml } : {}),
     ...(titleSize !== 'm' ? { titleSize } : {}),
     ...(bylineSize !== 'm' ? { bylineSize } : {}),
+    ...(titleFace ? { titleFace } : {}),
+    ...(bylineFace ? { bylineFace } : {}),
     html,
     words: wordCount(html),
     /* so the contents can say why a piece is not in the printed issue */
