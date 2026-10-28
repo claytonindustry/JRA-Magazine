@@ -442,11 +442,26 @@ body{background:var(--paper)}
 }
 #reader .crumb:hover{color:var(--tanbark)}
 @container reader (min-width:64rem){ #reader .crumb{display:none} }
+/* ---------- how big the words in a block are ----------
+   One number, multiplied into whatever size the block would have had,
+   so the same five steps mean the right thing on a heading, on a
+   paragraph and on a title. It is registered rather than declared so
+   that it does not inherit: a quotation set large would otherwise hand
+   its multiplier to the paragraph inside it and be enlarged twice. */
+@property --tz{ syntax:'<number>'; inherits:false; initial-value:1 }
+.sz-xs{--tz:.8}
+.sz-s{--tz:.9}
+.sz-l{--tz:1.2}
+.sz-xl{--tz:1.45}
+/* and the same guard again in plain CSS, for anything that does not
+   know how to register a property */
+#reader .body blockquote p,.mag .mq p{--tz:1}
+
 #reader .art h1{
-  font-size:clamp(1.65rem,5cqi,2.4rem);font-weight:600;line-height:1.1;
+  font-size:calc(clamp(1.65rem,5cqi,2.4rem) * var(--tz,1));font-weight:600;line-height:1.1;
   letter-spacing:-.018em;margin:0 0 .6rem;text-wrap:balance;
 }
-#reader .art .by{font-family:var(--sans);font-size:.88rem;color:var(--brine);margin:0 0 .4rem}
+#reader .art .by{font-family:var(--sans);font-size:calc(.88rem * var(--tz,1));color:var(--brine);margin:0 0 .4rem}
 #reader .art .meta{
   font-family:var(--sans);font-size:.76rem;color:var(--brine);
   margin:0 0 2rem;padding-bottom:1.25rem;border-bottom:1px solid var(--rule);
@@ -460,20 +475,20 @@ body{background:var(--paper)}
 }
 #reader .body>*{grid-column:text-start/text-end;min-width:0}
 #reader .body>figure.wide{grid-column:text-start/media-end}
-#reader .body p{margin:0 0 1.15em;overflow-wrap:break-word}
+#reader .body p{margin:0 0 1.15em;overflow-wrap:break-word;font-size:calc(1em * var(--tz,1))}
 #reader .body h2,#reader .body h3,#reader .body h4{
   font-weight:600;line-height:1.2;letter-spacing:-.01em;margin:2.2em 0 .6em;
 }
 #reader .body>:first-child{margin-top:0}
-#reader .body h2{font-size:1.4em}
-#reader .body h3{font-size:1.18em}
+#reader .body h2{font-size:calc(1.4em * var(--tz,1))}
+#reader .body h3{font-size:calc(1.18em * var(--tz,1))}
 #reader .body h4{font-size:1.05em}
 #reader .body strong{font-weight:600}
 #reader .body em{font-style:italic}
-#reader .body blockquote{margin:1.6em 0;padding-inline-start:1.1em;border-inline-start:3px solid var(--rule);font-style:italic}
+#reader .body blockquote{margin:1.6em 0;padding-inline-start:1.1em;border-inline-start:3px solid var(--rule);font-style:italic;font-size:calc(1em * var(--tz,1))}
 #reader .body blockquote p{margin:0 0 .8em}
 #reader .body blockquote p:last-child{margin-bottom:0}
-#reader .body .standfirst{font-size:1.12em;line-height:1.5;font-style:italic;color:var(--brine)}
+#reader .body .standfirst{font-size:calc(1.12em * var(--tz,1));line-height:1.5;font-style:italic;color:var(--brine)}
 /* a word set the other way round inside an italic run */
 #reader .upright,.mag .upright,#editor .upright{font-style:normal}
 #reader .body figcaption .credit{font-style:normal}
@@ -797,10 +812,10 @@ dialog #coverBody .subhead:first-child{margin-top:.2rem}
    The faces and sizes they had as form fields, kept exactly, so the
    only thing that changed is that they can be written in. */
 #editor .ed-title{
-  font-size:1.5rem;font-family:var(--mag-body);font-style:italic;
+  font-size:calc(1.5rem * var(--tz,1));font-family:var(--mag-body);font-style:italic;
   line-height:1.3;padding:.4rem .5rem;
 }
-#editor .ed-byline{font-family:var(--ui);font-size:.98rem;line-height:1.4}
+#editor .ed-byline{font-family:var(--ui);font-size:calc(.98rem * var(--tz,1));line-height:1.4}
 #editor .ed-stand{font-style:italic;color:var(--e-ink);line-height:1.5}
 #editor .blk.t-title .kind,#editor .blk.t-byline .kind,#editor .blk.t-stand .kind{
   color:var(--e-muted);
@@ -817,6 +832,9 @@ dialog #coverBody .subhead:first-child{margin-top:.2rem}
 #editor .aligns{display:flex;gap:2px;margin-inline-start:.3rem}
 #editor .aligns button{min-width:1.9rem;line-height:1}
 #editor .aligns button[aria-pressed="true"]{background:var(--e-accent);color:var(--e-on-accent);border-color:var(--e-accent)}
+#editor .tsizes{display:flex;gap:2px;margin-inline-start:.3rem}
+#editor .tsizes button{min-width:2.1rem;line-height:1;font-size:.72rem;letter-spacing:.02em}
+#editor .tsizes button[aria-pressed="true"]{background:var(--e-accent);color:var(--e-on-accent);border-color:var(--e-accent)}
 #editor .fmtbar{
   margin:.7rem 0;display:flex;gap:.4rem;align-items:center;position:sticky;top:-1.1rem;
   background:var(--e-bg);padding:.45rem 0;z-index:3;border-bottom:1px solid var(--e-line);flex-wrap:wrap;
@@ -842,12 +860,12 @@ dialog #coverBody .subhead:first-child{margin-top:.2rem}
 #editor .ed.al-right{text-align:right}
 #editor .ed{
   min-height:1.5em;padding:.3rem .5rem;border:1px solid transparent;border-radius:6px;
-  outline:none;font-family:var(--mag-body);font-size:1.08rem;line-height:1.55;
+  outline:none;font-family:var(--mag-body);font-size:calc(1.08rem * var(--tz,1));line-height:1.55;
   background:#fff;overflow-wrap:anywhere;
 }
 #editor .ed:focus{border-color:var(--e-accent)}
 #editor .ed-h3{font-weight:700}
-#editor .ed-h2{font-weight:700;font-size:1.3rem}
+#editor .ed-h2{font-weight:700;font-size:calc(1.3rem * var(--tz,1))}
 #editor .ed-quote{font-style:italic;border-inline-start:3px solid var(--e-line);border-radius:0 6px 6px 0}
 #editor .fig.is-icon .fig-thumb{
   width:auto;max-width:5rem;max-height:5rem;object-fit:contain;
@@ -1354,15 +1372,16 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
 .mag .cols{display:flex;align-items:flex-start}
 .mag .col{display:flow-root;overflow:hidden;flex:none;position:relative}
 .mag p{margin:0}
-.mag .mp{text-indent:1.15em;text-align:justify;hyphens:auto;-webkit-hyphens:auto;hyphenate-limit-chars:6 3 3}
+.mag .mp{font-size:calc(1em * var(--tz,1));line-height:calc(var(--lh) * var(--tz,1));text-indent:1.15em;text-align:justify;hyphens:auto;-webkit-hyphens:auto;hyphenate-limit-chars:6 3 3}
 .mag .mp.first,.mag .mp.cont,.mag .mq.cont{text-indent:0}
 .mag .al-center{text-align:center}
 .mag .al-right{text-align:right}
 .mag .brk{text-align-last:justify}
 .mag h1,.mag h2,.mag h3,.mag .mast-title,.mag .chead,.mag .ahead h1{font-family:var(--mag-head,var(--mag-body))}
-.mag .mh2{font-size:1.5em;line-height:2em;font-weight:700;margin:2em 0 0;text-indent:0}
-.mag .mh3{font-size:1em;line-height:var(--lh);font-weight:700;margin:var(--lh) 0 0;text-indent:0}
+.mag .mh2{font-size:calc(1.5em * var(--tz,1));line-height:2em;font-weight:700;margin:2em 0 0;text-indent:0}
+.mag .mh3{font-size:calc(1em * var(--tz,1));line-height:calc(var(--lh) * var(--tz,1));font-weight:700;margin:var(--lh) 0 0;text-indent:0}
 .mag .mq{
+  font-size:calc(1em * var(--tz,1));line-height:calc(var(--lh) * var(--tz,1));
   margin:var(--lh) 0 0;padding-inline-start:12px;border-inline-start:2px solid #7f95a3;
   font-style:italic;text-align:left;hyphens:auto;-webkit-hyphens:auto;
 }
@@ -1384,11 +1403,11 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
 .mag .credit{font-style:normal;color:#5b6770}
 .mag a{color:inherit;text-decoration:none}
 .mag .ahead{text-align:center;padding-bottom:7px;border-bottom:1px solid #2f4b5c;overflow:hidden}
-.mag .ahead h1{font-weight:400;font-style:italic;font-size:2.9em;line-height:1.14em;margin:0 0 6px;hyphens:manual}
+.mag .ahead h1{font-weight:400;font-style:italic;font-size:calc(2.9em * var(--tz,1));line-height:1.14em;margin:0 0 6px;hyphens:manual}
 .mag .ahead-col{text-align:start}
-.mag .ahead-col h1{font-size:1.8em;line-height:1.1em}
-.mag .byline{font-size:.8em;line-height:1.6em;letter-spacing:.14em;text-transform:uppercase;color:#2f5878}
-.mag .stand{font-style:italic;line-height:var(--lh);margin:6px auto 0;max-width:34em}
+.mag .ahead-col h1{font-size:calc(1.8em * var(--tz,1));line-height:1.1em}
+.mag .byline{font-size:calc(.8em * var(--tz,1));line-height:1.6em;letter-spacing:.14em;text-transform:uppercase;color:#2f5878}
+.mag .stand{font-style:italic;font-size:calc(1em * var(--tz,1));line-height:calc(var(--lh) * var(--tz,1));margin:6px auto 0;max-width:34em}
 .mag .pfoot{
   position:absolute;display:flex;justify-content:space-between;
   font-size:10.5px;line-height:13px;color:#4c5961;border-top:.6px solid #8a969d;padding-top:3px;
@@ -1815,7 +1834,7 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
    when the file changes. It is unrelated to the database's own VERSION,
    which governs schema upgrades and must not be moved for a cosmetic
    change. */
-const APP_VERSION = '1.11';
+const APP_VERSION = '1.12';
 
 /* Nothing is imported at the top any more. The Firebase libraries are
    several hundred kilobytes and, loaded this way, the browser must fetch
@@ -2655,9 +2674,27 @@ const headHtml = (a, t) => {
   return b ? sanitizeInline(b.html) : '';
 };
 
+/* ---------- how big the words in a block are ----------
+   Five steps either side of the size the block would have been, rather
+   than five sizes: a heading set large is large for a heading, and a
+   paragraph set large is large for a paragraph, so the one never turns
+   into the other. M is the size it always was and writes nothing down.
+
+   `size' was already taken — a photograph and a film use it for the
+   width of the column they stand in — so the key is its own. */
+const TSIZES = ['xs','s','m','l','xl'];
+const TSIZE_LABEL = { xs:'XS', s:'S', m:'M', l:'L', xl:'XL' };
+const tsizeOf = (b) => TSIZES.includes(b && b.tsize) ? b.tsize : 'm';
+const tsizeClass = (b) => tsizeOf(b) === 'm' ? '' : 'sz-' + tsizeOf(b);
+/* read back off markup, so an issue edited again keeps its sizes */
+const tsizeFromEl = (n) =>
+  TSIZES.find(k => k !== 'm' && n.classList.contains('sz-' + k)) || null;
+
 function blockClass(b){
   const cls = [];
   if(alignOf(b) !== 'left') cls.push('al-' + alignOf(b));
+  const sz = tsizeClass(b);
+  if(sz) cls.push(sz);
   if(b && b.webOnly) cls.push('web-only');
   return cls;
 }
@@ -2673,7 +2710,7 @@ function blocksHtml(doc, fallbackBase){
      showing the article, so they do not go in twice. */
   const stand = headBlock(doc, 'stand');
   const standHtml = stand ? sanitizeInline(stand.html) : sanitizeInline(doc.standfirst || '');
-  if(standHtml) out.push(`<p class="standfirst">${standHtml}</p>`);
+  if(standHtml) out.push(`<p class="standfirst${stand && tsizeClass(stand) ? ' ' + tsizeClass(stand) : ''}">${standHtml}</p>`);
   for(const b of bodyBlocks(doc)){
     const al = alignAttr(b);
     if(b.t === 'p'){ const s = sanitizeInline(b.html); if(s) out.push(`<p${al}>${s}</p>`); }
@@ -2703,17 +2740,19 @@ function blocksFromHtml(html, base){
     /* kept on the markup so a block left out of the printed issue stays
        left out when the issue is edited again */
     const web = n.classList.contains('web-only');
+    const sz = tsizeFromEl(n);
+    const zz = sz ? { tsize: sz } : {};
     if(tag === 'p'){
       const s = sanitizeInline(n.innerHTML);
       if(!s) return;
       if(n.classList.contains('standfirst')) standfirst = s;
-      else blocks.push({ id: uid('b'), t: 'p', html: s, align: al, webOnly: web });
+      else blocks.push({ id: uid('b'), t: 'p', html: s, align: al, webOnly: web, ...zz });
     }else if(tag === 'h1' || tag === 'h2'){
-      blocks.push({ id: uid('b'), t: 'h2', html: escapeHtml(plainText(n.innerHTML)), align: al, webOnly: web });
+      blocks.push({ id: uid('b'), t: 'h2', html: escapeHtml(plainText(n.innerHTML)), align: al, webOnly: web, ...zz });
     }else if(tag === 'h3' || tag === 'h4'){
-      blocks.push({ id: uid('b'), t: 'h3', html: escapeHtml(plainText(n.innerHTML)), align: al, webOnly: web });
+      blocks.push({ id: uid('b'), t: 'h3', html: escapeHtml(plainText(n.innerHTML)), align: al, webOnly: web, ...zz });
     }else if(tag === 'blockquote'){
-      blocks.push({ id: uid('b'), t: 'quote', html: sanitizeInline(n.innerHTML), align: al, webOnly: web });
+      blocks.push({ id: uid('b'), t: 'quote', html: sanitizeInline(n.innerHTML), align: al, webOnly: web, ...zz });
     }else if(tag === 'figure' && n.classList.contains('video') && n.dataset.vid){
       /* A video carries what it is on the tag itself, so an issue edited
          a year from now still knows which film this was. */
@@ -3907,8 +3946,8 @@ function renderArticle(num, id, query, mode){
         <article class="art">
           <header>
             ${bare ? '' : `<button class="crumb" id="back">← ${esc(query ? S().backToResults : S().backToContents)}</button>`}
-            <h1>${a.titleHtml || esc(a.title)}</h1>
-            ${a.author ? `<p class="by">${a.authorHtml || esc(a.author)}</p>` : ''}
+            <h1${a.titleSize ? ` class="sz-${esc(a.titleSize)}"` : ''}>${a.titleHtml || esc(a.title)}</h1>
+            ${a.author ? `<p class="by${a.bylineSize ? ' sz-' + esc(a.bylineSize) : ''}">${a.authorHtml || esc(a.author)}</p>` : ''}
             <p class="meta">${esc(bare
               ? (a.words ? `${a.words.toLocaleString()} words, about ${longSpan(mins(a.words))}. ${where}.`
                          : `${S().picturePage}. ${where}.`)
@@ -5836,8 +5875,23 @@ function fmtBar(){
       group.append(b);
     });
   bar.append(group);
+
+  /* Size belongs to the paragraph in the same way alignment does, and is
+     set from the same place — including on the title, which is a block
+     like any other and takes the cursor like one. */
+  const sizes = h('div', { class:'tsizes', role:'group', 'aria-label':'Text size' });
+  TSIZES.forEach(k => {
+    const b = h('button', { class:'btn small', text: TSIZE_LABEL[k],
+      title: k === 'm' ? 'The size it would be' : 'Text size ' + TSIZE_LABEL[k] });
+    b.dataset.tz = k;
+    b.onmousedown = e => e.preventDefault();
+    b.onclick = () => setTsize(k);
+    sizes.append(b);
+  });
+  bar.append(sizes);
+
   bar.append(h('span', { class:'hint', text:'Paste text and photographs straight in. Enter starts a new paragraph.' }));
-  setTimeout(markAligns, 0);
+  setTimeout(() => { markAligns(); markTsizes(); }, 0);
   return bar;
 }
 
@@ -5853,6 +5907,25 @@ function markAligns(){
   $$('#editor .aligns button').forEach(x =>
     x.setAttribute('aria-pressed', String(x.dataset.align === how)));
 }
+function markTsizes(){
+  const b = focusedBlock();
+  const how = b ? tsizeOf(b) : 'm';
+  $$('#editor .tsizes button').forEach(x =>
+    x.setAttribute('aria-pressed', String(x.dataset.tz === how)));
+}
+function setTsize(how){
+  const b = focusedBlock();
+  if(!b) return;
+  if(how === 'm') delete b.tsize; else b.tsize = how;
+  saveDoc({ fast:true });
+  const ed = $(`.blk[data-id="${b.id}"] .ed`);
+  if(ed){
+    TSIZES.forEach(k => ed.classList.remove('sz-' + k));
+    if(tsizeClass(b)) ed.classList.add(tsizeClass(b));
+  }
+  markTsizes();
+}
+
 function setAlign(how){
   const b = focusedBlock();
   if(!b) return;
@@ -5994,7 +6067,8 @@ function blockNode(b){
 }
 
 function textNode(b){
-  const ed = h('div', { class:'ed ed-' + b.t + (alignOf(b) === 'left' ? '' : ' al-' + alignOf(b)),
+  const ed = h('div', { class:'ed ed-' + b.t + (alignOf(b) === 'left' ? '' : ' al-' + alignOf(b)) +
+      (tsizeClass(b) ? ' ' + tsizeClass(b) : ''),
     contenteditable:'true', spellcheck:'true',
     role:'textbox', 'aria-multiline':'true',
     'aria-label': isHeadBlock(b) ? HEAD_LABEL[b.t] : (KINDS[b.t] || 'Text') });
@@ -6003,7 +6077,7 @@ function textNode(b){
   /* The buttons say what this paragraph is set to, so they have to be
      told when the cursor arrives in a different one — otherwise they go
      on showing the block that was last aligned by hand. */
-  ed.addEventListener('focus', () => { State.focusBlock = b.id; markAligns(); });
+  ed.addEventListener('focus', () => { State.focusBlock = b.id; markAligns(); markTsizes(); });
   ed.addEventListener('input', () => {
     b.html = (b.t === 'h2' || b.t === 'h3') ? escapeHtml(plainText(ed.innerHTML)) : sanitizeInline(ed.innerHTML);
     if(isHeadBlock(b)){
@@ -8223,7 +8297,12 @@ function blockEl(b, m, G){
   }
   if(el){
     el.dataset.b = b.id;
-    if(b.t !== 'fig' && b.t !== 'video' && alignOf(b) !== 'left') el.classList.add('al-' + alignOf(b));
+    if(b.t !== 'fig' && b.t !== 'video'){
+      if(alignOf(b) !== 'left') el.classList.add('al-' + alignOf(b));
+      /* The PDF is written by reading the sizes the browser settled on,
+         so a block set larger needs nothing here but the class. */
+      if(tsizeClass(b)) el.classList.add(tsizeClass(b));
+    }
   }
   return el;
 }
@@ -8265,9 +8344,11 @@ function headEl(art, G, full){
   const t = headHtml(art, 'title') || escapeHtml(art.title || '');
   const by = headHtml(art, 'byline') || escapeHtml(art.author || '');
   const st = headHtml(art, 'stand') || sanitizeInline(art.standfirst || '');
-  el.innerHTML = `<h1>${t || 'Untitled'}</h1>` +
-    (by ? `<div class="byline">${/^\s*by\b/i.test(plainText(by)) ? '' : 'By '}${by}</div>` : '') +
-    (st ? `<p class="stand">${st}</p>` : '');
+  const hz = (which) => { const c = tsizeClass(headBlock(art, which)); return c ? ' ' + c : ''; };
+  const hc = (which) => { const c = tsizeClass(headBlock(art, which)); return c ? ` class="${c}"` : ''; };
+  el.innerHTML = `<h1${hc('title')}>${t || 'Untitled'}</h1>` +
+    (by ? `<div class="byline${hz('byline')}">${/^\s*by\b/i.test(plainText(by)) ? '' : 'By '}${by}</div>` : '') +
+    (st ? `<p class="stand${hz('stand')}">${st}</p>` : '');
   return el;
 }
 
@@ -9252,6 +9333,11 @@ function articlePayload(a, m){
   const html = blocksHtml(a, m.mediaBase);
   const titleHtml = headHtml(a, 'title');
   const authorHtml = headHtml(a, 'byline');
+  /* The title and the byline are the only words a reader draws rather
+     than receives: both arrive as the inside of a heading this file has
+     not written yet, so their size travels beside them. */
+  const titleSize = tsizeOf(headBlock(a, 'title'));
+  const bylineSize = tsizeOf(headBlock(a, 'byline'));
   return {
     id: pubId(a),
     /* plain, for the contents, the search index and the window title */
@@ -9260,6 +9346,8 @@ function articlePayload(a, m){
     /* and as it was written, for the article's own page */
     ...(titleHtml && titleHtml !== escapeHtml(a.title || '') ? { titleHtml } : {}),
     ...(authorHtml && authorHtml !== escapeHtml(a.author || '') ? { authorHtml } : {}),
+    ...(titleSize !== 'm' ? { titleSize } : {}),
+    ...(bylineSize !== 'm' ? { bylineSize } : {}),
     html,
     words: wordCount(html),
     /* so the contents can say why a piece is not in the printed issue */
