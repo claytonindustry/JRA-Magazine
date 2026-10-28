@@ -1423,7 +1423,16 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
 .mag .al-right{text-align:right}
 .mag .brk{text-align-last:justify}
 .mag h1,.mag h2,.mag h3,.mag .mast-title,.mag .chead,.mag .ahead h1{font-family:var(--mag-head,var(--mag-body))}
-.mag .mh2{font-size:calc(1.5em * var(--tz,1));line-height:2em;font-weight:700;margin:2em 0 0;text-indent:0}
+/* Led and spaced by the page's own rule rather than by its own size: a
+   heading set in ems stood two and a third rules high, so everything
+   below it sat between the rules of the column beside it, and the
+   column it fell at the foot of lost a line. Two rules is a little
+   tighter than two ems and holds the grid at every size a heading can
+   be set in. */
+.mag .mh2{
+  font-size:calc(1.5em * var(--tz,1));line-height:calc(var(--lh) * 2);
+  font-weight:700;margin:calc(var(--lh) * 2) 0 0;text-indent:0;
+}
 .mag .mh3{font-size:calc(1em * var(--tz,1));line-height:calc(var(--lh) * var(--tz,1));font-weight:700;margin:var(--lh) 0 0;text-indent:0}
 .mag .mq{
   font-size:calc(1em * var(--tz,1));line-height:calc(var(--lh) * var(--tz,1));
@@ -1879,7 +1888,7 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
    when the file changes. It is unrelated to the database's own VERSION,
    which governs schema upgrades and must not be moved for a cosmetic
    change. */
-const APP_VERSION = '1.14';
+const APP_VERSION = '1.15';
 
 /* Nothing is imported at the top any more. The Firebase libraries are
    several hundred kilobytes and, loaded this way, the browser must fetch
@@ -8569,12 +8578,19 @@ Flow.prototype.startArticle = function(art){
   }
   this.starts[art.id] = this.pages.length;      // 1-based among body pages
 };
+/* The page is ruled at a fixed leading and everything is placed by the
+   rule. How many rules a block stands in has to be rounded up: rounded
+   to the nearest, a block of two rules and a third was given two, and
+   the column — which hides what will not fit — cut the last line
+   through the middle. A photograph has always been rounded up; this is
+   the same sum, and the same hair's breadth taken off first so that a
+   block exactly on the rule is not given a spare one. */
 Flow.prototype.placeText = function(el){
   const lh = this.G.lh;
   this.meas.appendChild(el);
   const mt = marginTop(el);
   for(let guard = 0; guard < 500; guard++){
-    const n = Math.round(hOf(el) / lh);
+    const n = Math.ceil((hOf(el) - 0.01) / lh);
     const avail = this.room() - (this.col().used === 0 ? 0 : mt);
     const fit = Math.floor(avail / lh + 1e-6);
     if(n <= fit){ this.put(el, n * lh, mt); return; }
@@ -8589,7 +8605,7 @@ Flow.prototype.placeText = function(el){
       pair = splitAt(el, o);
       if(!pair) break;
       this.meas.appendChild(pair[0]);
-      const got = Math.round(hOf(pair[0]) / lh);
+      const got = Math.ceil((hOf(pair[0]) - 0.01) / lh);
       if(got <= k){ k = got; break; }
       this.meas.removeChild(pair[0]);
       pair = null;
