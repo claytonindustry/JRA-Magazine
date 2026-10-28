@@ -739,6 +739,10 @@ body{background:var(--paper)}
 #editor .alist .at small{display:block;color:var(--e-muted);font-size:.72rem}
 #editor .alist .mini{border:0;background:none;cursor:pointer;color:var(--e-muted);padding:.1rem .22rem;border-radius:4px}
 #editor .alist .mini:hover{background:#fff;color:var(--e-ink)}
+/* Deleting is not taking out of an issue, and the same mark for both in
+   two lists side by side is a misreading waiting to happen. */
+#editor .alist .mini.danger{color:#b3261e}
+#editor .alist .mini.danger:hover{background:#fbeae9;color:#8c1d16}
 
 /* the articles in this issue: number, title, and the small tools that
    only appear when you are on the row */
@@ -820,8 +824,11 @@ dialog #coverBody .subhead:first-child{margin-top:.2rem}
 
 /* The editor is a pane of the split now rather than the whole of the main
    area, so it is sized by the grid around it and scrolls inside itself. */
-#editor .work{overflow:auto;padding:1.1rem 1rem 5rem;min-width:0;min-height:0}
-#editor .sheet{max-width:46rem;margin:0 auto}
+#editor .work{overflow:auto;padding:1.1rem 1rem 0;min-width:0;min-height:0}
+/* The room at the end of a document belongs to the document, not to
+   the pane it scrolls in: a bar stuck to the foot measures from the
+   pane's padding box, and padding there would hold it that far up. */
+#editor .sheet{max-width:46rem;margin:0 auto;padding-bottom:5rem}
 #editor .art-head .row label{flex:0 0 auto}
 /* ---- the article's header, now three blocks like any other ----
    The faces and sizes they had as form fields, kept exactly, so the
@@ -960,7 +967,18 @@ dialog .figctl .btn[aria-pressed="true"],
 #editor .blk.webonly .kind::after{content:" · web";color:var(--e-muted);font-size:.78em}
 #editor .tools button.on{background:var(--e-accent);color:#fff;border-color:var(--e-accent)}
 #editor .fig input{margin-top:.3rem}
-#editor .addbar{margin:.9rem 0 0;display:flex;gap:.4rem;flex-wrap:wrap}
+/* The foot of the screen, the way the format bar is its head: it stays
+   in reach however long the article is, and what it adds goes in where
+   the cursor is rather than at the end. It is in the flow rather than
+   over it, so when the article runs out the bar settles under the last
+   block instead of covering it. */
+#editor .addbar{
+  position:sticky;bottom:0;z-index:3;
+  margin:.9rem 0 0;display:flex;gap:.4rem;flex-wrap:wrap;
+  background:var(--e-bg);padding:.5rem 0;border-top:1px solid var(--e-line);
+}
+/* so a block added or walked to does not come to rest under the bar */
+#editor .blk{scroll-margin-bottom:4.5rem}
 #editor .work.drag{outline:3px dashed var(--e-accent);outline-offset:-10px}
 
 
@@ -1861,7 +1879,7 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
    when the file changes. It is unrelated to the database's own VERSION,
    which governs schema upgrades and must not be moved for a cosmetic
    change. */
-const APP_VERSION = '1.13';
+const APP_VERSION = '1.14';
 
 /* Nothing is imported at the top any more. The Firebase libraries are
    several hundred kilobytes and, loaded this way, the browser must fetch
@@ -2879,6 +2897,11 @@ const State = {
      asked for: the two whole-screen views are the ordinary way to look
      at a magazine, and the split is the extra. */
   pvOff: { issue:true },
+  /* the block the next thing added goes after: the one last written in
+     or pressed on, of whatever kind. Kept apart from focusBlock, which
+     the format buttons read and which only ever means a block with
+     words in it. */
+  atBlock: null,
   /* the article each tab had open, and where you were in it, so
      crossing between them comes back to where you were */
   lastArticle: { write:null, issue:null },
@@ -5016,7 +5039,14 @@ function sidePool(side){
   const list = h('ol', { class:'alist arts' });
   if(!pool.length) list.append(h('li', {}, h('span', { class:'hint',
     text: 'Nothing waiting. Start one, and it stays here until you put it in an issue.' })));
-  pool.forEach(a => list.append(artRow(a, {})));
+  /* The magazine's list has a ✕ that takes an article out of the issue.
+     This one deletes it, which is the only thing left to do to a piece
+     nothing holds — so it is marked as the different thing it is. */
+  pool.forEach(a => list.append(artRow(a, {
+    tools: () => h('span', { class:'rowtools' },
+      h('button', { class:'mini danger', title:'Delete this article',
+        onclick: () => deleteArticle(a) }, '\u2715'))
+  })));
   card.append(list);
 
   card.append(h('div', { class:'fp-row' },
@@ -5850,39 +5880,13 @@ function workArticle(work){
   s.append(blocks);
   s.append(addBar());
 
-  // what happens to this article next
-  const foot = h('section', { class:'card', style:'margin-top:1.4rem' }, h('h2', { text:'This article' }));
-  const mag = a.magazine && State.magazines[a.magazine];
-  if(!a.publishedIn){
-    foot.append(h('p', { class:'hint',
-      text: mag
-        ? `In issue ${mag.num || '—'} (${mag.month} ${mag.year}), not yet published.`
-        : 'Waiting in the pool. It is written and saved; it is not in a magazine yet.' }));
-    /* Placing it is the next thing you want from here, so it is here
-       rather than only on the issue's own screen. There is no longer a
-       "see how it looks": it is looking at you from the other half. */
-    /* An article moves between magazines by going back to the pool and
-       being added to the other one, which is one road rather than two
-       and leaves nothing to explain. */
-    /* An article in the pool is put into a magazine from the magazine's
-       own side panel, where the list it is joining is in front of you.
-       There was a second way in from here, and it never opened. */
-    if(mag){
-      foot.append(h('div', { class:'fp-row' }, h('button', { class:'btn small',
-        title:'Take it out of the magazine; the article itself is kept',
-        onclick: () => unplaceArticle(a, mag) }, 'Back to the pool')));
-    }
-  }else{
-    foot.append(h('p', { class:'hint' },
-      `Published in issue ${a.publishedIn} on ${niceDate(a.publishedAt)}.` +
-      (a.correctedAt ? ` Corrected ${niceDate(a.correctedAt)}.` : '')));
-    foot.append(h('button', { class:'btn', onclick: () => republishArticle(a) }, 'Republish correction'));
-    foot.append(h('p', { class:'hint', text:'The issue keeps its place on the shelf; only this article is rewritten, and it carries the date of the correction.' }));
-  }
-  foot.append(h('div', { class:'fp-row', style:'margin-top:.8rem' },
-    h('button', { class:'btn small danger', onclick: () => deleteArticle(a) }, 'Delete article')));
-  s.append(foot);
-
+  /* There was a card here saying what became of this article, with a
+     button to take it back to the pool, one to send a correction, and
+     one to delete it. Each of the three is a press away in the list it
+     belongs to — the ✕ beside it in a magazine takes it out, the ✕
+     beside it in the pool deletes it, and a correction goes out with the
+     issue — and the card stood between the last paragraph and the bar
+     that adds the next one. */
   work.append(s);
   renderBlocks();
 }
@@ -5966,6 +5970,28 @@ function fmtBar(){
   return bar;
 }
 
+/* Where the foot of the screen adds things. Nothing when the cursor has
+   not been anywhere in this article, so the bar then adds to the end as
+   it always did. */
+function insertPoint(){
+  const doc = curDoc();
+  if(!doc) return null;
+  return arr(doc.blocks).find(b => b.id === State.atBlock) || null;
+}
+/* Added where you are, or at the end when you are nowhere. insertAfter
+   knows that below a part of the header means below the whole of it. */
+function addBlockHere(proto, focus){
+  const d = curDoc();
+  if(!d) return null;
+  const at = insertPoint();
+  if(at) return insertAfter(at, proto, focus);
+  const nb = Object.assign({ id: uid('b') }, proto);
+  d.blocks = arr(d.blocks).concat([nb]);
+  renderBlocks(focus ? nb.id : null, 0);
+  saveDoc({ fast:true });
+  return nb;
+}
+
 function focusedBlock(){
   const doc = curDoc();
   if(!doc) return null;
@@ -6025,24 +6051,21 @@ function setAlign(how){
   markAligns();
 }
 
+/* The bar stays at the foot of the screen, and what it adds goes where
+   you are rather than at the end of the article — so a photograph can be
+   put in the middle of a piece without walking it up with the arrows. */
 function addBar(){
   const bar = h('div', { class:'addbar' });
   [['p','+ Paragraph'],['h2','+ Heading'],['h3','+ Subheading'],['quote','+ Quote']].forEach(([t, label]) => {
-    bar.append(h('button', { class:'btn small', onclick: () => {
-      const d = curDoc();
-      if(!d) return;
-      const nb = { id: uid('b'), t, html:'' };
-      d.blocks = arr(d.blocks).concat([nb]);
-      renderBlocks(nb.id, 0);
-      saveDoc({ fast:true });
-    } }, label));
+    bar.append(h('button', { class:'btn small',
+      onclick: () => addBlockHere({ t, html:'' }, true) }, label));
   });
   /* One button for a photograph, wherever it is coming from — and a
      separate one for an icon, which is a different kind of thing and was
      confusing as a third tab behind the same button. */
-  bar.append(h('button', { class:'btn small', onclick: () => openAdd(null) }, '+ Photo…'));
-  bar.append(h('button', { class:'btn small', onclick: () => openAdd(null, { icons:true }) }, '+ Icon…'));
-  bar.append(h('button', { class:'btn small', onclick: () => addVideo(null) }, '+ Video…'));
+  bar.append(h('button', { class:'btn small', onclick: () => openAdd(insertPoint()) }, '+ Photo…'));
+  bar.append(h('button', { class:'btn small', onclick: () => openAdd(insertPoint(), { icons:true }) }, '+ Icon…'));
+  bar.append(h('button', { class:'btn small', onclick: () => addVideo(insertPoint()) }, '+ Video…'));
   return bar;
 }
 
@@ -6059,7 +6082,12 @@ async function addVideo(after){
                url: String(url).trim(), poster: '', size:'col', print:'poster',
                caption:'', credit:'' };
   const blocks = arr(doc.blocks);
-  blocks.splice(after ? blocks.indexOf(after) + 1 : blocks.length, 0, nb);
+  /* below a part of the header means below the whole of it, the same
+     rule a paragraph and a photograph are placed by */
+  const at = after
+    ? (isHeadBlock(after) ? blocks.filter(isHeadBlock).length : blocks.indexOf(after) + 1)
+    : blocks.length;
+  blocks.splice(at, 0, nb);
   doc.blocks = blocks;
   renderBlocks(nb.id);
   saveDoc({ fast:true });
@@ -6109,6 +6137,10 @@ function renderBlocks(focusId, where){
 
 function blockNode(b){
   const row = h('div', { class:'blk t-' + b.t + (isWebOnly(b) ? ' webonly' : ''), 'data-id': b.id });
+  /* A photograph has no words to put a cursor in, so pressing anywhere
+     on a row is what marks it as the place the next thing goes. Before
+     focus, so it holds for the kinds that never take it. */
+  row.addEventListener('mousedown', () => { State.atBlock = b.id; });
   if(isHeadBlock(b)) row.append(h('div', { class:'kind kind-head', text: HEAD_LABEL[b.t] }));
   else if(b.t === 'fig') row.append(h('div', { class:'kind', text:'▣ Photo', style:'padding-top:.5rem' }));
   else if(b.t === 'video') row.append(h('div', { class:'kind', text:'▶ Video', style:'padding-top:.5rem' }));
@@ -6166,7 +6198,10 @@ function textNode(b){
   /* The buttons say what this paragraph is set to, so they have to be
      told when the cursor arrives in a different one — otherwise they go
      on showing the block that was last aligned by hand. */
-  ed.addEventListener('focus', () => { State.focusBlock = b.id; markAligns(); markTsizes(); markFace(); });
+  ed.addEventListener('focus', () => {
+    State.focusBlock = b.id; State.atBlock = b.id;
+    markAligns(); markTsizes(); markFace();
+  });
   ed.addEventListener('input', () => {
     b.html = (b.t === 'h2' || b.t === 'h3') ? escapeHtml(plainText(ed.innerHTML)) : sanitizeInline(ed.innerHTML);
     if(isHeadBlock(b)){
@@ -7661,17 +7696,27 @@ const galleryAtStamp = () => gallerySet().map(e => e.key + ':' + (e.cap || '')).
    all. It is treated as having corrections waiting — the same way the
    gallery treats a missing one — because offering a publish that turns
    out to be unnecessary is a smaller fault than hiding one that was. */
-function magStamp(m){
-  const built = buildIssue(m);
-  const text = JSON.stringify([built.issue, built.card]);
-  /* FNV-1a, so the record carries a short string rather than the issue
-     over again. */
+/* FNV-1a, so a record carries a short string rather than its contents
+   over again. */
+function stampOf(text){
   let h = 0x811c9dc5;
   for(let i = 0; i < text.length; i++){
     h ^= text.charCodeAt(i);
     h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0;
   }
   return text.length.toString(36) + ':' + h.toString(36);
+}
+function magStamp(m){
+  const built = buildIssue(m);
+  return stampOf(JSON.stringify([built.issue, built.card]));
+}
+/* One article as it would go out. The date of a correction is left out
+   of what is weighed, or stamping one would itself look like a change
+   and every issue would correct itself for ever. */
+function artStamp(a, m){
+  const pay = articlePayload(a, m);
+  delete pay.correctedAt;
+  return stampOf(JSON.stringify(pay));
 }
 function magIsStale(m){
   if(!m || !m.published) return false;
@@ -9861,6 +9906,21 @@ function openPublish(){
 async function doPublish(m){
   try{
     await busy('Publishing…');
+    const now = Date.now();
+    /* An article that has been out before and reads differently now is
+       a correction, and readers are told the date of it. This is worked
+       out before the issue is built, so the date goes out inside the
+       article rather than waiting for the next publication. An article
+       published for the first time, or arriving from another issue, is
+       not a correction: it is simply new here. */
+    const prevNum = String(m.publishedNum || '');
+    magArticles(m).forEach(a => {
+      const was = a.publishedStamp;
+      const now_ = artStamp(a, m);
+      if(was && was !== now_ && String(a.publishedIn || '') === prevNum && prevNum)
+        a.correctedAt = now;
+      a.pendingStamp = now_;
+    });
     const built = buildIssue(m);
     const num = built.num;
 
@@ -9880,7 +9940,6 @@ async function doPublish(m){
        issue does, without a second press anywhere. */
     await publishGallery({ quiet:true });
 
-    const now = Date.now();
     m.published = true;
     m.publishedAt = m.publishedAt || now;
     m.publishedNum = num;
@@ -9893,6 +9952,9 @@ async function doPublish(m){
       a.status = 'published';
       a.publishedIn = num;
       a.publishedAt = a.publishedAt || now;
+      /* what this article looked like going out, so the next publication
+         can tell whether it has been corrected since */
+      if(a.pendingStamp){ a.publishedStamp = a.pendingStamp; delete a.pendingStamp; }
       await dbSet('articles/' + a.id, a);
     }
 
@@ -9957,59 +10019,10 @@ async function unpublishMagazine(m){
   }
 }
 
-/* ---------- one corrected article ---------- */
-async function republishArticle(a){
-  const num = a.publishedIn;
-  if(!num) return;
-  if(!confirm(`Replace this article inside issue ${num}? The issue keeps its place; the article carries today's date as a correction.`)) return;
-  try{
-    await busy('Republishing…');
-    const issue = await dbGet('issues/' + num);
-    if(!issue) throw new Error('that issue is no longer on the shelf');
-    issue.articles = arr(issue.articles);
-    issue.contents = arr(issue.contents);
-    const i = issue.articles.findIndex(x => x.id === pubId(a));
-    if(i === -1) throw new Error('that article is not in the issue');
-
-    const m = Object.values(State.magazines).find(x => String(x.publishedNum || x.num) === String(num))
-      || { mediaBase:'' };
-    a.correctedAt = Date.now();
-    const payload = articlePayload(a, m);
-    issue.articles[i] = payload;
-    issue.contents[i] = { id: payload.id, title: payload.title, author: payload.author, external: null };
-    await dbSet('issues/' + num, issue);
-
-    // the shelf card carries the issue's length, so it moves with the text
-    const card = await dbGet('library/issues/' + num);
-    if(card){
-      card.words = issue.articles.reduce((n, x) => n + (x.words || 0), 0);
-      card.articles = issue.articles.filter(x => x.words > 0 || String(x.html).includes('<img')).length;
-      await dbSet('library/issues/' + num, card);
-    }
-    const index = arr(await dbGet('searchindex/' + num));
-    const j = index.findIndex(r => r.id === pubId(a));
-    const rec = { id: payload.id, title: payload.title, author: payload.author,
-                  text: articleText(num + ':fresh', payload) };
-    if(j === -1) index.push(rec); else index[j] = rec;
-    await dbSet('searchindex/' + num, index);
-
-    await dbSet('articles/' + a.id, a);
-    /* The shelf now holds this correction, so the magazine's own stamp
-       has to move with it — otherwise the issue would go on claiming a
-       correction was waiting when it had just been made. */
-    if(m && m.id && m.published){
-      m.publishedStamp = magStamp(m);
-      await dbSet('magazines/' + m.id, m);
-    }
-    forgetReader();
-    busy(null);
-    renderWork(); renderEditorChrome();
-    toast(`Corrected in issue ${num}.`, 'See it', () => { location.hash = `#/${num}/${pubId(a)}`; });
-  }catch(e){
-    busy(null);
-    toast('That correction did not go through: ' + e.message);
-  }
-}
+/* An article corrected after its issue went out is republished with
+   that issue, and carries the date it was corrected. There was a button
+   here that sent one article on its own; the issue takes them all now,
+   and knows which of them have moved. */
 
 /* =====================================================================
    Importing the old library
