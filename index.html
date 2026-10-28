@@ -1445,6 +1445,11 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
     <div class="spacer"></div>
     <span class="status" id="status" aria-live="polite"></span>
     <button class="btn primary" id="btnPublish" hidden>Publish…</button>
+    <!-- A published magazine is taken off the shelf rather than published
+         again, so the one button becomes the other. The correction beside
+         it is the way back out to readers once something has changed. -->
+    <button class="btn" id="btnUnpublish" hidden>Unpublish</button>
+    <button class="btn primary" id="btnCorrect" hidden>Publish correction</button>
   </header>
 
   <div class="menu" id="brandMenu" role="menu" hidden></div>
@@ -1753,7 +1758,7 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
    when the file changes. It is unrelated to the database's own VERSION,
    which governs schema upgrades and must not be moved for a cosmetic
    change. */
-const APP_VERSION = '1.8';
+const APP_VERSION = '1.9';
 
 /* Nothing is imported at the top any more. The Firebase libraries are
    several hundred kilobytes and, loaded this way, the browser must fetch
@@ -2915,6 +2920,7 @@ function saveArticle(a, opts){
   later('save-' + a.id, async () => {
     try{ await dbSet('articles/' + a.id, a); setStatus('Saved'); }
     catch(e){ setStatus('Not saved — ' + e.message); }
+    afterSavedChange();
   }, (opts && opts.fast) ? 150 : 700);
 }
 function saveMagazine(m){
@@ -2922,7 +2928,16 @@ function saveMagazine(m){
   later('savem-' + m.id, async () => {
     try{ await dbSet('magazines/' + m.id, m); setStatus('Saved'); }
     catch(e){ setStatus('Not saved — ' + e.message); }
+    afterSavedChange();
   }, 400);
+}
+/* The correction button reads a fingerprint of the whole issue, which is
+   too much work to do on every keystroke — so it is done here, once a
+   change has settled and been written down, and only while the magazine
+   is the thing on screen. Writing an article costs nothing: the buttons
+   are not on that tab to need an answer. */
+function afterSavedChange(){
+  if(State.etab === 'issue' && State.loaded) renderEditorChrome();
 }
 function savePages(){
   setStatus('Saving…');
@@ -4731,9 +4746,28 @@ function renderEditorChrome(){
   else if(m) where = (m.num ? `Issue ${m.num} · ` : '') + `${m.month} ${m.year}` + (m.published ? ' · published' : '');
   $('#whereLabel').textContent = where;
   /* Publishing is something you do to a magazine. In the pool there is
-     nothing to publish, so the button is not there to be wondered at. */
-  $('#btnPublish').hidden = State.etab !== 'issue';
+     nothing to publish, so the button is not there to be wondered at.
+
+     A magazine on the shelf shows the other pair: it is taken down with
+     the first, and corrected with the second, which stays grey and says
+     so until there is a correction to make. A magazine not yet published
+     shows the one button, live even when the issue is not ready — the
+     sheet it opens explains what is missing, which a dead button cannot. */
+  const onIssue = State.etab === 'issue';
+  const out = !!m && !!m.published;
+  $('#btnPublish').hidden = !onIssue || out;
   $('#btnPublish').disabled = !m;
+  $('#btnUnpublish').hidden = !onIssue || !out;
+  $('#btnCorrect').hidden = !onIssue || !out;
+  if(onIssue && out){
+    const waiting = magIsStale(m);
+    const c = $('#btnCorrect');
+    c.disabled = !waiting;
+    c.textContent = waiting ? 'Publish correction' : 'No corrections made';
+    c.title = waiting
+      ? 'Sends this issue again as it reads here, in place of the one on the shelf'
+      : 'Nothing has changed since this issue was published';
+  }
   document.title = (where ? where + ' — ' : '') + 'JRA Magazine';
 }
 
@@ -7313,9 +7347,15 @@ function deleteMagazine(m){
     : 'Delete this issue? This cannot be undone.';
   if(!confirm(what)) return;
   magArticles(m).forEach(a => { a.magazine = null; saveArticle(a, { fast:true }); });
-  if(m.published && m.num){
-    dbDel('issues/' + m.num); dbDel('library/issues/' + m.num);
-    dbDel('gallery/' + m.num); dbDel('searchindex/' + m.num);
+  /* The number it went out under, which is not always the number it
+     carries now: renumber a published issue and m.num has moved on
+     while the shelf still holds the old one. Deleting by the current
+     number would leave that behind, in public, with nothing left in
+     the editor to take it down with. */
+  const outNum = String(m.publishedNum || m.num || '');
+  if(m.published && outNum){
+    dbDel('issues/' + outNum); dbDel('library/issues/' + outNum);
+    dbDel('gallery/' + outNum); dbDel('searchindex/' + outNum);
   }
   delete State.magazines[m.id];
   dbDel('magazines/' + m.id);
@@ -7360,6 +7400,37 @@ const gallerySet = () => arr(State.gallery);
 const inGallery = (key) => gallerySet().some(e => e && e.key === key);
 const galleryEntry = (key) => gallerySet().find(e => e && e.key === key) || null;
 const galleryAtStamp = () => gallerySet().map(e => e.key + ':' + (e.cap || '')).join('|');
+
+/* ---------- has this magazine changed since it went out? ----------
+   The same question the gallery asks of itself, asked of an issue. The
+   answer cannot be a flag set while editing: nothing of the sort lives
+   through a closed browser, and the whole point is to be right about a
+   magazine opened fresh tomorrow. So it is a fingerprint of what would
+   be published, kept beside the issue in the database and compared with
+   what is there now. buildIssue carries no clock of its own, so the
+   same magazine always prints the same stamp.
+
+   A published magazine from before this was written has no stamp at
+   all. It is treated as having corrections waiting — the same way the
+   gallery treats a missing one — because offering a publish that turns
+   out to be unnecessary is a smaller fault than hiding one that was. */
+function magStamp(m){
+  const built = buildIssue(m);
+  const text = JSON.stringify([built.issue, built.card]);
+  /* FNV-1a, so the record carries a short string rather than the issue
+     over again. */
+  let h = 0x811c9dc5;
+  for(let i = 0; i < text.length; i++){
+    h ^= text.charCodeAt(i);
+    h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0;
+  }
+  return text.length.toString(36) + ':' + h.toString(36);
+}
+function magIsStale(m){
+  if(!m || !m.published) return false;
+  if(typeof m.publishedStamp !== 'string') return true;
+  return m.publishedStamp !== magStamp(m);
+}
 
 /* Put a photograph in, take it out, or change its line. */
 function setInGallery(p, on, cap){
@@ -9543,6 +9614,9 @@ async function doPublish(m){
     m.published = true;
     m.publishedAt = m.publishedAt || now;
     m.publishedNum = num;
+    /* what went out, so the correction button can tell later whether
+       anything has moved since */
+    m.publishedStamp = magStamp(m);
     await dbSet('magazines/' + m.id, m);
 
     for(const a of magArticles(m)){
@@ -9559,6 +9633,57 @@ async function doPublish(m){
   }catch(e){
     busy(null);
     toast('Publishing failed: ' + e.message);
+  }
+}
+
+/* ---------- off the shelf, but not thrown away ----------
+   The opposite of publishing, and nothing more: the public nodes go,
+   the magazine and every word in it stay. Deleting is still deleting,
+   and still lives in the magazine's own settings. */
+async function unpublishMagazine(m){
+  if(!m || !m.published) return;
+  const num = String(m.publishedNum || m.num || '');
+  if(!num) return;
+  const n = magArticles(m).length;
+  if(!confirm(
+    `Take issue ${num} off the shelf?\n\n` +
+    'Readers will no longer find it, and a link anyone has saved to it will ' +
+    'stop working.\n\n' +
+    'Nothing written is lost: ' +
+    (n === 1 ? 'its one article stays' : `its ${n} articles stay`) +
+    ' here in the editor, and the issue can be published again whenever ' +
+    'you like.')) return;
+  try{
+    await busy('Unpublishing…');
+    await Promise.all([
+      dbDel('issues/' + num), dbDel('library/issues/' + num),
+      dbDel('gallery/' + num), dbDel('searchindex/' + num)
+    ]);
+    /* publishedAt is left where it is. The day an issue first reached
+       readers is a fact about it, and publishing it again should not
+       pretend it was new. */
+    m.published = false;
+    m.publishedNum = null;
+    m.publishedStamp = null;
+    await dbSet('magazines/' + m.id, m);
+
+    for(const a of magArticles(m)){
+      a.status = 'draft';
+      a.publishedIn = null;
+      await dbSet('articles/' + a.id, a);
+    }
+    /* A photograph carries the issue it was printed in only while that
+       issue is published, so sending the gallery again is what takes
+       the dead links back out of it. */
+    await publishGallery({ quiet:true });
+
+    forgetReader();
+    busy(null);
+    renderSide(); renderWork(); renderEditorChrome();
+    toast(`Issue ${num} is off the shelf.`);
+  }catch(e){
+    busy(null);
+    toast('Unpublishing failed: ' + e.message);
   }
 }
 
@@ -9599,9 +9724,16 @@ async function republishArticle(a){
     await dbSet('searchindex/' + num, index);
 
     await dbSet('articles/' + a.id, a);
+    /* The shelf now holds this correction, so the magazine's own stamp
+       has to move with it — otherwise the issue would go on claiming a
+       correction was waiting when it had just been made. */
+    if(m && m.id && m.published){
+      m.publishedStamp = magStamp(m);
+      await dbSet('magazines/' + m.id, m);
+    }
     forgetReader();
     busy(null);
-    renderWork();
+    renderWork(); renderEditorChrome();
     toast(`Corrected in issue ${num}.`, 'See it', () => { location.hash = `#/${num}/${pubId(a)}`; });
   }catch(e){
     busy(null);
@@ -9872,6 +10004,8 @@ function wire(){
   });
 
   $('#btnPublish').onclick = openPublish;
+  $('#btnCorrect').onclick = openPublish;
+  $('#btnUnpublish').onclick = () => { const m = curMag(); if(m) unpublishMagazine(m); };
 
   $('#fileImages').onchange = e => addPhotos(e.target.files, pickAfter);
   $('#fileCover').onchange = e => { if(e.target.files[0]) setCover(e.target.files[0]); };
