@@ -200,18 +200,23 @@ body{background:var(--paper)}
 #reader .shelf .stand{
   margin:0 0 .75rem;aspect-ratio:3/4;display:flex;align-items:flex-end;justify-content:center;
 }
-#reader .shelf .stand img{
+#reader .shelf .stand > img,
+#reader .shelf .stand > .co-wrap{
   display:block;max-width:100%;max-height:100%;width:auto;height:auto;
   background:var(--paper-raised);
   box-shadow:0 1px 0 var(--rule),0 14px 30px -18px rgba(0,0,0,.5);
   transition:transform .18s ease,box-shadow .18s ease;
 }
+/* With the words on it the cover is a box of the photograph's shape, so
+   it takes its height from the shelf and its width from the picture. */
+#reader .shelf .stand > .co-wrap{height:100%}
 #reader .shelf .stand.blank{
   border:1px solid var(--rule);background:var(--paper-raised);
   align-items:center;justify-content:center;
   font-family:var(--sans);font-size:.8rem;color:var(--brine);
 }
-#reader .shelf a:hover .stand img{
+#reader .shelf a:hover .stand > img,
+#reader .shelf a:hover .stand > .co-wrap{
   transform:translateY(-3px);
   box-shadow:0 1px 0 var(--rule),0 20px 36px -18px rgba(0,0,0,.55);
 }
@@ -226,7 +231,51 @@ body{background:var(--paper)}
   padding:clamp(1.75rem,6cqi,3.5rem) 0 clamp(1.25rem,3cqi,1.75rem);
 }
 #reader .cover{margin:0;width:100%;box-shadow:0 1px 0 var(--rule),0 14px 30px -18px rgba(0,0,0,.5)}
-#reader .cover img{display:block;width:100%;height:auto;background:var(--paper-raised)}
+#reader .cover > img,#reader .cover > .co-wrap{display:block;width:100%;height:auto;background:var(--paper-raised)}
+
+/* ---- the words on the cover ----
+   Published as shares of the cover rather than as sizes, so one
+   description is drawn at the thumbnail on the shelf and at the larger
+   cover on the issue's page without being written twice. --u is one
+   page pixel as a share of the width; every size below is the print
+   design's own measurement multiplied by it, which is what keeps the
+   proportions of the printed cover at any width. */
+#reader .co-wrap{
+  position:relative;display:block;container-type:inline-size;
+  max-width:100%;max-height:100%;
+}
+#reader .co-wrap img{display:block;width:100%;height:100%;object-fit:cover}
+#reader .co-mast,#reader .co-inside,#reader .co-credit{
+  position:absolute;color:#fff;font-family:var(--sans);
+  text-shadow:0 1px 3px rgba(0,0,0,.45);pointer-events:none;
+}
+#reader .co-mast{text-align:center}
+#reader .co-title{
+  font-size:calc(var(--u) * 34 * 1cqw);line-height:calc(var(--u) * 40 * 1cqw);
+  letter-spacing:.09em;text-transform:uppercase;
+}
+#reader .co-row{
+  display:flex;justify-content:space-between;align-items:baseline;
+  font-size:calc(var(--u) * 14 * 1cqw);margin-top:calc(var(--u) * 6 * 1cqw);
+}
+#reader .co-sub{font-size:calc(var(--u) * 21 * 1cqw)}
+#reader .co-inside{text-align:center}
+#reader .co-inside h2{
+  font-size:calc(var(--u) * 20 * 1cqw);line-height:calc(var(--u) * 28 * 1cqw);
+  font-weight:400;letter-spacing:.14em;text-transform:uppercase;
+  margin:0 0 calc(var(--u) * 6 * 1cqw);padding:0 0 calc(var(--u) * 2 * 1cqw);
+  border-bottom:1px solid rgba(255,255,255,.45);
+}
+#reader .co-inside ul{
+  list-style:none;margin:0 auto;padding:0;columns:3;
+  column-gap:calc(var(--u) * 20 * 1cqw);text-align:start;
+  font-size:calc(var(--u) * 13 * 1cqw);line-height:calc(var(--u) * 20 * 1cqw);
+  max-width:calc(var(--u) * 640 * 1cqw);
+}
+#reader .co-inside li{break-inside:avoid}
+#reader .co-credit{
+  font-size:calc(var(--u) * 10 * 1cqw);letter-spacing:.02em;text-align:end;color:#e8edf0;
+}
 #reader .issue h1{
   font-family:var(--serif);font-weight:600;font-size:clamp(2.1rem,7cqi,3.4rem);
   line-height:1;letter-spacing:-.025em;margin:0;
@@ -335,6 +384,23 @@ body{background:var(--paper)}
 @container reader (min-width:64rem){
   #reader .spread{grid-template-columns:15rem minmax(0,1fr);align-items:start}
 }
+#reader .nowbar{
+  display:none;width:100%;border:0;border-top:1px solid var(--rule);
+  background:none;color:var(--brine);font-family:var(--sans);
+  font-size:.76rem;line-height:1.2;text-align:start;cursor:pointer;
+  padding:.4rem var(--gutter);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+#reader .nowbar:hover{color:var(--ink)}
+#reader .nowbar b{font-weight:600;color:var(--ink)}
+#reader .nowbar.flat{cursor:default}
+#reader .nowbar.flat:hover{color:var(--brine)}
+/* The rail is the better answer whenever there is room for it, so this
+   appears only where it cannot. */
+@container reader (max-width:63.99rem){
+  #reader .nowbar.on{display:block}
+}
+
 #reader .rail{display:none}
 @container reader (min-width:64rem){
   #reader .rail{
@@ -658,21 +724,6 @@ body{background:var(--paper)}
 #editor .alist.arts li.cur .rowtools,
 #editor .alist.arts .rowtools:focus-within{opacity:1}
 
-/* where an article goes when this issue is full */
-#editor .mover{
-  position:absolute;top:100%;inset-inline-end:0;z-index:50;min-width:13rem;padding:.3rem;
-  background:var(--e-panel);border:1px solid var(--e-line);border-radius:9px;
-  box-shadow:0 10px 26px rgba(0,0,0,.18);
-}
-#editor .mover button{
-  display:block;width:100%;text-align:start;border:0;background:none;cursor:pointer;
-  padding:.35rem .5rem;border-radius:5px;font-size:.84rem;
-}
-#editor .mover button:hover{background:var(--e-bg)}
-#editor .mover .mhead{
-  margin:0;padding:.3rem .5rem .15rem;font-size:.66rem;letter-spacing:.1em;
-  text-transform:uppercase;color:var(--e-muted);
-}
 
 #editor details.sub{margin-top:.6rem;border-top:1px solid var(--e-line);padding-top:.5rem}
 #editor .subhead{
@@ -1351,20 +1402,14 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
 .mag .cover-pic img{width:100%;height:100%;object-fit:cover;display:block}
 .mag .cover-pic figcaption{
   position:absolute;inset-inline:0;bottom:0;padding:10px 14px;color:#fff;font-style:italic;
-  font-size:12px;line-height:15px;background:linear-gradient(transparent,rgba(0,0,0,.65));text-align:center;
+  font-size:12px;line-height:15px;text-align:center;
 }
-.mag .cover-pic .credit{color:#e0e6ea}
 .mag .cover-empty{display:grid;place-items:center;height:100%;color:#8a949b;font-size:16px}
 
-/* A cover with no frame: the photograph is the paper, and the masthead
-   sits on it. The scrims are what make the lettering readable over a
-   bright sky — and because they are gradients, the PDF writer lays them
-   down as the soft wash they look like rather than dropping them. */
+/* The photograph is the paper, and the masthead sits on it. There is
+   nothing laid between the two: no wash, no panel. Lettering that cannot
+   be read is a sign the cover wants a different photograph. */
 .mag .page-cover.full .cover-pic{inset:0;border:0;border-radius:0}
-.mag .page-cover.full .cover-pic figcaption{display:none}
-.mag .page-cover.full .scrim{position:absolute;left:0;right:0;pointer-events:none}
-.mag .page-cover.full .scrim-top{top:0;height:34%;background:linear-gradient(to bottom,rgba(0,0,0,.62),rgba(0,0,0,0))}
-.mag .page-cover.full .scrim-bottom{bottom:0;height:40%;background:linear-gradient(to top,rgba(0,0,0,.66),rgba(0,0,0,0))}
 .mag .page-cover.full .mast{border:0;border-radius:0;height:auto;padding:0;color:#fff}
 .mag .page-cover.full .mast-row{margin-top:6px}
 .mag .page-cover.full .inside{color:#fff}
@@ -1423,6 +1468,10 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
       </div>
     </div>
     <nav class="tabs" id="tabs" aria-label="Sections"></nav>
+    <!-- Narrow enough to lose the contents rail, and the reader has
+         nothing on screen saying where they are. This says it, and
+         gives back the one thing the rail was for. -->
+    <button class="nowbar" id="nowBar" type="button"></button>
   </header>
   <main id="top"></main>
 </div>
@@ -1766,7 +1815,7 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
    when the file changes. It is unrelated to the database's own VERSION,
    which governs schema upgrades and must not be moved for a cosmetic
    change. */
-const APP_VERSION = '1.10';
+const APP_VERSION = '1.11';
 
 /* Nothing is imported at the top any more. The Firebase libraries are
    several hundred kilobytes and, loaded this way, the browser must fetch
@@ -2779,7 +2828,7 @@ function newMagazine(){
   return {
     id: uid('m'), num: '', month: MONTHS[d.getMonth()], year: d.getFullYear(),
     magazine: 'JRA Magazine', masthead: 'JRA Magazine', mastheadSub: '',
-    cover: null, coverSrc: null, coverCaption: '', coverCredit: '', coverFull: true,
+    cover: null, coverSrc: null, coverCredit: '',
     coverShow: { masthead:true, date:true, inside:true, credit:true },
     contents: [], featured: [], design: Object.assign({}, DEFAULT_DESIGN),
     mediaBase: '', pdf: '', published: false, publishedAt: null,
@@ -3086,6 +3135,27 @@ function store(key, val){
   return null;
 }
 
+/* Where the reader is, for the narrow screens that have no room for the
+   contents rail. Set as an article is drawn and emptied by anything
+   else, so it can never be left behind saying something untrue. */
+function setNowBar(issue, title, num){
+  const bar = $('#nowBar');
+  if(!bar) return;
+  bar.textContent = '';
+  bar.append(h('b', { text: issue }));
+  if(title) bar.append(' \u00b7 ' + title);
+  bar.classList.add('on');
+  bar.classList.toggle('flat', !num);
+  bar.onclick = num ? () => { location.hash = '#/' + num; } : null;
+}
+function clearNowBar(){
+  const bar = $('#nowBar');
+  if(!bar) return;
+  bar.classList.remove('on');
+  bar.textContent = '';
+  bar.onclick = null;
+}
+
 const scrollTop0 = () => {
   if(State.previewing) $('#preview').scrollTop = 0;
   else window.scrollTo(0, 0);
@@ -3346,28 +3416,58 @@ function hydrateImages(root, base, want){
   });
 }
 
+/* The words on the cover, laid over the photograph at whatever size it
+   is being shown. Each block was published as a share of the cover, so
+   the same description serves a thumbnail on the shelf and the larger
+   cover on the issue's own page. */
+function coverOverMarkup(c){
+  const o = c && c.over;
+  if(!o) return '';
+  const box = (b) => `left:${b.x}%;top:${b.y}%;width:${b.w}%`;
+  const parts = [];
+  if(o.mast){
+    const row = (o.mast.date || o.mast.num || o.mast.sub)
+      ? `<div class="co-row"><span>${esc(o.mast.date || '')}</span>` +
+        `<span class="co-sub">${esc(o.mast.sub || '')}</span>` +
+        `<span>${esc(o.mast.num || '')}</span></div>` : '';
+    parts.push(`<div class="co-mast" style="${box(o.mast)}">` +
+      (o.mast.title ? `<div class="co-title">${esc(o.mast.title)}</div>` : '') + row + '</div>');
+  }
+  if(o.inside) parts.push(`<div class="co-inside" style="${box(o.inside)}">` +
+    `<h2>Inside</h2><ul>${arr(o.inside.titles).map(t => `<li>${esc(t)}</li>`).join('')}</ul></div>`);
+  if(o.credit) parts.push(`<div class="co-credit" style="${box(o.credit)}">${esc(o.credit.text)}</div>`);
+  return parts.join('');
+}
+
 function coverMarkup(meta, sizesAttr, cls){
   const c = meta && meta.cover;
   if(!c || !c.full){
     return cls === 'stand'
       ? `<div class="stand blank">${esc(S().issueN(meta ? meta.num : ''))}</div>` : '';
   }
+  const over = coverOverMarkup(c);
+  /* The lettering is placed on the photograph, not on the space the
+     photograph is sitting in, so when there is any it gets a wrapper of
+     the picture's own shape to be placed against. */
+  const wrap = (img) => over
+    ? `<span class="co-wrap" style="--u:${c.over.u}${c.ar ? `;aspect-ratio:${c.ar}` : ''}">${img}${over}</span>`
+    : img;
   const base = (typeof c.base === 'string' && c.base) ? c.base
              : (meta && typeof meta.mediaBase === 'string' && meta.mediaBase) ? meta.mediaBase
              : MEDIA_BASE;
   if(base === LOCAL){
     const rec = State.images[String(c.full).split('/')[0]];
     const src = rec ? figUrl(resolveFig({ img: rec.id }), 500) : '';
-    return `<figure class="${cls || 'cover'}"><img src="${esc(src)}" alt=""></figure>`;
+    return `<figure class="${cls || 'cover'}">${wrap(`<img src="${esc(src)}" alt="">`)}</figure>`;
   }
   const widths = Object.keys(c.sizes || {}).map(Number).sort((a, b) => a - b);
   const srcset = widths.map(w => base + encodeURI(c.sizes[w]) + ' ' + w + 'w').join(', ');
   const pick = widths.find(w => w >= 500) || widths[widths.length - 1];
   const src = pick ? c.sizes[pick] : c.full;
-  return `<figure class="${cls || 'cover'}"><img src="${base + encodeURI(src)}"
+  return `<figure class="${cls || 'cover'}">${wrap(`<img src="${base + encodeURI(src)}"
     ${srcset ? `srcset="${srcset}" sizes="${sizesAttr}"` : ''}
     loading="lazy" decoding="async"
-    alt="${esc(S().coverOf(S().issueN(meta.num)))}"></figure>`;
+    alt="${esc(S().coverOf(S().issueN(meta.num)))}">`)}</figure>`;
 }
 
 /* A photograph uses the wider track only when the extra width helps:
@@ -3791,6 +3891,9 @@ function renderArticle(num, id, query, mode){
   const prevIssue = !bare && here > 0 ? all[here - 1] : null;
 
   const where = bare ? S().draft : S().issueN(num);
+  /* A loose proof is not in an issue, so there is no contents to send
+     anyone back to; it still says which piece this is. */
+  setNowBar(where, a.title || '', bare ? '' : num);
 
   main.className = 'reading';
   barIn.classList.add('wide');
@@ -4065,6 +4168,7 @@ let routeToken = 0;
 
 async function routeReader(hash, opts){
   const token = ++routeToken;
+  clearNowBar();
   /* A redraw asked for by the editor, rather than a reader going
      somewhere, leaves the scroll alone. */
   const settle = (opts && opts.keepScroll) ? () => {} : scrollTop0;
@@ -5172,15 +5276,11 @@ function openCoverSettings(m){
   };
   const redraw = () => redrawPreview(200);
 
-  const full = h('input', { type:'checkbox' });
-  full.checked = !!m.coverFull;
   const bits = h('div', { class:'coverbits' });
   const note = h('p', { class:'hint bare-note' });
 
   const drawBits = () => {
     bits.textContent = '';
-    bits.hidden = !m.coverFull;
-    if(!m.coverFull) return;
     m.coverShow = Object.assign({ masthead:true, date:true, inside:true, credit:true }, m.coverShow);
     bits.append(h('p', { class:'hint', text:'Printed over the photograph:' }));
     COVER_BITS.forEach(([k, label]) => {
@@ -5198,37 +5298,21 @@ function openCoverSettings(m){
       ? 'Nothing is printed over it — the photograph stands on its own.'
       : 'Untick them all for a photograph with nothing printed over it.';
   };
-  full.onchange = () => {
-    m.coverFull = full.checked;
-    m.coverChosen = true;
-    saveMagazine(m);
-    redraw();
-    openCoverSettings(m);        // the window says different things either way
-  };
-
   body.append(h('h4', { class:'subhead', text:'How the cover is laid out' }));
-  /* The photograph fills the page unless this magazine was made before
-     that became the way of it, so the tick is here rather than first —
-     what you actually come here to do is move the lettering. */
   const layout = h('button', { class:'btn', type:'button',
     onclick: () => { dlg.close(); openCoverLayout(m); } }, 'Place the lettering…');
   const hasCover = !!((m.cover && State.images[m.cover]) || m.coverSrc);
-  layout.disabled = !hasCover || !m.coverFull;
+  layout.disabled = !hasCover;
   body.append(h('div', { class:'fp-row' }, layout));
-  body.append(h('p', { class:'hint', text: !hasCover
-    ? 'Add a cover photograph and the lettering can be placed over it.'
-    : !m.coverFull
-      ? 'The framed cover is a fixed design. Let the photograph fill the page and the lettering can be moved.'
-      : 'Drag the masthead, the “Inside” list and the credit to wherever the photograph leaves room for them.' }));
+  body.append(h('p', { class:'hint', text: hasCover
+    ? 'Drag the masthead, the “Inside” list and the credit to wherever the photograph leaves room for them.'
+    : 'Add a cover photograph and the lettering can be placed over it.' }));
   body.append(bits);
   drawBits();
-
-  body.append(h('label', { class:'check' }, full, ' Photograph fills the page'));
 
   body.append(h('h4', { class:'subhead', text:'Words on the cover' }));
   body.append(bind('Masthead', 'masthead', '(the magazine\u2019s name — also used in the page footers)'));
   body.append(bind('Under the masthead', 'mastheadSub'));
-  body.append(bind('Cover caption', 'coverCaption'));
   body.append(bind('Cover photo credit', 'coverCredit'));
 
   dlg.returnValue = '';
@@ -5365,32 +5449,6 @@ function openPool(m){
    way to move one straight from one magazine to another: it comes back
    to the pool and is added again, which is the same two steps written
    down once. */
-function openMover(anchor, from, a){
-  const others = activeMags().filter(x => !from || x.id !== from.id);
-  const menu = h('div', { class:'mover' });
-  if(!others.length) menu.append(h('p', { class:'hint', text:'There is nowhere to put it yet — start a magazine first.' }));
-  menu.append(h('p', { class:'mhead', text:'Put it in' }));
-  others.forEach(x => menu.append(h('button', {
-    onclick: () => { moveArticle(a, from, x); menu.remove(); }
-  }, (x.num ? `Issue ${x.num}` : 'Unnumbered') + ` — ${x.month} ${x.year}`)));
-  $$('.mover').forEach(el => el.remove());
-  (anchor.closest('li') || anchor.parentElement).append(menu);
-  const away = e => { if(!menu.contains(e.target)){ menu.remove(); document.removeEventListener('mousedown', away); } };
-  setTimeout(() => document.addEventListener('mousedown', away), 0);
-}
-/* An article that gains an issue stops being the Article tab's business, so
-   the screen follows it across rather than leaving you editing something
-   the list beside you no longer shows. */
-function moveArticle(a, from, to){
-  if(a.publishedIn && !confirm(`This article is published in issue ${a.publishedIn}. Moving it here does not change that issue until you republish. Move it anyway?`)) return;
-  if(from){ from.contents = arr(from.contents).filter(x => x !== a.id); saveMagazine(from); }
-  placeArticle(a, to);
-  State.curMag = to.id;
-  scrolledTo = null;
-  const where = to.num ? `issue ${to.num}` : 'that issue';
-  toast(from ? `Moved to ${where}.` : `Now in ${where}.`);
-  goEditor('editor/issue/' + a.id);
-}
 
 function sideSettings(side){
   const card = h('section', { class:'card' }, h('h2', { text:'Settings' }));
@@ -5705,13 +5763,14 @@ function workArticle(work){
     /* An article moves between magazines by going back to the pool and
        being added to the other one, which is one road rather than two
        and leaves nothing to explain. */
-    const act = h('div', { class:'fp-row' });
-    if(mag) act.append(h('button', { class:'btn small',
-      title:'Take it out of the magazine; the article itself is kept',
-      onclick: () => unplaceArticle(a, mag) }, 'Back to the pool'));
-    else act.append(h('button', { class:'btn small',
-      onclick: e => openMover(e.currentTarget, null, a) }, 'Put it in a magazine…'));
-    foot.append(act);
+    /* An article in the pool is put into a magazine from the magazine's
+       own side panel, where the list it is joining is in front of you.
+       There was a second way in from here, and it never opened. */
+    if(mag){
+      foot.append(h('div', { class:'fp-row' }, h('button', { class:'btn small',
+        title:'Take it out of the magazine; the article itself is kept',
+        onclick: () => unplaceArticle(a, mag) }, 'Back to the pool')));
+    }
   }else{
     foot.append(h('p', { class:'hint' },
       `Published in issue ${a.publishedIn} on ${niceDate(a.publishedAt)}.` +
@@ -6928,7 +6987,6 @@ async function setCover(file){
        fills the page unless it is told otherwise. Only the first one
        decides: an issue whose layout has already been set is left as
        the editor left it. */
-    if(m.coverFull == null || !m.coverChosen){ m.coverFull = true; m.coverChosen = true; }
     saveMagazine(m);
     renderSide();
     redrawPreview(120);
@@ -8535,26 +8593,13 @@ function coverBox(m, G, which){
 }
 const boxStyle = (b) => `left:${b.left}px;top:${b.top}px;width:${b.width}px`;
 
-/* The wash that makes lettering readable follows the block it is behind,
-   so moving the masthead down the page takes its shade with it. It never
-   shrinks below what it always was, which is why covers already made
-   look exactly as they did. */
-function scrimStyle(m, G, which, floorPct){
-  const p = coverPos(m, G, which);
-  const topPct = p.y * 100;
-  if(topPct < 50){
-    const h = Math.min(85, Math.max(floorPct, topPct + 16));
-    return `top:0;height:${h.toFixed(1)}%;` +
-      'background:linear-gradient(to bottom,rgba(0,0,0,.62),rgba(0,0,0,0))';
-  }
-  const h = Math.min(85, Math.max(floorPct, (100 - topPct) + 14));
-  return `bottom:0;height:${h.toFixed(1)}%;` +
-    'background:linear-gradient(to top,rgba(0,0,0,.66),rgba(0,0,0,0))';
-}
 
+/* There was a second cover once — a framed one, with the photograph
+   inset and the masthead in a ruled box above it. It is gone, and with
+   it the choice between the two: the photograph fills the page, and the
+   lettering is placed on it. */
 function drawCover(G, m){
-  const full = !!m.coverFull;
-  const s = pageShell(1, G, 'page-cover' + (full ? ' full' : ''));
+  const s = pageShell(1, G, 'page-cover full');
   const cover = m.cover && State.images[m.cover];
   const f = cover ? resolveFig({ img: cover.id })
           : (m.coverSrc ? resolveFig({ src: m.coverSrc.src,
@@ -8563,25 +8608,20 @@ function drawCover(G, m){
   /* The cover of the printed issue lists what is in the printed issue,
      so a piece written for the web alone is not advertised on it. */
   const titles = magArticles(m).filter(a => a.title && inPrint(a)).map(a => a.title).slice(0, 9);
-  const mm = 10 * MMPX;
   const hasInside = titles.length > 0;
 
   const img = f
-    ? `<img src="${escapeHtml(figUrl(f, full ? 2000 : 1200))}" alt=""${f.local ? '' : ' crossorigin="anonymous"'}>`
+    ? `<img src="${escapeHtml(figUrl(f, 2000))}" alt=""${f.local ? '' : ' crossorigin="anonymous"'}>`
     : '<div class="cover-empty">Cover photograph</div>';
 
-  /* On a framed cover the masthead box is the design, so it always
-     stands; the choices belong to the full-bleed one. */
-  const want = (which) => !full || coverShows(m, which);
+  const want = (which) => coverShows(m, which);
   const credit = (m.coverCredit && want('credit')) ? 'Photo: ' + escapeHtml(m.coverCredit) : '';
   const showInside = hasInside && want('inside');
   const showMast = want('masthead') && (m.masthead || m.mastheadSub);
   const showDate = want('date');
 
-  /* On a full-bleed cover each block sits where it has been put; the
-     framed cover is a fixed design and keeps its margins. */
-  const at = (which) => full ? boxStyle(coverBox(m, G, which))
-                             : `left:${mm}px;right:${mm}px;top:${mm}px`;
+  /* Each block sits where it has been put. */
+  const at = (which) => boxStyle(coverBox(m, G, which));
   const mast = (showMast || showDate)
     ? `<div class="mast" data-cb="mast" style="${at('mast')}">
       ${showMast ? `<div class="mast-title">${escapeHtml(m.masthead || '')}</div>` : ''}
@@ -8591,35 +8631,16 @@ function drawCover(G, m){
       : (m.mastheadSub && showMast ? `<div class="mast-row"><span class="mast-sub">${escapeHtml(m.mastheadSub)}</span></div>` : '')}
     </div>` : '';
 
-  if(full){
-    /* The photograph first, then the washes, then the lettering — the
-       PDF paints in the order it finds things, so this order is the
-       stacking order. A wash with no lettering over it would only dirty
-       the picture, so each one appears with its text or not at all. */
-    s.innerHTML = `
-      <figure class="cover-pic">${img}</figure>
-      ${mast ? `<div class="scrim" style="${scrimStyle(m, G, 'mast', 34)}"></div>` : ''}
-      ${showInside ? `<div class="scrim" style="${scrimStyle(m, G, 'inside', 40)}"></div>` : ''}
-      ${mast}
-      ${showInside ? `<div class="inside" data-cb="inside" style="${at('inside')}">
-        <h2>Inside</h2>
-        <ul>${titles.map(t => `<li>${escapeHtml(t)}</li>`).join('')}</ul>
-      </div>` : ''}
-      ${credit ? `<div class="cover-credit" data-cb="credit" style="${at('credit')}">${credit}</div>` : ''}`;
-    return s;
-  }
-
+  /* The photograph first, then the lettering: the PDF paints in the
+     order it finds things, so this order is the stacking order. */
   s.innerHTML = `
+    <figure class="cover-pic">${img}</figure>
     ${mast}
-    <figure class="cover-pic" style="left:${mm}px;right:${mm}px;top:${mm + 92}px;bottom:${mm + (showInside ? 150 : 20)}px">
-      ${img}
-      ${m.coverCaption || credit ? `<figcaption>${sanitizeInline(m.coverCaption || '')}${
-        credit ? ' <span class="credit">' + credit + '</span>' : ''}</figcaption>` : ''}
-    </figure>
-    ${showInside ? `<div class="inside" style="left:${mm}px;right:${mm}px;bottom:${mm}px">
+    ${showInside ? `<div class="inside" data-cb="inside" style="${at('inside')}">
       <h2>Inside</h2>
       <ul>${titles.map(t => `<li>${escapeHtml(t)}</li>`).join('')}</ul>
-    </div>` : ''}`;
+    </div>` : ''}
+    ${credit ? `<div class="cover-credit" data-cb="credit" style="${at('credit')}">${credit}</div>` : ''}`;
   return s;
 }
 function drawContents(G, m, startNo){
@@ -9247,17 +9268,54 @@ function articlePayload(a, m){
   };
 }
 
+/* ---------- the lettering, for a cover that is not a printed page ----------
+   The masthead and the rest were drawn only by the PDF, so the shelf
+   showed a bare photograph of a cover whose whole design was the words
+   on it. They go out with the issue now.
+
+   Everything here is a fraction of the cover's width or height, which is
+   what lets the same description be drawn at the size of a page and at
+   the size of a thumbnail. `u` is one page pixel as a share of the
+   width, so the type keeps the proportions it was given in the print
+   design whatever that design's page happens to measure. */
+function coverOverlay(m){
+  const G = geometry(m.design);
+  const at = (which) => {
+    const p = coverPos(m, G, which);
+    return { x: +(p.x * 100).toFixed(3), y: +(p.y * 100).toFixed(3), w: +(p.w * 100).toFixed(3) };
+  };
+  const titles = magArticles(m).filter(a => a.title && inPrint(a)).map(a => a.title).slice(0, 9);
+  const showMast = coverShows(m, 'masthead') && !!(m.masthead || m.mastheadSub);
+  const showDate = coverShows(m, 'date');
+  const over = { u: +(100 / G.pageW).toFixed(5) };
+  if(showMast || showDate) over.mast = Object.assign(at('mast'), {
+    title: showMast ? (m.masthead || '') : '',
+    sub:   showMast ? (m.mastheadSub || '') : '',
+    date:  showDate ? issueDate(m) : '',
+    num:   showDate && m.num ? 'Issue ' + m.num : ''
+  });
+  if(titles.length && coverShows(m, 'inside')) over.inside = Object.assign(at('inside'), { titles });
+  if(m.coverCredit && coverShows(m, 'credit'))
+    over.credit = Object.assign(at('credit'), { text: 'Photo: ' + m.coverCredit });
+  return (over.mast || over.inside || over.credit) ? over : null;
+}
+
 function coverPayload(m){
+  const over = coverOverlay(m);
   const cover = m.cover && State.images[m.cover];
   if(!cover) return m.coverSrc && m.coverSrc.full !== undefined
-    ? { full: m.coverSrc.full, sizes: m.coverSrc.sizes || {}, base: m.coverSrc.base || '' }
-    : (m.coverSrc ? { full: m.coverSrc.src, sizes: m.coverSrc.sizes || {}, base: m.coverSrc.base || '' } : null);
+    ? { full: m.coverSrc.full, sizes: m.coverSrc.sizes || {}, base: m.coverSrc.base || '', ...(over ? { over } : {}) }
+    : (m.coverSrc ? { full: m.coverSrc.src, sizes: m.coverSrc.sizes || {}, base: m.coverSrc.base || '', ...(over ? { over } : {}) } : null);
   const sizes = {};
   imageWidths(cover).forEach(w => { sizes[w] = cover.files[w]; });
   sizes[cover.w] = cover.files.full;
   /* The cover carries its own address, so a cover still sitting in this
      browser cannot drag the rest of the issue's photographs with it. */
-  return { full: cover.files.full, sizes, base: cover.base || LOCAL };
+  return { full: cover.files.full, sizes, base: cover.base || LOCAL,
+           /* the photograph's own shape, so the lettering can be laid on
+              the picture rather than on the box it is sitting in */
+           ...(cover.w && cover.h ? { ar: +(cover.w / cover.h).toFixed(4) } : {}),
+           ...(over ? { over } : {}) };
 }
 
 /* ---------------------------------------------------------------------
@@ -9905,7 +9963,6 @@ async function runImport(text){
         : null;
       /* The old pages printed the cover's caption and the photographer
          under the picture; both belong on the cover here too. */
-      mag.coverCaption = card.coverCaption || '';
       mag.coverCredit  = card.coverCredit  || '';
       mag.pdf = card.pdf || '';
       mag.published = true;
