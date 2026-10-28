@@ -1193,11 +1193,19 @@ dialog#dlgCoverLay{max-width:min(34rem,96vw)}
 /* ---- the crop window ---- */
 dialog#dlgCrop{max-width:46rem}
 .cr-stage{
-  position:relative;width:100%;max-height:58vh;margin:.2rem 0 .6rem;
-  background:#2a2e31;border-radius:6px;overflow:hidden;
-  display:flex;align-items:center;justify-content:center;touch-action:none;
+  position:relative;width:fit-content;max-width:100%;margin:.2rem auto .6rem;
+  background:#2a2e31;border-radius:6px;overflow:hidden;touch-action:none;
 }
-.cr-stage img{display:block;width:100%;height:100%;object-fit:fill;user-select:none;-webkit-user-drag:none}
+/* The picture is what decides the size here, and the stage shrinks to
+   it. Stretching it to fill a box of some other shape would not only
+   look wrong: the crop box is held in fractions of this stage, so a
+   stage that is not the photograph's shape means the rectangle you drag
+   is not the rectangle you get. A tall photograph in a wide window used
+   to be pulled sideways for exactly that reason. */
+.cr-stage img{
+  display:block;width:auto;height:auto;max-width:100%;max-height:58vh;
+  user-select:none;-webkit-user-drag:none;
+}
 .cr-shade{position:absolute;inset:0;background:rgba(20,22,24,.62);pointer-events:none}
 .cr-win{position:absolute;border:1px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.45);cursor:move}
 .cr-h{
@@ -1758,7 +1766,7 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
    when the file changes. It is unrelated to the database's own VERSION,
    which governs schema upgrades and must not be moved for a cosmetic
    change. */
-const APP_VERSION = '1.9';
+const APP_VERSION = '1.10';
 
 /* Nothing is imported at the top any more. The Firebase libraries are
    several hundred kilobytes and, loaded this way, the browser must fetch
@@ -2732,6 +2740,9 @@ const State = {
      which of the two is on screen. The preview choice is shared by both
      tabs, so it does not have to be made twice. */
   spWide: 0.5, pvKind: 'pdf', showPv: false,
+  /* what the web preview was last showing, so a redraw of the same page
+     can be told apart from a move to another one */
+  pvHash: '',
   /* which of the magazine's three faces is showing */
   mview: 'edit',
   /* The preview beside the editor on the magazine, put away until it is
@@ -4052,8 +4063,11 @@ function renderTabs(current){
 
 let routeToken = 0;
 
-async function routeReader(hash){
+async function routeReader(hash, opts){
   const token = ++routeToken;
+  /* A redraw asked for by the editor, rather than a reader going
+     somewhere, leaves the scroll alone. */
+  const settle = (opts && opts.keepScroll) ? () => {} : scrollTop0;
   const [path, qs] = hash.split('?');
   const sp = new URLSearchParams(qs || '');
   const pick = m => MODES.includes(m) ? m : 'all';
@@ -4085,12 +4099,12 @@ async function routeReader(hash){
     renderTabs(where);
     if(where === 'gallery') await renderGallery(params, token);
     else await renderPage(where, token);
-    if(token === routeToken) scrollTop0();
+    if(token === routeToken) settle();
     return;
   }
 
   renderTabs('');
-  if(!parts.length){ renderShelf(params); scrollTop0(); return; }
+  if(!parts.length){ renderShelf(params); settle(); return; }
 
   const [num, id] = parts;
   const meta = issueMeta(num);
@@ -4101,7 +4115,7 @@ async function routeReader(hash){
     $('#up').onclick = () => { location.hash = ''; };
     return;
   }
-  if(meta.pdfOnly){ renderPdfOnly(meta); scrollTop0(); return; }
+  if(meta.pdfOnly){ renderPdfOnly(meta); settle(); return; }
 
   if(!Reader.issues[num]){
     main.className = '';
@@ -4118,7 +4132,7 @@ async function routeReader(hash){
 
   if(id) renderArticle(num, id, params.q, params.qm);
   else renderIssue(num, params.q, params.qm);
-  scrollTop0();
+  settle();
 }
 
 /* ---------- reader controls ---------- */
@@ -4187,6 +4201,7 @@ function setMode(m){
 function setPreviewing(on){
   if(State.previewing === on) return;
   State.previewing = on;
+  State.pvHash = '';
   forgetReader();
   if(on) previewEl.append(readerEl);
   else document.body.insertBefore(readerEl, editorEl);
@@ -4494,8 +4509,15 @@ function wireSplit(){
    other one is brought up to date when it is switched to. */
 function refreshWeb(){
   if(!State.previewing) return;
+  const hash = webHash();
+  /* Typing is not travelling. Redrawing the page already on screen
+     leaves the reader where it was, the way the printed pages beside it
+     have always behaved; going to another article is a move, and still
+     starts at the top. */
+  const keepScroll = hash === State.pvHash;
+  State.pvHash = hash;
   forgetReader();
-  routeReader(webHash());
+  routeReader(hash, { keepScroll });
 }
 function drawPreview(){
   if(!pvVisible()) return;
@@ -5919,7 +5941,10 @@ function textNode(b){
     'aria-label': isHeadBlock(b) ? HEAD_LABEL[b.t] : (KINDS[b.t] || 'Text') });
   ed.innerHTML = b.html;
   /* which block the format bar is acting on */
-  ed.addEventListener('focus', () => { State.focusBlock = b.id; });
+  /* The buttons say what this paragraph is set to, so they have to be
+     told when the cursor arrives in a different one — otherwise they go
+     on showing the block that was last aligned by hand. */
+  ed.addEventListener('focus', () => { State.focusBlock = b.id; markAligns(); });
   ed.addEventListener('input', () => {
     b.html = (b.t === 'h2' || b.t === 'h3') ? escapeHtml(plainText(ed.innerHTML)) : sanitizeInline(ed.innerHTML);
     if(isHeadBlock(b)){
@@ -6314,14 +6339,15 @@ function openCrop(b, f, done){
   let lock = 0;                                   // 0 is a free shape
 
   stage.textContent = '';
-  const img = h('img', { src: figUrl(f, 1400), alt:'' });
+  /* The file's own measurements, so the shape is right before a byte of
+     the picture has arrived and nothing jumps when it does. The stage
+     then wraps whatever size the picture settles at, which is what keeps
+     the box's fractions and the pixels on screen the same thing scaled. */
+  const img = h('img', { src: figUrl(f, 1400), alt:'', width: f.w, height: f.h });
   const shade = h('div', { class:'cr-shade' });
   const win = h('div', { class:'cr-win' });
   ['nw','ne','sw','se'].forEach(k => win.append(h('span', { class:'cr-h cr-' + k, 'data-h':k })));
   stage.append(img, shade, win);
-  /* the stage is the photograph's own shape, so the box's fractions and
-     the pixels on screen are the same thing scaled */
-  stage.style.aspectRatio = (f.w / f.h);
 
   const clamp01 = (v) => Math.max(0, Math.min(1, v));
   const MINC = 0.05;
