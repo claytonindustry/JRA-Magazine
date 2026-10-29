@@ -1919,7 +1919,7 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
    when the file changes. It is unrelated to the database's own VERSION,
    which governs schema upgrades and must not be moved for a cosmetic
    change. */
-const APP_VERSION = '1.20';
+const APP_VERSION = '1.21';
 
 /* Nothing is imported at the top any more. The Firebase libraries are
    several hundred kilobytes and, loaded this way, the browser must fetch
@@ -6270,7 +6270,10 @@ function setAlign(how){
    put in the middle of a piece without walking it up with the arrows. */
 function addBar(){
   const bar = h('div', { class:'addbar' });
-  [['p','+ Paragraph'],['h2','+ Heading'],['h3','+ Subheading'],['quote','+ Quote']].forEach(([t, label]) => {
+  /* Named for the block it makes. The other three are abbreviated in
+     the block's own column for want of room; this one was a different
+     word for the same thing. */
+  [['p','+ Text'],['h2','+ Heading'],['h3','+ Subheading'],['quote','+ Quote']].forEach(([t, label]) => {
     bar.append(h('button', { class:'btn small',
       onclick: () => addBlockHere({ t, html:'' }, true) }, label));
   });
