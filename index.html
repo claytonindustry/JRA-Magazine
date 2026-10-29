@@ -1919,7 +1919,7 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
    when the file changes. It is unrelated to the database's own VERSION,
    which governs schema upgrades and must not be moved for a cosmetic
    change. */
-const APP_VERSION = '1.19';
+const APP_VERSION = '1.20';
 
 /* Nothing is imported at the top any more. The Firebase libraries are
    several hundred kilobytes and, loaded this way, the browser must fetch
@@ -3144,12 +3144,14 @@ function saveMagazine(m){
    are not on that tab to need an answer. */
 function afterSavedChange(){
   if(State.etab === 'issue' && State.loaded) renderEditorChrome();
+  noteEdit();
 }
 function savePages(){
   setStatus('Saving…');
   later('savep', async () => {
     try{ await dbSet('pages', State.pages); setStatus('Saved'); }
     catch(e){ setStatus('Not saved — ' + e.message); }
+    afterSavedChange();
   }, 600);
 }
 
@@ -3183,12 +3185,13 @@ function toast(msg, label, fn){
    moved. Kept apart, they wait for you instead: leave a piece, come
    back, and its five are still there.
    --------------------------------------------------------------------- */
-const UNDO_DEEP = 5;
-const undoLists = new Map();
-let undoing = false;
+const UNDO_DEEP = 50;
+const undoBooks = new Map();
+let undoLabelNext = null;
+
 /* Which piece is in front of you. The two screens with no article open
    — the pool and a magazine — have their own, which is where an article
-   deleted from them puts its offer, since that is where you are left
+   deleted from them leaves its step, since that is where you are left
    standing when it goes. */
 function undoKey(){
   if(State.etab === 'settings') return 'page:' + (State.curPage || '-');
@@ -3197,35 +3200,119 @@ function undoKey(){
   if(State.etab === 'issue'){ const m = curMag(); return 'mag:' + (m ? m.id : '-'); }
   return 'pool';
 }
-function undoList(key){
-  const k = key || undoKey();
-  if(!undoLists.has(k)) undoLists.set(k, []);
-  return undoLists.get(k);
+/* The whole of a piece, written down. Compared against the last one
+   written down, it says both whether anything changed and what it was
+   before — which is every kind of change at once, including the ones
+   nobody has thought of yet. */
+const snapNow = () => { const d = curDoc(); return d ? JSON.stringify(d.blocks) : null; };
+function bookFor(){
+  const k = undoKey();
+  if(!undoBooks.has(k))
+    undoBooks.set(k, { past:[], future:[], seen: snapNow(), t:0 });
+  return undoBooks.get(k);
 }
-function offerUndo(msg, fn){
-  /* Undoing is not itself one of the things you did. */
-  if(undoing) return;
-  const list = undoList();
-  list.push({ msg, fn });
-  while(list.length > UNDO_DEEP) list.shift();
+/* Called as a piece is opened, so its mark is taken before it is
+   touched rather than after the first change. */
+function openBook(){ bookFor(); }
+
+/* What to call the next change. Set by the deliberate acts just before
+   they happen; anything that says nothing is typing. */
+function undoLabel(msg){ undoLabelNext = msg; }
+
+/* Where the cursor is in the block being written in, so that stepping
+   back puts it where it was rather than at the end of the paragraph. */
+function caretNow(){
+  const id = State.focusBlock;
+  const ed = id && $(`.blk[data-id="${id}"] .ed`);
+  if(!ed || document.activeElement !== ed) return null;
+  const sel = getSelection();
+  if(!sel.rangeCount) return null;
+  const r = sel.getRangeAt(0);
+  const upto = document.createRange();
+  upto.selectNodeContents(ed);
+  upto.setEnd(r.endContainer, r.endOffset);
+  return { id, at: upto.toString().length };
+}
+
+/* Every change to the piece passes through here, once it has settled
+   and been written down — so a letter typed, a block added, a crop, a
+   size, all arrive by the same road and none of them has to say so. */
+function noteEdit(){
+  if(!curDoc()) return;
+  const book = bookFor();
+  const now = snapNow();
+  if(now === null || now === book.seen) return;
+  const typed = !undoLabelNext;
+  const here = State.focusBlock;
+  const t = Date.now();
+  const last = book.past[book.past.length - 1];
+  /* A run of typing in one block is one step, not one a letter. */
+  if(typed && last && last.typed && last.blk === here && t - last.t < 1500){
+    last.after = now; last.t = t; last.caret = caretNow();
+  }else{
+    book.past.push({ label: undoLabelNext || 'Typing', before: book.seen, after: now,
+                     typed, blk: here, t, caret: caretNow() });
+    while(book.past.length > UNDO_DEEP) book.past.shift();
+  }
+  /* Doing something new is what ends a run of stepping back. */
+  book.future.length = 0;
+  book.seen = now;
+  undoLabelNext = null;
   markUndo();
 }
-function takeUndo(){
-  const list = undoList();
-  const last = list.pop();
-  if(!last) return;
-  undoing = true;
-  try{ last.fn(); }
-  finally{ undoing = false; }
+
+/* The things that are not changes to a piece — an article deleted, or
+   taken out of an issue, or moved along it — cannot be a snapshot of
+   the piece, so they bring their own way back and forward. */
+function pushUndo(label, undo, redo){
+  const book = bookFor();
+  book.past.push({ label, undo, redo });
+  while(book.past.length > UNDO_DEEP) book.past.shift();
+  book.future.length = 0;
+  markUndo();
+}
+
+function restoreDoc(snap, caret){
+  const d = curDoc();
+  if(!d || snap == null) return;
+  d.blocks = JSON.parse(snap);
+  if(State.articles[d.id]){ ensureHead(d); syncHead(d); }
+  const where = caret ? Math.max(0, caret.at) : 'end';
+  renderBlocks(caret ? caret.id : null, caret ? where : 0);
+  renderSide();
+  saveDoc({ fast:true });
+}
+/* The mark is taken from the piece as it now stands rather than from
+   the writing that was put back, because putting it back also tidies it
+   — a header with its parts in order, a body that is never empty — and
+   a mark that ignored the tidying would read as a change nobody made,
+   which would record itself as a new step and throw away the way
+   forward. */
+function stepBack(){
+  const book = bookFor();
+  const e = book.past.pop();
+  if(!e) return;
+  if(e.undo) e.undo(); else restoreDoc(e.before, e.caret);
+  book.seen = snapNow();
+  book.future.push(e);
+  markUndo();
+}
+function stepOn(){
+  const book = bookFor();
+  const e = book.future.pop();
+  if(!e) return;
+  if(e.redo) e.redo(); else restoreDoc(e.after, e.caret);
+  book.seen = snapNow();
+  book.past.push(e);
   markUndo();
 }
 function markUndo(){
-  const btn = $('#undoBtn');
-  if(!btn) return;
-  const list = undoList();
-  const top = list[list.length - 1];
-  btn.disabled = !top;
-  btn.title = top ? 'Undo — ' + top.msg : 'Nothing to undo';
+  const book = bookFor();
+  const u = $('#undoBtn'), r = $('#redoBtn');
+  const back = book.past[book.past.length - 1];
+  const on = book.future[book.future.length - 1];
+  if(u){ u.disabled = !back; u.title = back ? 'Undo ' + back.label + ' (Ctrl+Z)' : 'Nothing to undo'; }
+  if(r){ r.disabled = !on; r.title = on ? 'Redo ' + on.label + ' (Ctrl+Shift+Z)' : 'Nothing to redo'; }
 }
 
 function busy(msg){
@@ -5604,15 +5691,18 @@ function goEditor(hash){
    so the screen goes with it. */
 function unplaceArticle(a, m){
   if(a.publishedIn && !confirm(`This article is published in issue ${a.publishedIn}. Taking it out here does not change that issue until you republish. Take it out anyway?`)) return;
+  const at = arr(m.contents).indexOf(a.id);
+  takeOutOfIssue(a, m);
+  pushUndo('taking it out of the issue',
+    () => { placeArticle(a, m, at < 0 ? undefined : at); goEditor('editor/issue/' + a.id); },
+    () => takeOutOfIssue(a, m));
+}
+function takeOutOfIssue(a, m){
   m.contents = arr(m.contents).filter(x => x !== a.id);
   a.magazine = null;
   saveMagazine(m);
   saveArticle(a, { fast:true });
   goEditor('editor/write/' + a.id);
-  offerUndo('Back in the pool, and open here.', () => {
-    placeArticle(a, m);
-    goEditor('editor/issue/' + a.id);
-  });
 }
 
 function placeArticle(a, m, at){
@@ -5861,6 +5951,7 @@ const DESIGN_FIELDS = [
    The same article editor on both working tabs: the pool's piece on
    Write, the issue's on Issue. */
 function renderWork(){
+  openBook();
   const work = $('#work');
   work.textContent = '';
   /* The magazine's own faces, so a block that says nothing about its
@@ -6075,11 +6166,15 @@ function fmtBar(){
   face.onchange = () => setFace(face.value);
   bar.append(face);
 
-  /* The last five things done to this piece, nearest first. */
+  /* The way back through this piece, and the way forward again. */
   const undo = h('button', { class:'btn small', id:'undoBtn', text:'\u21B6 Undo' });
   undo.onmousedown = e => e.preventDefault();
-  undo.onclick = takeUndo;
+  undo.onclick = stepBack;
   bar.append(undo);
+  const redo = h('button', { class:'btn small', id:'redoBtn', text:'\u21B7 Redo' });
+  redo.onmousedown = e => e.preventDefault();
+  redo.onclick = stepOn;
+  bar.append(redo);
 
   setTimeout(() => { markAligns(); markTsizes(); markFace(); markUndo(); }, 0);
   return bar;
@@ -6100,6 +6195,7 @@ function addBlockHere(proto, focus){
   if(!d) return null;
   const at = insertPoint();
   if(at) return insertAfter(at, proto, focus);
+  undoLabel('adding the block');
   const nb = Object.assign({ id: uid('b') }, proto);
   d.blocks = arr(d.blocks).concat([nb]);
   renderBlocks(focus ? nb.id : null, 0);
@@ -6127,12 +6223,8 @@ function markFace(){
 function setFace(which){
   const b = focusedBlock();
   if(!b) return;
-  const was = b.face;
+  undoLabel(FACE_KEYS.includes(which) ? 'typeface' : 'the magazine face');
   if(FACE_KEYS.includes(which)) b.face = which; else delete b.face;
-  offerUndo(FACE_KEYS.includes(which) ? FACES[which].label + '.' : 'Back to the magazine face.', () => {
-    if(was === undefined) delete b.face; else b.face = was;
-    renderBlocks(); markFace(); saveDoc({ fast:true });
-  });
   saveDoc({ fast:true });
   const ed = $(`.blk[data-id="${b.id}"] .ed`);
   if(ed){
@@ -6151,12 +6243,8 @@ function markTsizes(){
 function setTsize(how){
   const b = focusedBlock();
   if(!b) return;
-  const was = b.tsize;
+  undoLabel('text size');
   if(how === 'm') delete b.tsize; else b.tsize = how;
-  offerUndo('Text size ' + TSIZE_LABEL[how] + '.', () => {
-    if(was === undefined) delete b.tsize; else b.tsize = was;
-    renderBlocks(); markTsizes(); saveDoc({ fast:true });
-  });
   saveDoc({ fast:true });
   const ed = $(`.blk[data-id="${b.id}"] .ed`);
   if(ed){
@@ -6169,12 +6257,8 @@ function setTsize(how){
 function setAlign(how){
   const b = focusedBlock();
   if(!b) return;
-  const was = b.align;
+  undoLabel('alignment');
   b.align = how;
-  offerUndo('Aligned ' + how + '.', () => {
-    if(was === undefined) delete b.align; else b.align = was;
-    renderBlocks(); markAligns(); saveDoc({ fast:true });
-  });
   saveDoc({ fast:true });
   const ed = $(`.blk[data-id="${b.id}"] .ed`);
   if(ed){ ed.classList.remove('al-center','al-right'); if(how !== 'left') ed.classList.add('al-' + how); }
@@ -6344,6 +6428,14 @@ function textNode(b){
       if(b.t === 'title'){ renderSide(); renderEditorChrome(); }
     }
     saveDoc();
+  });
+  /* The same again for an undo asked for by any other road — a menu, a
+     trackpad gesture — which never passes the key handler. */
+  ed.addEventListener('beforeinput', e => {
+    if(e.inputType === 'historyUndo' || e.inputType === 'historyRedo'){
+      e.preventDefault();
+      if(e.inputType === 'historyUndo') stepBack(); else stepOn();
+    }
   });
   ed.addEventListener('keydown', e => onKey(e, b, ed));
   ed.addEventListener('paste', e => onPaste(e, b, ed));
@@ -6823,15 +6915,11 @@ function openCrop(b, f, done){
 
   draw();
   $('#cropGo').onclick = () => {
-    const wasCrop = b.crop, wasShape = b.shape;
+    undoLabel(isWholeCrop(c) ? 'clearing the crop' : 'the crop');
     b.crop = isWholeCrop(c) ? undefined : { x:+c.x.toFixed(4), y:+c.y.toFixed(4),
                                             w:+c.w.toFixed(4), h:+c.h.toFixed(4) };
     b.shape = undefined;              // the crop is the shape now
     done();
-    offerUndo(b.crop ? 'Cropped.' : 'Crop cleared.', () => {
-      b.crop = wasCrop; b.shape = wasShape;
-      done();
-    });
   };
   dlg.returnValue = '';
   dlg.onclose = null;
@@ -7088,6 +7176,7 @@ function onKey(e, b, ed){
     tail.setEnd(ed, ed.childNodes.length);
     const tmp = document.createElement('div');
     tmp.appendChild(tail.extractContents());
+    undoLabel('splitting the paragraph');
     b.html = (b.t === 'h2' || b.t === 'h3') ? escapeHtml(plainText(ed.innerHTML)) : sanitizeInline(ed.innerHTML);
     const nb = { id: uid('b'), t:'p', html: sanitizeInline(tmp.innerHTML) };
     const doc = curDoc();
@@ -7104,6 +7193,7 @@ function onKey(e, b, ed){
       if(!plainText(b.html)){ doc.blocks.splice(i, 1); renderBlocks(); saveDoc({ fast:true }); }
       return;
     }
+    undoLabel('joining the paragraphs');
     const joinAt = plainText(prev.html).length;
     prev.html = (prev.t === 'h2' || prev.t === 'h3')
       ? escapeHtml(plainText(prev.html) + plainText(b.html))
@@ -7162,6 +7252,7 @@ function onPaste(e, b, ed){
   }
 }
 function insertParagraphs(b, ed, paras){
+  undoLabel(paras.length > 1 ? 'pasting' : 'the paste');
   const s = getSelection();
   if(s.rangeCount && !s.isCollapsed) s.getRangeAt(0).deleteContents();
   if(paras.length === 1 && ed){ document.execCommand('insertHTML', false, paras[0]); return [b]; }
@@ -7195,12 +7286,13 @@ function insertParagraphs(b, ed, paras){
 }
 
 /* ---------- moving blocks about ---------- */
-function moveBlock(b, d, quiet){
+function moveBlock(b, d){
   const doc = docOfBlock(b.id) || curDoc();
   const i = doc.blocks.indexOf(b), j = i + d;
   if(j < 0 || j >= doc.blocks.length) return;
   /* the header stays at the top, and nothing moves through it */
   if(isHeadBlock(b) || isHeadBlock(doc.blocks[j])) return;
+  undoLabel(d < 0 ? 'moving it up' : 'moving it down');
   [doc.blocks[i], doc.blocks[j]] = [doc.blocks[j], doc.blocks[i]];
   /* the editor is on screen on every tab now, so it always redraws */
   {
@@ -7209,13 +7301,11 @@ function moveBlock(b, d, quiet){
     if(row) row.scrollIntoView({ block:'nearest' });
   }
   saveDoc({ fast:true });
-  /* Putting it back is the same move the other way, so the offer asks
-     for that rather than remembering where it was. Quiet when it is
-     itself an undo, or the offer would only ever undo itself. */
-  if(!quiet) offerUndo(d < 0 ? 'Moved up.' : 'Moved down.', () => moveBlock(b, -d, true));
 }
 function insertAfter(b, proto, focus){
   const doc = docOfBlock(b.id) || curDoc();
+  undoLabel(proto.t === 'fig' ? 'adding the photograph'
+          : proto.t === 'video' ? 'adding the film' : 'adding the block');
   const nb = Object.assign({ id: uid('b') }, proto);
   /* "below" a part of the header means below the whole of it */
   const at = isHeadBlock(b)
@@ -7230,7 +7320,7 @@ function deleteBlock(b){
   if(isHeadBlock(b)) return;        // the header has no delete, but be sure
   const doc = docOfBlock(b.id) || curDoc();
   const i = doc.blocks.indexOf(b);
-  const empty = b.t !== 'fig' && !plainText(b.html);
+  undoLabel('deleting the block');
   /* A photograph in the gallery stays in it: the entry carries the file
      it points at, so deleting the figure here loses the place it was
      printed, not the photograph itself. */
@@ -7239,12 +7329,6 @@ function deleteBlock(b){
   renderBlocks();
   renderSide();
   saveDoc({ fast:true });
-  /* An empty paragraph taken out has lost nothing, so there is nothing
-     to offer putting back. */
-  if(!empty) offerUndo('Deleted.', () => {
-    doc.blocks.splice(Math.min(i, doc.blocks.length), 0, b);
-    renderBlocks(); renderSide(); saveDoc({ fast:true });
-  });
 }
 
 /* ---------- photographs ---------- */
@@ -7674,6 +7758,7 @@ function openPlaceSheet(cands, after){
 /* The blocks themselves, in the order they were shown, each one after
    the last so a batch keeps the order it was picked in. */
 function placeCandidates(cands, shared, after, mag){
+  undoLabel(cands.length > 1 ? 'adding the photographs' : 'adding the photograph');
   const doc = curDoc();
   if(!doc) return;
   const blocks = arr(doc.blocks);
@@ -7755,20 +7840,27 @@ function deleteArticle(a){
   /* where it was in the issue, so putting it back puts it back there
      rather than at the end */
   const at = m ? arr(m.contents).indexOf(a.id) : -1;
+  dropArticle(a, m);
+  pushUndo(`deleting “${a.title || 'Untitled'}”`,
+    () => {
+      State.articles[a.id] = a;
+      saveArticle(a, { fast:true });
+      if(m) placeArticle(a, m, at < 0 ? undefined : at);
+      goEditor('editor/' + tabOf(a) + '/' + a.id);
+    },
+    () => dropArticle(a, m));
+}
+/* The deleting itself, without the asking — so that doing it again
+   after stepping back is the same act rather than a copy of it. */
+function dropArticle(a, m){
   if(m){ m.contents = arr(m.contents).filter(x => x !== a.id); saveMagazine(m); }
   delete State.articles[a.id];
   dbDel('articles/' + a.id);
   clearArticle(m ? 'issue' : 'write');
   goEditor(m ? 'editor/issue' : 'editor/write');
-  offerUndo(`“${a.title || 'Untitled'}” deleted.`, () => {
-    State.articles[a.id] = a;
-    saveArticle(a, { fast:true });
-    if(m) placeArticle(a, m, at < 0 ? undefined : at);
-    goEditor('editor/' + tabOf(a) + '/' + a.id);
-  });
 }
 
-function moveInIssue(m, i, d){
+function moveInIssue(m, i, d, quiet){
   const j = i + d;
   const c = arr(m.contents);
   if(j < 0 || j >= c.length) return;
@@ -7777,6 +7869,10 @@ function moveInIssue(m, i, d){
   saveMagazine(m);
   renderSide();
   redrawPreview(200);
+  /* Putting it back is the same move the other way. */
+  if(!quiet) pushUndo(d < 0 ? 'moving it earlier' : 'moving it later',
+    () => moveInIssue(m, j, -d, true),
+    () => moveInIssue(m, i, d, true));
 }
 function deleteMagazine(m){
   /* An article outlives the issue it was put in: deleting the issue hands
@@ -10577,6 +10673,18 @@ function wire(){
     if(State.mode === 'edit'){
       if(e.key === 'Escape' && selected) select(null);
       if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k'){ e.preventDefault(); addLink(); }
+      /* Taken from the browser, which keeps its own account of the words
+         inside one block and knows nothing of the blocks themselves. Two
+         accounts would answer differently depending on where the cursor
+         happened to be, so there is one, and it is this one. */
+      if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z'){
+        e.preventDefault();
+        if(e.shiftKey) stepOn(); else stepBack();
+        return;
+      }
+      if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y'){
+        e.preventDefault(); stepOn(); return;
+      }
       return;
     }
     if(e.target.matches('input, textarea, select')){
