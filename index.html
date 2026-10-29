@@ -919,7 +919,15 @@ dialog #coverBody .subhead:first-child{margin-top:.2rem}
   display:grid;grid-template-columns:150px minmax(0,1fr);gap:.7rem;
   background:#fff;border:1px solid var(--e-line);border-radius:8px;padding:.5rem;
 }
-#editor .fig-thumb{width:150px;max-height:150px;object-fit:contain;background:#eee;border-radius:4px}
+/* A thumbnail is the shape of the picture in it. Giving the box one
+   fixed side and capping the other is what squares a tall photograph
+   up: the cap wins, the fixed side does not give, and the shape the box
+   was asked for is lost. Both sides are a limit here, and the picture
+   decides what it is within them. */
+#editor .fig-thumb{
+  width:auto;height:auto;max-width:150px;max-height:150px;
+  background:#eee;border-radius:4px;
+}
 #editor .fig .ed-cap{font-size:.95rem;min-height:2.2em}
 #editor .fig-row{display:flex;gap:.4rem;align-items:center;margin-bottom:.35rem;flex-wrap:wrap}
 #editor .fig-row select{width:auto;margin:0}
@@ -1344,9 +1352,14 @@ dialog#dlgCrop .chips .btn[aria-pressed="true"]{
   background:var(--e-accent);color:var(--e-on-accent);border-color:var(--e-accent);
 }
 /* the crop, shown small beside the block it belongs to */
+/* A crop is a window with the picture pushed about behind it, and the
+   picture is placed in shares of the window — so a window of the wrong
+   shape does not crop differently, it stretches what it shows. The
+   width is taken as narrow as either limit requires and the crop's own
+   shape gives the height, so the window is never the wrong shape. */
 #editor .fig-thumb.crop-thumb{
   position:relative;overflow:hidden;display:block;
-  width:150px;height:auto;aspect-ratio:var(--ar);max-height:150px;
+  width:min(150px, calc(150px * var(--ar)));height:auto;aspect-ratio:var(--ar);
   background:#eee;border-radius:4px;
 }
 #editor .fig-thumb.crop-thumb img{
@@ -1386,10 +1399,10 @@ dialog#dlgAdd .fp-row input[type="search"]{flex:1 1 10rem;margin:0;min-width:0;
    holds: a crop shown here at the wrong shape would be the same lie
    the whole change was meant to fix. */
 .place-pic.cropped{
-  position:relative;height:11rem;width:auto;aspect-ratio:var(--ar);
-  max-width:100%;margin-inline:auto;
+  position:relative;width:min(100%, calc(11rem * var(--ar)));height:auto;
+  aspect-ratio:var(--ar);max-width:100%;margin-inline:auto;
 }
-.place-row > .place-pic.cropped{height:4.6rem;max-width:9rem}
+.place-row > .place-pic.cropped{width:min(9rem, calc(4.6rem * var(--ar)));height:auto;max-width:9rem}
 .place-pic.cropped > img{
   position:absolute;left:calc(var(--lx) * 1%);top:calc(var(--ly) * 1%);
   width:calc(var(--sw) * 1%);height:calc(var(--sh) * 1%);
@@ -1904,7 +1917,7 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
    when the file changes. It is unrelated to the database's own VERSION,
    which governs schema upgrades and must not be moved for a cosmetic
    change. */
-const APP_VERSION = '1.16';
+const APP_VERSION = '1.17';
 
 /* Nothing is imported at the top any more. The Firebase libraries are
    several hundred kilobytes and, loaded this way, the browser must fetch
@@ -5404,7 +5417,10 @@ function openMagSettings(existing){
       onclick: () => { dlg.close(); deleteMagazine(m); } },
       m.published ? 'Unpublish and delete' : 'Delete this magazine')));
 
-  dlg.showModal();
+  /* Drawn again while it is already up — a cover arriving, or one being
+     taken away — the window has been rebuilt and only needs showing the
+     first time. */
+  if(!dlg.open) dlg.showModal();
 }
 
 /* ---------------------------------------------------------------------
@@ -7217,6 +7233,12 @@ async function setCover(file){
     saveMagazine(m);
     renderSide();
     redrawPreview(120);
+    /* The window that asked for the photograph is still in front of you,
+       and it drew its thumbnail before there was a photograph to draw.
+       Taking a cover away has always redrawn it; putting one there has
+       to do the same, or the only place the new cover does not appear is
+       the window you chose it in. */
+    if($('#dlgMagSet').open) openMagSettings(m);
     setStatus('');
   }catch(e){ toast(e.message); }
 }
