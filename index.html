@@ -1205,6 +1205,24 @@ body.pdf-building #editor .work,body.pdf-building #editor .sp-grip{display:none!
 #gate .sr{display:block;font-size:0;margin-bottom:0}   /* label for readers only */
 /* signed in, but not an editor — the form is no use, the way out is */
 
+/* The offer to put the last thing back. It is not a message and does
+   not behave like one: it waits rather than fading, and a message
+   arriving moves it rather than replacing it. */
+#undo{
+  position:fixed;left:50%;bottom:1.2rem;transform:translateX(-50%);
+  background:var(--e-accent);color:#fff;padding:.45rem .5rem .45rem 1rem;
+  border-radius:8px;z-index:121;display:flex;gap:.5rem;align-items:center;
+  max-width:90vw;font-family:var(--ui);font-size:14px;
+  box-shadow:0 6px 18px rgba(0,0,0,.25);
+}
+#undo button{
+  font:inherit;font-weight:600;color:#fff;background:rgba(255,255,255,.18);
+  border:0;border-radius:6px;padding:.2rem .6rem;cursor:pointer;
+}
+#undo button:hover{background:rgba(255,255,255,.3)}
+#undo button.x{font-weight:400;padding:.2rem .45rem;background:none}
+#undo button.x:hover{background:rgba(255,255,255,.2)}
+body.has-undo #toast{bottom:4.3rem}
 #toast{
   position:fixed;left:50%;bottom:1.2rem;transform:translateX(-50%);
   background:#1d2328;color:#fff;padding:.6rem 1rem;border-radius:8px;z-index:120;
@@ -1737,6 +1755,9 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
 <input type="file" id="fileImages" accept="image/*" multiple hidden>
 <input type="file" id="fileCover" accept="image/*" hidden>
 <div id="toast" role="status" hidden></div>
+<!-- The last undoable thing, kept apart from the messages so that one
+     cannot take the other away. -->
+<div id="undo" hidden></div>
 <div id="busy" hidden><div class="box" id="busyText"></div></div>
 
 <dialog id="dlgImport">
@@ -1917,7 +1938,7 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
    when the file changes. It is unrelated to the database's own VERSION,
    which governs schema upgrades and must not be moved for a cosmetic
    change. */
-const APP_VERSION = '1.17';
+const APP_VERSION = '1.18';
 
 /* Nothing is imported at the top any more. The Firebase libraries are
    several hundred kilobytes and, loaded this way, the browser must fetch
@@ -3161,6 +3182,46 @@ function toast(msg, label, fn){
   clearTimeout(timers.toast);
   timers.toast = setTimeout(() => { t.hidden = true; }, label ? 10000 : 4500);
 }
+/* ---------------------------------------------------------------------
+   Putting the last thing back
+
+   One offer, always the most recent undoable thing. It waits instead of
+   counting down, because an offer that has gone by the time you look up
+   is not an offer. A message no longer carries it off either: they are
+   different things and now they are in different boxes.
+
+   What it will not do is reach into a piece you have left. The offer
+   holds a reference to the document it came from, so an undo taken
+   after walking away would change that document out of sight. It is
+   dropped when the screen it belongs to is no longer the one in front
+   of you.
+   --------------------------------------------------------------------- */
+let undoAt = null;
+function undoScope(){
+  if(State.etab === 'settings') return 'page:' + State.curPage;
+  const a = curArt(), m = curMag();
+  return State.etab + '|' + (a ? a.id : '-') + '|' + (m ? m.id : '-');
+}
+function offerUndo(msg, fn){
+  const box = $('#undo');
+  if(!box) return;
+  undoAt = undoScope();
+  box.textContent = '';
+  box.append(msg);
+  box.append(h('button', { text:'Undo', onclick: () => { const go = fn; clearUndo(); go(); } }));
+  box.append(h('button', { class:'x', text:'\u2715', title:'Leave it', 'aria-label':'Dismiss' ,
+    onclick: clearUndo }));
+  box.hidden = false;
+  document.body.classList.add('has-undo');
+}
+function clearUndo(){
+  undoAt = null;
+  const box = $('#undo');
+  if(box){ box.hidden = true; box.textContent = ''; }
+  document.body.classList.remove('has-undo');
+}
+function checkUndo(){ if(undoAt !== null && undoAt !== undoScope()) clearUndo(); }
+
 function busy(msg){
   const b = $('#busy');
   if(!msg){ b.hidden = true; return Promise.resolve(); }
@@ -5541,11 +5602,11 @@ function unplaceArticle(a, m){
   a.magazine = null;
   saveMagazine(m);
   saveArticle(a, { fast:true });
-  toast('Back in the pool, and open here.', 'Undo', () => {
+  goEditor('editor/write/' + a.id);
+  offerUndo('Back in the pool, and open here.', () => {
     placeArticle(a, m);
     goEditor('editor/issue/' + a.id);
   });
-  goEditor('editor/write/' + a.id);
 }
 
 function placeArticle(a, m, at){
@@ -5794,6 +5855,7 @@ const DESIGN_FIELDS = [
    The same article editor on both working tabs: the pool's piece on
    Write, the issue's on Issue. */
 function renderWork(){
+  checkUndo();
   const work = $('#work');
   work.textContent = '';
   /* The magazine's own faces, so a block that says nothing about its
@@ -6054,7 +6116,12 @@ function markFace(){
 function setFace(which){
   const b = focusedBlock();
   if(!b) return;
+  const was = b.face;
   if(FACE_KEYS.includes(which)) b.face = which; else delete b.face;
+  offerUndo(FACE_KEYS.includes(which) ? FACES[which].label + '.' : 'Back to the magazine face.', () => {
+    if(was === undefined) delete b.face; else b.face = was;
+    renderBlocks(); markFace(); saveDoc({ fast:true });
+  });
   saveDoc({ fast:true });
   const ed = $(`.blk[data-id="${b.id}"] .ed`);
   if(ed){
@@ -6073,7 +6140,12 @@ function markTsizes(){
 function setTsize(how){
   const b = focusedBlock();
   if(!b) return;
+  const was = b.tsize;
   if(how === 'm') delete b.tsize; else b.tsize = how;
+  offerUndo('Text size ' + TSIZE_LABEL[how] + '.', () => {
+    if(was === undefined) delete b.tsize; else b.tsize = was;
+    renderBlocks(); markTsizes(); saveDoc({ fast:true });
+  });
   saveDoc({ fast:true });
   const ed = $(`.blk[data-id="${b.id}"] .ed`);
   if(ed){
@@ -6086,7 +6158,12 @@ function setTsize(how){
 function setAlign(how){
   const b = focusedBlock();
   if(!b) return;
+  const was = b.align;
   b.align = how;
+  offerUndo('Aligned ' + how + '.', () => {
+    if(was === undefined) delete b.align; else b.align = was;
+    renderBlocks(); markAligns(); saveDoc({ fast:true });
+  });
   saveDoc({ fast:true });
   const ed = $(`.blk[data-id="${b.id}"] .ed`);
   if(ed){ ed.classList.remove('al-center','al-right'); if(how !== 'left') ed.classList.add('al-' + how); }
@@ -6735,10 +6812,15 @@ function openCrop(b, f, done){
 
   draw();
   $('#cropGo').onclick = () => {
+    const wasCrop = b.crop, wasShape = b.shape;
     b.crop = isWholeCrop(c) ? undefined : { x:+c.x.toFixed(4), y:+c.y.toFixed(4),
                                             w:+c.w.toFixed(4), h:+c.h.toFixed(4) };
     b.shape = undefined;              // the crop is the shape now
     done();
+    offerUndo(b.crop ? 'Cropped.' : 'Crop cleared.', () => {
+      b.crop = wasCrop; b.shape = wasShape;
+      done();
+    });
   };
   dlg.returnValue = '';
   dlg.onclose = null;
@@ -7102,7 +7184,7 @@ function insertParagraphs(b, ed, paras){
 }
 
 /* ---------- moving blocks about ---------- */
-function moveBlock(b, d){
+function moveBlock(b, d, quiet){
   const doc = docOfBlock(b.id) || curDoc();
   const i = doc.blocks.indexOf(b), j = i + d;
   if(j < 0 || j >= doc.blocks.length) return;
@@ -7116,6 +7198,10 @@ function moveBlock(b, d){
     if(row) row.scrollIntoView({ block:'nearest' });
   }
   saveDoc({ fast:true });
+  /* Putting it back is the same move the other way, so the offer asks
+     for that rather than remembering where it was. Quiet when it is
+     itself an undo, or the offer would only ever undo itself. */
+  if(!quiet) offerUndo(d < 0 ? 'Moved up.' : 'Moved down.', () => moveBlock(b, -d, true));
 }
 function insertAfter(b, proto, focus){
   const doc = docOfBlock(b.id) || curDoc();
@@ -7142,7 +7228,9 @@ function deleteBlock(b){
   renderBlocks();
   renderSide();
   saveDoc({ fast:true });
-  if(!empty) toast('Deleted.', 'Undo', () => {
+  /* An empty paragraph taken out has lost nothing, so there is nothing
+     to offer putting back. */
+  if(!empty) offerUndo('Deleted.', () => {
     doc.blocks.splice(Math.min(i, doc.blocks.length), 0, b);
     renderBlocks(); renderSide(); saveDoc({ fast:true });
   });
@@ -7651,13 +7739,22 @@ async function addArticle(intoMag){
 }
 function deleteArticle(a){
   if(a.publishedIn && !confirm(`This article is published in issue ${a.publishedIn}. Deleting it here does not remove it from that issue. Delete anyway?`)) return;
-  if(!a.publishedIn && !confirm('Delete this article? This cannot be undone.')) return;
+  if(!a.publishedIn && !confirm('Delete this article?')) return;
   const m = a.magazine && State.magazines[a.magazine];
+  /* where it was in the issue, so putting it back puts it back there
+     rather than at the end */
+  const at = m ? arr(m.contents).indexOf(a.id) : -1;
   if(m){ m.contents = arr(m.contents).filter(x => x !== a.id); saveMagazine(m); }
   delete State.articles[a.id];
   dbDel('articles/' + a.id);
   clearArticle(m ? 'issue' : 'write');
   goEditor(m ? 'editor/issue' : 'editor/write');
+  offerUndo(`“${a.title || 'Untitled'}” deleted.`, () => {
+    State.articles[a.id] = a;
+    saveArticle(a, { fast:true });
+    if(m) placeArticle(a, m, at < 0 ? undefined : at);
+    goEditor('editor/' + tabOf(a) + '/' + a.id);
+  });
 }
 
 function moveInIssue(m, i, d){
