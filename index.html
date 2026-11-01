@@ -1126,8 +1126,9 @@ body.pdf-building #editor .work,body.pdf-building #editor .sp-grip{display:none!
 #editor .cu-scroll{flex:1;overflow:auto;padding:1rem 1.2rem 3rem}
 #editor .cu-h{font-size:.78rem;text-transform:uppercase;letter-spacing:.08em;color:var(--e-muted);margin:0}
 #editor .cu-head-row{display:flex;align-items:center;gap:.6rem;margin:1rem 0 .7rem}
-#editor .cu-head-row .btn{margin-inline-start:auto}
-#editor .cu-head-row .btn + .btn{margin-inline-start:.4rem}
+/* The heading does the pushing, not the first button: which button is
+   first depends on the view, and a hidden one is still a sibling. */
+#editor .cu-head-row .cu-h{margin-inline-end:auto}
 #editor .cu-h:first-child{margin-top:0}
 #editor .cu-h .hint{text-transform:none;letter-spacing:0}
 #editor .cu-empty{color:var(--e-muted);font-size:.85rem;margin:0 0 .4rem}
@@ -1137,6 +1138,11 @@ body.pdf-building #editor .work,body.pdf-building #editor .sp-grip{display:none!
 #editor .cu-pic{position:relative;aspect-ratio:4/3;background:#e7e2d6}
 #editor .cu-pic img{width:100%;height:100%;object-fit:cover;display:block}
 #editor .cu-no{position:absolute;top:.3rem;inset-inline-start:.3rem;background:var(--e-accent);color:#fff;font-size:.75rem;padding:.05rem .4rem;border-radius:20px}
+#editor .cu-card.ingal{border-color:var(--e-accent)}
+#editor .cu-tag{
+  position:absolute;top:.3rem;inset-inline-start:.3rem;background:var(--e-accent);color:#fff;
+  font-size:.68rem;letter-spacing:.02em;padding:.08rem .45rem;border-radius:20px;
+}
 #editor .cu-body{padding:.45rem .55rem;display:flex;flex-direction:column;gap:.35rem;flex:1}
 #editor .cu-cap{font-size:.8rem;line-height:1.35}
 #editor .cu-cap em{color:var(--e-muted);font-style:normal}
@@ -1693,6 +1699,7 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
       <div class="cu-head-row">
         <h3 class="cu-h" id="cuHead"></h3>
         <button class="btn small ghost" id="cuUpload" hidden>Upload…</button>
+        <button class="btn small ghost danger" id="cuClear" hidden>Empty the gallery</button>
         <button class="btn small primary" id="cuPublish" hidden>Publish the gallery</button>
       </div>
       <ul class="cu-grid" id="cuGrid"></ul>
@@ -1920,7 +1927,7 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
    when the file changes. It is unrelated to the database's own VERSION,
    which governs schema upgrades and must not be moved for a cosmetic
    change. */
-const APP_VERSION = '1.22';
+const APP_VERSION = '1.23';
 
 /* Nothing is imported at the top any more. The Firebase libraries are
    several hundred kilobytes and, loaded this way, the browser must fetch
@@ -8219,10 +8226,16 @@ const shownShots = () => shownList.map(p => ({
 function photoCard(p, n){
   const on = n != null;
   const icon = inIconSet(p.key);
-  const card = h('li', { class:'cu-card' + (on ? ' on' : '') });
+  /* Which of them are in the gallery has to be plain at a glance. It was
+     only ever said on each card's own button, in a word that reads the
+     same whichever way round it is, so a library entirely inside the
+     gallery looked exactly like one entirely outside it. */
+  const inGal = State.galKind !== 'icons' && photoIsFeatured(p);
+  const card = h('li', { class:'cu-card' + (on ? ' on' : '') + (inGal ? ' ingal' : '') });
 
   const pic = h('div', { class:'cu-pic' }, h('img', { src: figUrl(p.f, 480), alt:'', loading:'lazy' }));
   if(on) pic.append(h('span', { class:'cu-no', text:String(n) }));
+  else if(inGal) pic.append(h('span', { class:'cu-tag', text:'In the gallery' }));
   /* the picture opens the picture — the same screen the reader gets */
   pic.append(h('button', { type:'button', title:'See the photograph',
     onclick: () => openShot(shownShots(), shownList.findIndex(x => x.key === p.key)) }));
@@ -8467,6 +8480,14 @@ function renderCurate(){
   up.title = kind === 'icons'
     ? 'Adds to the icon set without putting one into an article'
     : 'Adds to the library without putting it into an article';
+
+  /* Taking everything out again belongs where what is in it can be
+     seen, rather than beside the filters, which is where the pair that
+     did this put it in from. */
+  const clear = $('#cuClear');
+  clear.hidden = kind !== 'gallery' || !gallerySet().length;
+  clear.title = 'Takes every photograph out of the gallery here. '
+              + 'Readers see no change until it is published.';
 
   /* One gallery, so one thing to send, and it is sent from the view that
      shows what will go. */
@@ -10664,6 +10685,20 @@ function wire(){
     State.galKind = b.dataset.kind;
     renderCurate();
   });
+  $('#cuClear').onclick = () => {
+    const n = gallerySet().length;
+    if(!n) return;
+    /* The editor's list and the published one are different things, and
+       saying so is the whole safety net: there is no undoing this, but
+       there is nothing to undo until it is published. */
+    if(!confirm(`Take all ${n} photograph${n === 1 ? '' : 's'} out of the gallery?\n\n`
+      + 'This cannot be undone. Readers see no change until you publish the gallery, '
+      + 'so you can put back the ones you want first.')) return;
+    State.gallery = [];
+    saveCuration();
+    renderCurate();
+    toast(`The gallery is empty. ${n} photograph${n === 1 ? '' : 's'} taken out.`);
+  };
   $('#cuPublish').onclick = () => publishStaleGalleries();
 
   /* sign in */
