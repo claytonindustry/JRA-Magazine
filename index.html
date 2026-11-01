@@ -1124,7 +1124,10 @@ body.pdf-building #editor .work,body.pdf-building #editor .sp-grip{display:none!
 #editor #cuMag:disabled{opacity:.45}
 #editor .cu-bar{display:flex;gap:.6rem;align-items:center;padding:.45rem .8rem;background:var(--e-panel);border-bottom:1px solid var(--e-line);flex-wrap:wrap}
 #editor .cu-scroll{flex:1;overflow:auto;padding:1rem 1.2rem 3rem}
-#editor .cu-h{font-size:.78rem;text-transform:uppercase;letter-spacing:.08em;color:var(--e-muted);margin:1.2rem 0 .6rem}
+#editor .cu-h{font-size:.78rem;text-transform:uppercase;letter-spacing:.08em;color:var(--e-muted);margin:0}
+#editor .cu-head-row{display:flex;align-items:center;gap:.6rem;margin:1rem 0 .7rem}
+#editor .cu-head-row .btn{margin-inline-start:auto}
+#editor .cu-head-row .btn + .btn{margin-inline-start:.4rem}
 #editor .cu-h:first-child{margin-top:0}
 #editor .cu-h .hint{text-transform:none;letter-spacing:0}
 #editor .cu-empty{color:var(--e-muted);font-size:.85rem;margin:0 0 .4rem}
@@ -1143,7 +1146,6 @@ body.pdf-building #editor .work,body.pdf-building #editor .sp-grip{display:none!
 #editor .cu-row .grow{flex:1 1 5rem;min-width:0}
 #editor .cu-pic button{position:absolute;inset:0;width:100%;height:100%;padding:0;border:0;
   background:none;cursor:zoom-in}
-#editor .cu-card.hid .cu-pic img{opacity:.42;filter:grayscale(1)}
 #editor .cu-bar select{font:inherit;font-size:.82rem;padding:.2rem .35rem;border:1px solid var(--e-line);
   border-radius:6px;background:var(--e-bg);color:inherit;max-width:16rem}
 #editor .chips{display:flex;gap:.2rem}
@@ -1669,33 +1671,32 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
   </section>
 
   <section class="curate" id="curate">
+    <!-- What narrows the library on the left, what part of it to look at
+         on the right, and the library itself underneath. -->
     <div class="cu-bar">
-      <b id="cuTitle">Image gallery</b>
-      <select id="cuMag" title="Which issue's photographs to show"></select>
-      <span class="boxlab inline">Search</span>
+      <b id="cuTitle">Media library</b>
+      <select id="cuMag" aria-label="Filter by magazine"></select>
+      <select id="cuArt" aria-label="Filter by article"></select>
       <input id="cuFind" type="search" autocomplete="off"
-             aria-label="Search every photograph">
+             placeholder="Search" aria-label="Search the media library">
+      <div class="spacer"></div>
       <div class="chips" id="cuKind">
-        <button class="btn small" data-kind="photos">Photographs</button>
+        <button class="btn small" data-kind="all">All</button>
+        <button class="btn small" data-kind="gallery">Gallery</button>
         <button class="btn small" data-kind="icons">Icons</button>
-        <button class="btn small" data-kind="hidden">Hidden</button>
-        <button class="btn small" data-kind="all">Everything</button>
+        <button class="btn small" data-kind="covers">Covers</button>
+        <button class="btn small" data-kind="uploads">Uploads</button>
       </div>
       <span class="hint" id="cuCount"></span>
-      <div class="spacer"></div>
-      <div class="cu-acts">
-        <button class="btn small" id="cuAll">Feature all shown</button>
-        <button class="btn small ghost" id="cuNone">Feature none</button>
-        <button class="btn small ghost" id="cuUpload">Upload an icon…</button>
-        <button class="btn small primary" id="cuPublish">Publish the gallery</button>
-      </div>
     </div>
     <div class="cu-scroll">
-      <h3 class="cu-h" id="cuFeatHead">The featured gallery</h3>
-      <ul class="cu-grid" id="cuFeat"></ul>
-      <p class="cu-empty" id="cuEmpty">Nothing chosen yet.</p>
-      <h3 class="cu-h" id="cuRestHead">Not in the gallery</h3>
-      <ul class="cu-grid" id="cuRest"></ul>
+      <div class="cu-head-row">
+        <h3 class="cu-h" id="cuHead"></h3>
+        <button class="btn small ghost" id="cuUpload" hidden>Upload…</button>
+        <button class="btn small primary" id="cuPublish" hidden>Publish the gallery</button>
+      </div>
+      <ul class="cu-grid" id="cuGrid"></ul>
+      <p class="cu-empty" id="cuEmpty"></p>
     </div>
   </section>
 </div>
@@ -1919,7 +1920,7 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
    when the file changes. It is unrelated to the database's own VERSION,
    which governs schema upgrades and must not be moved for a cosmetic
    change. */
-const APP_VERSION = '1.21';
+const APP_VERSION = '1.22';
 
 /* Nothing is imported at the top any more. The Firebase libraries are
    several hundred kilobytes and, loaded this way, the browser must fetch
@@ -2922,7 +2923,7 @@ const State = {
   icons: [], hidden: [], gallery: [], galleryAt: null, galMigrated: false,
   legacyLoose: [],
   /* the gallery screen's own two filters: which issue, and which kind */
-  galMag: '', galKind: 'photos',
+  galMag: '', galArt: '', galKind: 'all',
   /* the split: how much of the pane the editor takes, which preview the
      other half is showing, and — when the window is too narrow to halve —
      which of the two is on screen. The preview choice is shared by both
@@ -3036,11 +3037,11 @@ async function loadEditorData(){
      down the whole editor on the way in. */
   try{
     const cur = readCuration(await dbGet('icons'));
-    State.icons = cur.icons; State.hidden = cur.hidden;
+    State.icons = cur.icons;
     State.gallery = cur.gallery; State.galleryAt = cur.galleryAt;
     State.galMigrated = cur.migrated; State.legacyLoose = cur.legacyLoose;
   }catch(e){
-    State.icons = []; State.hidden = []; State.gallery = []; State.galleryAt = null;
+    State.icons = []; State.gallery = []; State.galleryAt = null;
     State.legacyLoose = [];
     toast('The icon set could not be read — add "icons" to database.rules.json.');
   }
@@ -5790,7 +5791,7 @@ function sideSettings(side){
       h('button', { class:'btn small ghost', onclick: () => { location.hash = '#editor/issue'; } }, 'The magazine'))));
 }
 const SPANE_LABEL = [
-  ['gallery','Image gallery'],
+  ['gallery','Media library'],
   ['about','About page'],
   ['links','Links page'],
   ['account','Account & settings']
@@ -5849,7 +5850,7 @@ function iconBlockFields(e){
 }
 
 function curationNode(){
-  return { icons: arr(State.icons), hidden: arr(State.hidden),
+  return { icons: arr(State.icons),
            gallery: arr(State.gallery),
            galleryAt: State.galleryAt || null,
            migrated: State.galMigrated === true };
@@ -5899,7 +5900,6 @@ const iconNameOf = (key) => {
   const e = arr(State.icons).find(x => x && x.key === key);
   return (e && e.name) || '';
 };
-const isHiddenPhoto = (key) => arr(State.hidden).includes(key);
 
 function markIcon(f, on, name, capW){
   const key = typeof f === 'string' ? f : photoKey(f);
@@ -5919,16 +5919,12 @@ function moveIcon(key, d){
   renderCurate();
 }
 
-/* ---------- out of the gallery for good ----------
-   Hiding is by address, so one press covers every copy in every issue.
-   It also takes the photograph out of the gallery, which is what leaves
-   the gallery needing to be sent again. */
-function hidePhoto(key, on){
-  State.hidden = arr(State.hidden).filter(k => k !== key);
-  if(on) State.hidden.push(key);
-  if(on) State.gallery = gallerySet().filter(e => e.key !== key);
-  saveCuration();
-}
+/* A photograph could once be marked hidden, which held it out of the
+   gallery whatever else happened to it. It was a third idea beside the
+   library and the gallery, and the only work it did was to stop a
+   caption written for a photograph sweeping it into the gallery by
+   itself. A photograph is in the gallery because somebody put it there,
+   and for no other reason, so there is nothing left for hiding to do. */
 
 /* One figure block inside an issue, with the article it sits in. */
 function blockAndArticle(m, id){
@@ -7381,6 +7377,24 @@ async function addPhotos(files, after){
     await addIconFiles(files);
     return;
   }
+  /* Straight into the library, belonging to no magazine, waiting to be
+     used — which is what the pool is. Nothing is placed, so no article
+     need be open. */
+  if(pickOpts && pickOpts.poolOnly){
+    pickOpts = null;
+    await busy(files.length === 1 ? 'Reading the photograph…'
+                                  : `Reading ${files.length} photographs…`);
+    let made = 0;
+    for(const f of files){
+      try{ await makeImage(f); made++; }
+      catch(e){ toast(e.message); }
+    }
+    busy(null);
+    renderCurate();
+    if(made) toast(made === 1 ? 'One photograph is in the library.'
+                              : `${made} photographs are in the library.`);
+    return;
+  }
   const asIcon = !!(pickOpts && pickOpts.icon);
   pickOpts = null;
 
@@ -8170,10 +8184,9 @@ async function deletePhoto(p){
     ? `Delete ${name}?\n\nIt never reached the host, so this browser holds the only copy and it cannot be got back.`
     : `Remove ${name} from the list?\n\nThe file stays in the bucket and any published issue using its address goes on working. It is the editor's list of uploads it leaves.`))
     return;
-  /* whatever else pointed at it goes too, or the icon set and the hidden
-     list are left holding a name with nothing behind it */
+  /* whatever else pointed at it goes too, or the icon set is left
+     holding a name with nothing behind it */
   State.icons = iconSet().filter(e => e.key !== p.key);
-  State.hidden = arr(State.hidden).filter(k => k !== p.key);
   saveCuration();
   delete State.images[rec.id];
   try{ await dbDel('images/' + rec.id); }
@@ -8205,9 +8218,8 @@ const shownShots = () => shownList.map(p => ({
 
 function photoCard(p, n){
   const on = n != null;
-  const hid = isHiddenPhoto(p.key);
   const icon = inIconSet(p.key);
-  const card = h('li', { class:'cu-card' + (on ? ' on' : '') + (hid ? ' hid' : '') });
+  const card = h('li', { class:'cu-card' + (on ? ' on' : '') });
 
   const pic = h('div', { class:'cu-pic' }, h('img', { src: figUrl(p.f, 480), alt:'', loading:'lazy' }));
   if(on) pic.append(h('span', { class:'cu-no', text:String(n) }));
@@ -8223,7 +8235,7 @@ function photoCard(p, n){
   const cap = gcap || (p.b ? plainText(p.b.caption || '') : (p.rec && p.rec.name) || '');
   const row = h('div', { class:'cu-row' });
 
-  if(on && State.galKind !== 'icons'){
+  if(State.galKind === 'gallery'){
     row.append(h('button', { class:'btn small', title:'Earlier in the gallery',
       onclick: () => moveFeatured(p.key, -1) }, '↑'));
     row.append(h('button', { class:'btn small', title:'Later in the gallery',
@@ -8242,11 +8254,9 @@ function photoCard(p, n){
      set, and an icon is a burgee rather than a photograph to look at. */
   if(State.galKind !== 'icons'){
     const inGal = photoIsFeatured(p);
-    const add = h('button', { class:'btn small grow' + (inGal ? ' ghost' : ''),
-      title: hid ? 'Hidden photographs stay out of the gallery' : '',
-      onclick: () => featurePhoto(p, !inGal) }, inGal ? 'Remove' : 'Add to gallery');
-    if(hid) add.disabled = true;
-    row.append(add);
+    row.append(h('button', { class:'btn small grow' + (inGal ? ' ghost' : ''),
+      onclick: () => featurePhoto(p, !inGal) },
+      inGal ? 'Remove from gallery' : 'Add to gallery'));
   }
 
   /* No star on every card: most photographs are not icons and never
@@ -8256,11 +8266,6 @@ function photoCard(p, n){
   if(State.galKind === 'icons' && icon)
     row.append(h('button', { class:'btn small ghost grow', title:'Take this out of the icon set',
       onclick: () => { markIcon(p.f, false); renderCurate(); } }, 'Not an icon'));
-
-  if(State.galKind !== 'icons')
-    row.append(h('button', { class:'btn small' + (hid ? ' primary' : ''),
-      title: hid ? 'Hidden from the gallery — press to show it again' : 'Keep this out of the gallery',
-      onclick: () => { hidePhoto(p.key, !hid); renderCurate(); } }, hid ? '◍' : '◌'));
 
   /* What a photograph says — its caption, its credit, the line the
      gallery shows — edited here rather than by being thrown into the
@@ -8300,46 +8305,75 @@ function syncGalleryFor(b){
   const f = resolveFig(b, m && m.mediaBase);
   if(!f) return;
   const key = photoKey(f);
-  if(want && isHiddenPhoto(key)){
-    toast('That photograph is hidden from the gallery, so it stays out of it.');
-    return;
-  }
   if(!want && !inGallery(key)) return;
   setInGallery({ key, b, f }, want, galCapOf(b));
 }
 
 function featurePhoto(p, on){
-  if(on && isHiddenPhoto(p.key)){ toast('That photograph is hidden from the gallery.'); return; }
   setInGallery(p, on, p.b ? galCapOf(p.b) : null);
   renderCurate();
 }
 
 /* ---------- the one screen ---------- */
+/* ---------------------------------------------------------------------
+   The media library
+
+   One grid, holding every photograph the magazine has. Two words, and
+   only two: the media library is all of it, and the gallery is the part
+   of it readers are shown. What used to be a featured gallery sitting
+   above a list of everything else is a view of the one library, chosen
+   with the rest.
+
+   The chips do not hold different things — they are ways of looking at
+   the same library: all of it, the part in the gallery, the icon set,
+   the covers, and whatever belongs to no magazine. The two filters and
+   the search narrow whichever is showing, so a cover can be found by
+   its issue and an upload by its name.
+   --------------------------------------------------------------------- */
+const CU_KINDS = ['all','gallery','icons','covers','uploads'];
+const CU_HEAD = { all:'Everything', gallery:'In the gallery', icons:'The icon set',
+                  covers:'Covers', uploads:'In no magazine' };
+
+/* Every article that has a photograph in it, for the second filter. */
+function articlesWithPhotos(m){
+  const list = m ? magArticles(m)
+                 : Object.values(State.articles).filter(a => a && arr(a.blocks).length);
+  return list.filter(a => arr(a.blocks).some(b => b.t === 'fig'));
+}
+
 function renderCurate(){
-  const feat = $('#cuFeat'), rest = $('#cuRest');
-  feat.textContent = ''; rest.textContent = '';
+  const grid = $('#cuGrid');
+  grid.textContent = '';
+  if(!CU_KINDS.includes(State.galKind)) State.galKind = 'all';
   const kind = State.galKind;
 
-  /* ---- which issue ---- */
+  /* ---- filter by magazine ---- */
   const sel = $('#cuMag');
   const mags = magsByNumber();
-  if(State.galMag && State.galMag !== 'pool' && !State.magazines[State.galMag]) State.galMag = '';
+  if(State.galMag && !State.magazines[State.galMag]) State.galMag = '';
   sel.textContent = '';
-  sel.append(h('option', { value:'', text:'All issues' }));
+  sel.append(h('option', { value:'', text:'Filter by magazine' }));
   mags.forEach(m => sel.append(h('option', { value:m.id,
-    text:(m.num ? 'Issue ' + m.num : 'Unnumbered') })));
-  sel.append(h('option', { value:'pool', text:'Uploaded, not in an issue' }));
+    text:(m.num ? 'Issue ' + m.num : 'Unnumbered') + ' · ' + m.month + ' ' + m.year })));
   sel.value = State.galMag;
+
+  /* ---- and by article, within it ---- */
+  const mag = State.galMag ? State.magazines[State.galMag] : null;
+  const arts = articlesWithPhotos(mag);
+  if(State.galArt && !arts.some(a => a.id === State.galArt)) State.galArt = '';
+  const asel = $('#cuArt');
+  asel.textContent = '';
+  asel.append(h('option', { value:'', text:'Filter by article' }));
+  arts.forEach(a => asel.append(h('option', { value:a.id, text: a.title || 'Untitled' })));
+  asel.value = State.galArt;
+  asel.disabled = !arts.length;
 
   $$('#cuKind button').forEach(b =>
     b.setAttribute('aria-pressed', String(b.dataset.kind === kind)));
 
-  /* ---- and the search ----
-     Everything a photograph can be found by, in one line: what its
-     caption says, who took it, what it is called, the article it ran in
-     and the issue that article was in. Searching reaches the whole
-     gallery rather than the issue on screen, because the thing you are
-     usually looking for is the one you cannot remember the issue of. */
+  /* ---- what a photograph can be found by ----
+     What its caption says, who took it, what it is called, the article
+     it ran in and the issue that article was in. */
   const q = ($('#cuFind').value || '').trim().toLowerCase();
   const terms = q.split(/\s+/).filter(Boolean);
   const hay = (p) => [
@@ -8351,87 +8385,93 @@ function renderCurate(){
     photoLabel(p),
     iconNameOf(p.key),
     p.m ? 'issue ' + (p.m.num || '') : '',
+    p.coverOf ? 'cover issue ' + (p.coverOf.num || '') : '',
     p.f.local ? 'not sent' : ''
   ].join(' ').toLowerCase();
 
-  const all = archivePhotos().filter(p => {
-    /* A search looks everywhere. Narrowing it to the issue chosen above
-       would hide the answer whenever the issue was the thing you were
-       trying to find. */
-    if(!terms.length){
-      if(State.galMag === 'pool' && p.m) return false;
-      if(State.galMag && State.galMag !== 'pool' && (!p.m || p.m.id !== State.galMag)) return false;
-    }else{
-      const text = hay(p);
-      if(!terms.every(t => text.includes(t))) return false;
-    }
-    const icon = inIconSet(p.key), hid = isHiddenPhoto(p.key);
-    if(kind === 'icons')  return icon;
-    if(kind === 'hidden') return hid;
-    if(kind === 'all')    return true;
-    return !icon && !hid;                      // 'photos', the everyday view
-  });
+  /* The covers are gathered here rather than taken from the archive,
+     which only lists a cover that is not also printed inside the issue —
+     true of most of them, and a reason for one to be missing from the
+     one view that is entirely about covers. */
+  const coverList = () => magsByNumber().map(m => {
+    if(!m.cover || !State.images[m.cover]) return null;
+    const f = resolveFig({ img: m.cover });
+    return f ? { key:'img:' + m.cover, m:null, b:null, a:null, f, uses:1,
+                 rec: State.images[m.cover], coverOf: m } : null;
+  }).filter(Boolean);
 
-  if(kind === 'icons'){
+  const everything = archivePhotos();
+  let list;
+  if(kind === 'covers') list = coverList();
+  else if(kind === 'icons'){
     /* An icon is one thing however many issues use it, so this is the
        one view where an entry per issue would be wrong. */
     const once = new Map();
-    all.forEach(p => { if(!once.has(p.key)) once.set(p.key, p); });
+    everything.forEach(p => { if(inIconSet(p.key) && !once.has(p.key)) once.set(p.key, p); });
     const order = iconSet().map(e => e.key);
-    const list = [...once.values()].sort((x, y) => order.indexOf(x.key) - order.indexOf(y.key));
-    $('#cuFeatHead').textContent = 'The icon set';
-    $('#cuRestHead').hidden = true;
-    shownList = list;
-    list.forEach((p, i) => feat.append(photoCard(p, i + 1)));
-  }else{
-    const inGal = all.filter(photoIsFeatured);
-    const out = all.filter(p => !photoIsFeatured(p));
-    /* The gallery reads in the order the reader will see it, which is
-       the one order the gallery itself keeps. */
-    const seat = new Map();
-    galleryOrdered().forEach((x, i) => seat.set(x.e.key, i));
-    const at = (p) => seat.has(p.key) ? seat.get(p.key) : 1e9;
-    inGal.sort((x, y) => at(x) - at(y));
-    $('#cuFeatHead').textContent = 'The featured gallery';
-    $('#cuRestHead').hidden = false;
-    $('#cuRestHead').textContent = kind === 'hidden' ? 'Hidden from the gallery'
-      : kind === 'all' ? 'Everything else' : 'Not in the gallery';
-    shownList = inGal.concat(out);
-    inGal.forEach((p, i) => feat.append(photoCard(p, i + 1)));
-    out.forEach(p => rest.append(photoCard(p, null)));
+    list = [...once.values()].sort((x, y) => order.indexOf(x.key) - order.indexOf(y.key));
   }
+  else if(kind === 'gallery'){
+    const order = gallerySet().map(e => e.key);
+    const once = new Map();
+    everything.forEach(p => { if(photoIsFeatured(p) && !once.has(p.key)) once.set(p.key, p); });
+    list = [...once.values()].sort((x, y) => order.indexOf(x.key) - order.indexOf(y.key));
+  }
+  else if(kind === 'uploads'){
+    /* Anything in no magazine: a file placed in nothing, and a
+       photograph in an article still waiting in the pool. The icons and
+       the covers have their own view and are not repeated here. */
+    list = everything.filter(p => !p.m && !p.coverOf && !inIconSet(p.key));
+  }
+  else list = everything;
 
-  /* ---- the bar ---- */
-  const shownIn = shownList.filter(photoIsFeatured).length;
-  const icons = iconSet().length, hidden = arr(State.hidden).length;
-  $('#cuEmpty').hidden = kind === 'icons' ? icons > 0 : shownIn > 0;
-  $('#cuEmpty').textContent = kind === 'icons'
-    ? 'No icons yet. Upload one here, or with + Icon… while writing an article.'
-    : 'Nothing here is in the gallery yet.';
-  $('#cuCount').textContent = terms.length
-    ? (shownList.length
-        ? `${shownList.length} match${shownList.length === 1 ? '' : 'es'}, everywhere`
-        : 'Nothing matches that.')
+  /* ---- and then narrowed, whichever view it is ---- */
+  const shown = list.filter(p => {
+    if(State.galMag){
+      const inMag = (p.m && p.m.id === State.galMag)
+                 || (p.coverOf && p.coverOf.id === State.galMag);
+      if(!inMag) return false;
+    }
+    if(State.galArt && (!p.a || p.a.id !== State.galArt)) return false;
+    if(terms.length && !terms.every(t => hay(p).includes(t))) return false;
+    return true;
+  });
+
+  shownList = shown;
+  const numbered = kind === 'gallery' || kind === 'icons';
+  shown.forEach((p, i) => grid.append(photoCard(p, numbered ? i + 1 : null)));
+
+  /* ---- what it says about itself ---- */
+  $('#cuHead').textContent = CU_HEAD[kind];
+  const n = shown.length;
+  $('#cuCount').textContent = n
+    ? `${n} photograph${n === 1 ? '' : 's'}`
+    : '';
+  $('#cuEmpty').hidden = n > 0;
+  $('#cuEmpty').textContent = terms.length || State.galMag || State.galArt
+    ? 'Nothing here matches that.'
     : kind === 'icons'
-      ? `${icons} icon${icons === 1 ? '' : 's'}`
-      : `${shownList.length} shown · ${shownIn} in the gallery · `
-        + `${icons} icon${icons === 1 ? '' : 's'} · ${hidden} hidden`;
-  /* while a search is running the issue picker is not what is being
-     shown, so it says so rather than lying about it */
-  $('#cuMag').disabled = !!terms.length;
-  $('#cuMag').title = terms.length
-    ? 'A search looks through every issue'
-    : "Which issue's photographs to show";
+      ? 'No icons yet. Upload one here, or with + Icon… while writing an article.'
+      : kind === 'gallery'
+        ? 'Nothing is in the gallery yet. Add photographs to it from All.'
+        : kind === 'covers'
+          ? 'No magazine has a cover yet.'
+          : kind === 'uploads'
+            ? 'Nothing here. Upload a photograph and it waits in this pool until it is used.'
+            : 'No photographs yet.';
 
-  $('#cuAll').hidden = kind === 'icons' || State.galMag === 'pool' || !!terms.length;
-  $('#cuNone').hidden = kind === 'icons' || State.galMag === 'pool' || !!terms.length;
-  $('#cuUpload').hidden = kind !== 'icons';
+  /* ---- and the one button each view has ---- */
+  const up = $('#cuUpload');
+  up.hidden = !(kind === 'icons' || kind === 'uploads');
+  up.textContent = kind === 'icons' ? 'Upload an icon…' : 'Upload…';
+  up.title = kind === 'icons'
+    ? 'Adds to the icon set without putting one into an article'
+    : 'Adds to the library without putting it into an article';
 
-  /* One gallery, so one thing to send. The old button counted issues,
-     which is how a photograph featured in an issue that had not been
-     published could leave the button saying everything was up to date
-     while the public gallery had never heard of it. */
+  /* One gallery, so one thing to send, and it is sent from the view that
+     shows what will go. */
   const btn = $('#cuPublish');
+  btn.hidden = kind !== 'gallery';
   const waiting = galleryIsStale();
   btn.disabled = !waiting;
   btn.textContent = waiting ? 'Publish the gallery' : 'The gallery is up to date';
@@ -9822,10 +9862,9 @@ function coverPayload(m){
    deleted still goes out, pointing at nothing but the file.
    --------------------------------------------------------------------- */
 function galleryPayload(){
-  const hidden = new Set(arr(State.hidden));
   const out = [];
   galleryOrdered().forEach(({ e, home }) => {
-    if(!e || hidden.has(e.key)) return;
+    if(!e) return;
     const b = home.b, m = home.m, a = home.a;
     const f = b ? resolveFig(b, m && m.mediaBase)
             : (e.img && State.images[e.img] ? resolveFig({ img: e.img })
@@ -10608,23 +10647,16 @@ function wire(){
   $('#fpDown').onclick = () => { const b = blockById(selected); if(b){ moveBlock(b, 1); drawLayout().then(reselect); } };
   $('#fpEdit').onclick = () => { if(selected) goToBlock(selected); };
 
-  /* Both act on exactly what the two filters are showing, which is the
-     point of having them: narrow to one issue, then take the lot in. */
-  $('#cuAll').onclick = () => {
-    shownList.forEach(p => {
-      if(isHiddenPhoto(p.key) || photoIsFeatured(p)) return;
-      setInGallery(p, true, p.b ? galCapOf(p.b) : null);
-    });
+  /* iconOnly and poolOnly alike add to the library without dropping
+     anything into whichever article happened to be open. */
+  $('#cuUpload').onclick = () => pickPhotos(null,
+    State.galKind === 'icons' ? { iconOnly:true } : { poolOnly:true });
+  $('#cuMag').onchange = () => {
+    State.galMag = $('#cuMag').value;
+    State.galArt = '';                 // the article list is the magazine's
     renderCurate();
   };
-  $('#cuNone').onclick = () => {
-    shownList.forEach(p => { if(photoIsFeatured(p)) setInGallery(p, false); });
-    renderCurate();
-  };
-  /* iconOnly, not icon: this adds to the set without dropping a burgee
-     into whichever article happened to be open. */
-  $('#cuUpload').onclick = () => pickPhotos(null, { iconOnly:true });
-  $('#cuMag').onchange = () => { State.galMag = $('#cuMag').value; renderCurate(); };
+  $('#cuArt').onchange = () => { State.galArt = $('#cuArt').value; renderCurate(); };
   $('#cuFind').oninput = () => later('cufind', renderCurate, 140);
   $('#cuKind').addEventListener('click', e => {
     const b = e.target.closest('button[data-kind]');
