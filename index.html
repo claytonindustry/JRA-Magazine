@@ -828,7 +828,7 @@ dialog #coverBody .subhead:first-child{margin-top:.2rem}
 /* The room at the end of a document belongs to the document, not to
    the pane it scrolls in: a bar stuck to the foot measures from the
    pane's padding box, and padding there would hold it that far up. */
-#editor .sheet{max-width:46rem;margin:0 auto;padding-bottom:5rem}
+#editor .sheet{max-width:46rem;margin:0 auto;padding-bottom:2rem}
 #editor .art-head .row label{flex:0 0 auto}
 /* ---- the article's header, now three blocks like any other ----
    The faces and sizes they had as form fields, kept exactly, so the
@@ -867,15 +867,31 @@ dialog #coverBody .subhead:first-child{margin-top:.2rem}
   padding:.22rem .3rem;border:1px solid var(--e-line);border-radius:6px;
   background:var(--e-panel);color:var(--e-ink);
 }
+/* What is done to the words, and what is added after them: two rows of
+   one header, stuck to the top together. */
+#editor .toolbars{
+  position:sticky;top:-1.1rem;z-index:3;
+  margin:.7rem 0;padding:.45rem 0 .5rem;
+  background:var(--e-bg);border-bottom:1px solid var(--e-line);
+}
 #editor .fmtbar{
-  margin:.7rem 0;display:flex;gap:.4rem;align-items:center;position:sticky;top:-1.1rem;
-  background:var(--e-bg);padding:.45rem 0;z-index:3;border-bottom:1px solid var(--e-line);flex-wrap:wrap;
+  display:flex;gap:.4rem;align-items:center;flex-wrap:wrap;
 }
 #editor .blk{
   display:grid;grid-template-columns:3.4rem minmax(0,1fr) auto;gap:.3rem;
   align-items:start;margin:.15rem 0;border-radius:8px;padding:.1rem;
 }
 #editor .blk:hover,#editor .blk:focus-within{background:#faf8f3}
+/* Where the next thing added will go. It was decided by the last block
+   pressed or written in and never drawn, so the buttons had somewhere
+   in mind that nobody else could see. Orange is what this editor
+   already means by selected — the same as a photograph picked out over
+   the printed page. */
+#editor .blk.at{
+  background:color-mix(in srgb,var(--e-sel) 9%,transparent);
+  box-shadow:inset 3px 0 0 var(--e-sel);
+}
+#editor .blk.at:hover{background:color-mix(in srgb,var(--e-sel) 14%,transparent)}
 #editor .blk .kind{
   width:3.4rem;padding:.2rem 0;font-size:.72rem;opacity:.45;border:0;background:none;
   margin:.15rem 0 0;appearance:none;-webkit-appearance:none;text-align:center;cursor:pointer;
@@ -993,12 +1009,11 @@ dialog .figctl .btn[aria-pressed="true"],
    over it, so when the article runs out the bar settles under the last
    block instead of covering it. */
 #editor .addbar{
-  position:sticky;bottom:0;z-index:3;
-  margin:.9rem 0 0;display:flex;gap:.4rem;flex-wrap:wrap;
-  background:var(--e-bg);padding:.5rem 0;border-top:1px solid var(--e-line);
+  display:flex;gap:.4rem;align-items:center;flex-wrap:wrap;margin-top:.45rem;
 }
 /* so a block added or walked to does not come to rest under the bar */
-#editor .blk{scroll-margin-bottom:4.5rem}
+/* clear of the header a block is being scrolled to sits under */
+#editor .blk{scroll-margin-top:7rem;scroll-margin-bottom:1rem}
 #editor .work.drag{outline:3px dashed var(--e-accent);outline-offset:-10px}
 
 
@@ -1927,7 +1942,7 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
    when the file changes. It is unrelated to the database's own VERSION,
    which governs schema upgrades and must not be moved for a cosmetic
    change. */
-const APP_VERSION = '1.23';
+const APP_VERSION = '1.24';
 
 /* Nothing is imported at the top any more. The Firebase libraries are
    several hundred kilobytes and, loaded this way, the browser must fetch
@@ -6079,10 +6094,9 @@ function workArticle(work){
       webOnly, ' Online only')));
   s.append(head);
 
-  s.append(fmtBar());
+  s.append(toolbars());
   const blocks = h('div', { id:'blocks' });
   s.append(blocks);
-  s.append(addBar());
 
   /* There was a card here saying what became of this article, with a
      button to take it back to the pool, one to send a correction, and
@@ -6110,11 +6124,15 @@ function workPage(work){
     h('button', { class:'btn small primary', onclick: publishPages }, 'Publish About and Links'),
     h('span', { class:'hint', text: pg.show ? '' : 'Not shown — publishing now takes the tab away.' }));
   s.append(pub);
-  s.append(fmtBar());
+  s.append(toolbars());
   s.append(h('div', { id:'blocks' }));
-  s.append(addBar());
   work.append(s);
   renderBlocks();
+}
+
+/* The two rows travel together, so they stick together. */
+function toolbars(){
+  return h('div', { class:'toolbars' }, fmtBar(), addBar());
 }
 
 function fmtBar(){
@@ -6286,7 +6304,30 @@ function addBar(){
   bar.append(h('button', { class:'btn small', onclick: () => openAdd(insertPoint()) }, '+ Photo…'));
   bar.append(h('button', { class:'btn small', onclick: () => openAdd(insertPoint(), { icons:true }) }, '+ Icon…'));
   bar.append(h('button', { class:'btn small', onclick: () => addVideo(insertPoint()) }, '+ Video…'));
+  /* With nothing chosen these add to the end, and no block is lit to say
+     so — which looks the same as something being wrong. */
+  bar.append(h('span', { class:'hint', id:'addWhere' }));
   return bar;
+}
+
+/* ---------- which block the next thing goes under ----------
+   State.atBlock has decided this since the foot bar learned to add
+   where you are, and nothing has ever drawn it. */
+function markAtBlock(){
+  const want = State.atBlock;
+  let found = false;
+  $$('#blocks .blk').forEach(row => {
+    const on = row.dataset.id === want;
+    row.classList.toggle('at', on);
+    if(on) found = true;
+  });
+  const say = $('#addWhere');
+  if(say) say.textContent = found ? '' : 'adds at the end';
+}
+function setAtBlock(id){
+  if(State.atBlock === id) return;
+  State.atBlock = id;
+  markAtBlock();
 }
 
 /* ---------- a film, from wherever it already lives ---------- */
@@ -6349,6 +6390,7 @@ function renderBlocks(focusId, where){
   doc.blocks = arr(doc.blocks);
   list.textContent = '';
   doc.blocks.forEach(b => list.append(blockNode(b)));
+  markAtBlock();
   if(focusId){
     const ed = $(`.blk[data-id="${focusId}"] .ed`);
     if(ed){ ed.focus(); setCaret(ed, where === 'end' ? Infinity : where || 0); }
@@ -6360,7 +6402,7 @@ function blockNode(b){
   /* A photograph has no words to put a cursor in, so pressing anywhere
      on a row is what marks it as the place the next thing goes. Before
      focus, so it holds for the kinds that never take it. */
-  row.addEventListener('mousedown', () => { State.atBlock = b.id; });
+  row.addEventListener('mousedown', () => setAtBlock(b.id));
   /* What the block is, and under it where it goes: the two questions
      about the block as a whole, in the margin the block's name already
      had. What is done to it is on the other side. */
@@ -6422,7 +6464,7 @@ function textNode(b){
      told when the cursor arrives in a different one — otherwise they go
      on showing the block that was last aligned by hand. */
   ed.addEventListener('focus', () => {
-    State.focusBlock = b.id; State.atBlock = b.id;
+    State.focusBlock = b.id; setAtBlock(b.id);
     markAligns(); markTsizes(); markFace();
   });
   ed.addEventListener('input', () => {
@@ -7332,6 +7374,10 @@ function deleteBlock(b){
      printed, not the photograph itself. */
   doc.blocks.splice(i, 1);
   if(!bodyBlocks(doc).length) doc.blocks.push({ id: uid('b'), t:'p', html:'' });
+  /* the gap closes on the block before it, which is where the next
+     thing added would have gone anyway */
+  const near = doc.blocks[Math.max(0, i - 1)];
+  State.atBlock = near && !isHeadBlock(near) ? near.id : null;
   renderBlocks();
   renderSide();
   saveDoc({ fast:true });
