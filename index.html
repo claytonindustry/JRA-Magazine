@@ -1094,9 +1094,15 @@ body.pv-off #editor .pv{display:none}
 body.pv-off #editor .sp-panes{grid-template-columns:minmax(0,1fr)}
 /* A piece in the pool is in no magazine, so there are no printed pages
    to show it on: the web version is the only thing the preview can
-   honestly be, and the switcher has nothing to switch. */
+   honestly be, and the switcher has nothing to switch. The printed half
+   is held shut here outright, so that whatever the magazine tab was
+   last showing cannot open onto an empty page viewer — the one state
+   that overrides this is a PDF being built, which needs the pages laid
+   out to measure them, and says so with its own rule above. */
 body.etab-write #editor #pvKind,
 body.etab-write #editor #pvLab{display:none}
+body.etab-write #editor .canvas{display:none}
+body.etab-write #editor .preview{display:block}
 /* And it is the piece alone. The reader's own ways out — the sections
    beside the library, and the masthead that goes back to the shelf —
    lead to a magazine this proof is not in, so they are not offered. */
@@ -1991,7 +1997,7 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
    when the file changes. It is unrelated to the database's own VERSION,
    which governs schema upgrades and must not be moved for a cosmetic
    change. */
-const APP_VERSION = '1.26';
+const APP_VERSION = '1.27';
 
 /* Nothing is imported at the top any more. The Firebase libraries are
    several hundred kilobytes and, loaded this way, the browser must fetch
@@ -4850,7 +4856,12 @@ function routeEditor(raw){
   renderSide();
   renderWork();
   restoreWorkScroll();
-  if(tab === 'issue'){
+  /* Both halves belong to the pool as much as to a magazine, and the
+     two tabs show different things in them — so arriving at either one
+     has to settle which half is showing and draw this tab's own piece
+     into it. Left to the magazine's last word, the pool opened onto the
+     printed-pages half, with nothing in it, still holding the issue. */
+  if(ARTICLE_TAB(tab)){
     applySplit();
     renderSplitBar();
     drawPreview();
@@ -5055,7 +5066,7 @@ function wireSplit(){
   /* Crossing the width where both halves stop fitting changes which
      classes apply, and the printed half has to be measured again. */
   const onWidth = () => {
-    if(State.etab !== 'issue') return;
+    if(!ARTICLE_TAB(State.etab)) return;
     applySplit();
     renderSplitBar();
     fitted = false;
@@ -5093,7 +5104,7 @@ function drawPreview(){
   else drawLayout();
 }
 function redrawPreview(ms){
-  if(State.etab !== 'issue') return;
+  if(!ARTICLE_TAB(State.etab)) return;
   const d = ms || 200;
   renderSplitBar();
   later('layout', () => drawPreview(), d);
