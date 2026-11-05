@@ -1038,21 +1038,27 @@ body.etab-settings.spane-gallery #editor .split,
 body.etab-settings.spane-icons #editor .split{display:none}
 body.etab-settings.spane-gallery #editor .curate,
 body.etab-settings.spane-icons #editor .curate{display:flex}
-/* Settings has nothing to preview, and neither has the pool: writing is
-   the whole of what either of them does, so the editor takes the pane. */
+/* Settings has nothing to preview: writing is the whole of what it does,
+   so the editor takes the pane. */
 body.etab-settings #editor .sp-bar,
 body.etab-settings #editor .sp-grip,
-body.etab-settings #editor .pv,
-body.etab-write #editor .sp-bar,
-body.etab-write #editor .sp-grip,
-body.etab-write #editor .pv{display:none}
-body.etab-settings #editor .sp-panes,
-body.etab-write #editor .sp-panes{grid-template-columns:minmax(0,1fr)}
-/* …and so does the magazine while its preview is put away, which is how
-   it starts. */
-body.pv-off.etab-issue #editor .sp-grip,
-body.pv-off.etab-issue #editor .pv{display:none}
-body.pv-off.etab-issue #editor .sp-panes{grid-template-columns:minmax(0,1fr)}
+body.etab-settings #editor .pv{display:none}
+body.etab-settings #editor .sp-panes{grid-template-columns:minmax(0,1fr)}
+/* …and so does a tab whose preview is put away, which is how both of
+   them start. */
+body.pv-off #editor .sp-grip,
+body.pv-off #editor .pv{display:none}
+body.pv-off #editor .sp-panes{grid-template-columns:minmax(0,1fr)}
+/* A piece in the pool is in no magazine, so there are no printed pages
+   to show it on: the web version is the only thing the preview can
+   honestly be, and the switcher has nothing to switch. */
+body.etab-write #editor #pvKind,
+body.etab-write #editor #pvLab{display:none}
+/* And it is the piece alone. The reader's own ways out — the sections
+   beside the library, and the masthead that goes back to the shelf —
+   lead to a magazine this proof is not in, so they are not offered. */
+body.etab-write #editor .pv #reader .tabs{display:none}
+body.etab-write #editor .pv #reader .flag{pointer-events:none}
 
 /* ---------- the magazine shown whole ----------
    Not half a screen but all of it: the editor steps aside, the divider
@@ -1942,7 +1948,7 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
    when the file changes. It is unrelated to the database's own VERSION,
    which governs schema upgrades and must not be moved for a cosmetic
    change. */
-const APP_VERSION = '1.24';
+const APP_VERSION = '1.25';
 
 /* Nothing is imported at the top any more. The Firebase libraries are
    several hundred kilobytes and, loaded this way, the browser must fetch
@@ -2959,7 +2965,7 @@ const State = {
   /* The preview beside the editor on the magazine, put away until it is
      asked for: the two whole-screen views are the ordinary way to look
      at a magazine, and the split is the extra. */
-  pvOff: { issue:true },
+  pvOff: { issue:true, write:true },
   /* the block the next thing added goes after: the one last written in
      or pressed on, of whatever kind. Kept apart from focusBlock, which
      the format buttons read and which only ever means a block with
@@ -3037,7 +3043,28 @@ const isPooled = (a) => !!a && !(a.magazine && State.magazines[a.magazine]);
 /* What the preview is of: the magazine that is open, and nothing else.
    The pool used to dress the piece in hand in a magazine it was not in,
    which is exactly the confusion the pool's preview was removed for. */
-function previewMag(){ return curMag(); }
+/* The pool previews the piece in hand, and nothing around it: a loose
+   proof, which the reader already knows how to show — no contents, no
+   neighbours, no way out to a shelf it is not on. It is dressed in the
+   open magazine's design if there is one, so a piece being written for
+   an issue reads as it will in it, and in the plain default otherwise. */
+let bareMag = null;
+function previewMag(){
+  if(State.etab !== 'write') return curMag();
+  const a = curArt();
+  if(!a) return null;
+  const m = curMag();
+  if(!bareMag) bareMag = Object.assign(newMagazine(), { bare:true });
+  bareMag.num = 'draft';
+  bareMag.month = m ? m.month : bareMag.month;
+  bareMag.year = m ? m.year : bareMag.year;
+  bareMag.masthead = m ? m.masthead : 'JRA Magazine';
+  bareMag.mediaBase = m ? m.mediaBase : '';
+  bareMag.design = m ? m.design : DEFAULT_DESIGN;
+  bareMag.cover = null; bareMag.coverSrc = null;
+  bareMag.contents = [a.id];
+  return bareMag;
+}
 
 /* The name an article answers to in a published issue — and so in the
    address a reader has bookmarked. It is normally the same as its own id,
@@ -4671,7 +4698,7 @@ const MV_ROUTE = { web:'web', pdf:'pdf' };
    alone now, so this says what it means rather than what it used to */
 const ARTICLE_TAB = (t) => t === 'write' || t === 'issue';
 /* a preview is mounted wherever the magazine is being shown */
-const PREVIEWING_TAB = () => State.etab === 'issue';
+const PREVIEWING_TAB = () => ARTICLE_TAB(State.etab);
 const tabOf = (a) => isPooled(a) ? 'write' : 'issue';
 
 function routeEditor(raw){
@@ -4726,8 +4753,8 @@ function routeEditor(raw){
 
   State.etab = tab;
   /* The web preview is the reader itself, moved into the pane, so it is
-     mounted wherever a magazine is being shown and handed back
-     everywhere else — the pool included, which no longer has one. */
+     mounted wherever a piece is being written — a magazine or the pool —
+     and handed back everywhere else. */
   setPreviewing(PREVIEWING_TAB());
   setMode('edit');
   closeMenu();
@@ -4790,14 +4817,26 @@ function loadSplit(){
   if(v >= 0.2 && v <= 0.8) State.spWide = v;
   if(store(PV_KIND) === 'web') State.pvKind = 'web';
   const kept = store(PV_OFF);
-  if(kept != null) State.pvOff.issue = String(kept).split(',').includes('issue');
+  if(kept != null){
+    const put = String(kept).split(',');
+    State.pvOff.issue = put.includes('issue');
+    State.pvOff.write = put.includes('write');
+  }
 }
-/* put away unless the magazine is being edited with it open */
-const pvIsOff = () => State.etab !== 'issue' || State.mview !== 'edit' || !!State.pvOff.issue;
+/* Which tab's preview is in question. Settings has none, and a magazine
+   shown whole is not a split at all. */
+const pvTab = () => ARTICLE_TAB(State.etab) ? State.etab : null;
+const pvIsOff = () => {
+  const t = pvTab();
+  if(!t) return true;
+  if(t === 'issue' && State.mview !== 'edit') return true;
+  return !!State.pvOff[t];
+};
 function setPvOff(off){
-  if(State.etab !== 'issue' || State.mview !== 'edit') return;
-  State.pvOff.issue = !!off;
-  store(PV_OFF, State.pvOff.issue ? 'issue' : '');
+  const t = pvTab();
+  if(!t || (t === 'issue' && State.mview !== 'edit')) return;
+  State.pvOff[t] = !!off;
+  store(PV_OFF, ['issue','write'].filter(k => State.pvOff[k]).join(','));
   applySplit();
   renderSplitBar();
   if(!off){ if(!showingWeb()) fitted = false; drawPreview(); }
@@ -4808,11 +4847,15 @@ function setPvOff(off){
    that hides the grip, and the two must agree. */
 const SP_NARROW = '(max-width:1080px)';
 const tooNarrow = () => window.matchMedia(SP_NARROW).matches;
-const showingWeb = () => State.pvKind === 'web';
+/* The pool has no printed pages to show, so its half is the web version
+   whatever the switcher last said on the magazine. */
+const showingWeb = () => State.etab === 'write' || State.pvKind === 'web';
 /* Whether the preview is actually on screen — on a narrow window it may
    be the article's turn, and then there is nothing to redraw. */
-const pvVisible = () => State.etab === 'issue' &&
-  (State.mview !== 'edit' || (!pvIsOff() && (!tooNarrow() || State.showPv)));
+const pvVisible = () => !!pvTab() &&
+  (State.etab === 'issue' && State.mview !== 'edit'
+    ? true
+    : (!pvIsOff() && (!tooNarrow() || State.showPv)));
 
 /* Which of the two is being shown, wherever it is being shown: the
    whole-screen views say so themselves, and the split asks its own
@@ -4835,12 +4878,21 @@ function applySplit(){
 /* What is on screen, said once above both halves. */
 function renderSplitBar(){
   const a = curArt(), m = curMag();
-  $('#spWhat').textContent = m
-    ? (m.num ? `Issue ${m.num}` : 'Unnumbered issue') : 'No magazine open';
-  $('#spNote').textContent = m
-    ? `${magArticles(m).length} article${magArticles(m).length === 1 ? '' : 's'}`
-      + (a ? ` · ${a.title || 'Untitled'}` : '')
-    : 'Start a magazine, then fill it from the pool.';
+  if(State.etab === 'write'){
+    /* The pool is one piece at a time, so the bar says which, and that
+       what is beside it is the piece on its own rather than an issue. */
+    $('#spWhat').textContent = a ? (a.title || 'Untitled article') : 'The pool';
+    $('#spNote').textContent = a
+      ? 'As it will read on the web'
+      : 'Choose a piece on the left.';
+  }else{
+    $('#spWhat').textContent = m
+      ? (m.num ? `Issue ${m.num}` : 'Unnumbered issue') : 'No magazine open';
+    $('#spNote').textContent = m
+      ? `${magArticles(m).length} article${magArticles(m).length === 1 ? '' : 's'}`
+        + (a ? ` · ${a.title || 'Untitled'}` : '')
+      : 'Start a magazine, then fill it from the pool.';
+  }
   const off = pvIsOff();
   $('#pvKind').hidden = off;
   $('#pvLab').hidden = off;
@@ -6181,7 +6233,7 @@ function fmtBar(){
   /* Three faces and a fourth choice — the magazine's own — which is one
      too many for a row of buttons and exactly right for a list. */
   const face = h('select', { class:'facesel', 'aria-label':'Typeface', title:'Typeface' });
-  face.append(h('option', { value:'', text:'Magazine face' }));
+  face.append(h('option', { value:'', text:'Default font' }));
   FACE_KEYS.forEach(k => face.append(h('option', { value:k, text: FACES[k].label })));
   face.onmousedown = e => e.stopPropagation();
   face.onchange = () => setFace(face.value);
@@ -6408,7 +6460,8 @@ function blockNode(b){
      had. What is done to it is on the other side. */
   const lead = h('div', { class:'blkside' });
   if(isHeadBlock(b)) lead.append(h('div', { class:'kind kind-head', text: HEAD_LABEL[b.t] }));
-  else if(b.t === 'fig') lead.append(h('div', { class:'kind', text:'▣ Photo', style:'padding-top:.5rem' }));
+  else if(b.t === 'fig') lead.append(h('div', { class:'kind',
+    text: isIcon(b) ? '▣ Icons' : '▣ Photo', style:'padding-top:.5rem' }));
   else if(b.t === 'video') lead.append(h('div', { class:'kind', text:'▶ Video', style:'padding-top:.5rem' }));
   else{
     const sel = h('select', { class:'kind', 'aria-label':'Kind of block' });
@@ -7007,6 +7060,11 @@ function figNode(b){
     refreshFigThumb(b);
     saveDoc({ fast:true });
   }));
+
+  /* An icon is a small mark — a burgee ending a column — not a
+     photograph. It is not captioned, not credited, and not something the
+     gallery shows, so it is not asked about any of them. */
+  if(isIcon(b)){ box.append(col); return box; }
 
   const cap = h('div', { class:'ed ed-cap', contenteditable:'true', spellcheck:'true',
     'aria-label':'Caption', role:'textbox' });
