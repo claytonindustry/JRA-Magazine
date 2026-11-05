@@ -528,9 +528,52 @@ body{background:var(--paper)}
   width:calc(var(--sw) * 1%);height:calc(var(--sh) * 1%);
   max-width:none;border-radius:0;
 }
-#reader .body figure.al-center .crop{margin-inline:auto}
-#reader .body figure.al-right .crop{margin-inline-start:auto;margin-inline-end:0}
-#reader .body figure.al-left .crop{margin-inline-start:0;margin-inline-end:auto}
+/* ---------- a turned photograph ----------
+   A quarter turn swaps the shape it is seen at, so the box takes the
+   turned shape and the picture is laid in it the other way round: as
+   wide as the box is tall, and as tall as the box is wide. The box is
+   the same in all three places — the thumbnail, the website and the
+   printed page. */
+.rot{position:relative;display:block;overflow:hidden}
+.rot-90 > img{transform:translate(-50%,-50%) rotate(90deg)}
+.rot-270 > img{transform:translate(-50%,-50%) rotate(-90deg)}
+.rot-180 > img{transform:rotate(180deg)}
+/* The picture inside that box has to be laid out by the turn rather
+   than by the ordinary rules for a photograph — and each of the three
+   places states those in its own right, specifically enough to win, so
+   the turn has to be stated in each of them too. The crop window a few
+   rules above is answered the same way, and for the same reason.
+
+   The picture is sized from the box's WIDTH alone and never its height,
+   so that a box shortened to fit a column crops the picture instead of
+   squashing it — which is what an unturned photograph does there. */
+#reader .body .rot > img,
+#editor .fig-thumb.rot > img,
+.mag figure.mf .rot > img{position:absolute;max-width:none;border-radius:0}
+#reader .body .rot-90 > img,     #reader .body .rot-270 > img,
+#editor .fig-thumb.rot-90 > img, #editor .fig-thumb.rot-270 > img,
+.mag figure.mf .rot-90 > img,    .mag figure.mf .rot-270 > img{
+  top:50%;left:50%;width:calc(var(--rr) * 100%);height:auto;
+  aspect-ratio:var(--rr);object-fit:fill;
+}
+#reader .body .rot-180 > img,
+#editor .fig-thumb.rot-180 > img,
+.mag figure.mf .rot-180 > img{
+  top:0;left:0;width:100%;height:100%;object-fit:cover;
+}
+#reader .body .rot{
+  width:var(--nw,100%);max-width:min(100%,var(--w,100%));aspect-ratio:var(--er);
+  border-radius:2px;background:var(--paper-raised);
+}
+#editor .fig-thumb.rot{
+  width:min(150px, calc(150px * var(--er)));height:auto;aspect-ratio:var(--er);
+  max-width:150px;max-height:150px;background:#eee;border-radius:4px;
+}
+.mag figure.mf .rot{width:100%;aspect-ratio:var(--er);background:#e8e6e0}
+
+#reader .body figure.al-center .crop,#reader .body figure.al-center .rot{margin-inline:auto}
+#reader .body figure.al-right .crop,#reader .body figure.al-right .rot{margin-inline-start:auto;margin-inline-end:0}
+#reader .body figure.al-left .crop,#reader .body figure.al-left .rot{margin-inline-start:0;margin-inline-end:auto}
 #reader .body figure.aligncenter,#reader .body figure.aligncenter img{margin-inline:auto}
 /* the picture itself fills the figure only as far as its own width
    allows, so it is the image that moves, not the box around it */
@@ -1038,21 +1081,27 @@ body.etab-settings.spane-gallery #editor .split,
 body.etab-settings.spane-icons #editor .split{display:none}
 body.etab-settings.spane-gallery #editor .curate,
 body.etab-settings.spane-icons #editor .curate{display:flex}
-/* Settings has nothing to preview, and neither has the pool: writing is
-   the whole of what either of them does, so the editor takes the pane. */
+/* Settings has nothing to preview: writing is the whole of what it does,
+   so the editor takes the pane. */
 body.etab-settings #editor .sp-bar,
 body.etab-settings #editor .sp-grip,
-body.etab-settings #editor .pv,
-body.etab-write #editor .sp-bar,
-body.etab-write #editor .sp-grip,
-body.etab-write #editor .pv{display:none}
-body.etab-settings #editor .sp-panes,
-body.etab-write #editor .sp-panes{grid-template-columns:minmax(0,1fr)}
-/* …and so does the magazine while its preview is put away, which is how
-   it starts. */
-body.pv-off.etab-issue #editor .sp-grip,
-body.pv-off.etab-issue #editor .pv{display:none}
-body.pv-off.etab-issue #editor .sp-panes{grid-template-columns:minmax(0,1fr)}
+body.etab-settings #editor .pv{display:none}
+body.etab-settings #editor .sp-panes{grid-template-columns:minmax(0,1fr)}
+/* …and so does a tab whose preview is put away, which is how both of
+   them start. */
+body.pv-off #editor .sp-grip,
+body.pv-off #editor .pv{display:none}
+body.pv-off #editor .sp-panes{grid-template-columns:minmax(0,1fr)}
+/* A piece in the pool is in no magazine, so there are no printed pages
+   to show it on: the web version is the only thing the preview can
+   honestly be, and the switcher has nothing to switch. */
+body.etab-write #editor #pvKind,
+body.etab-write #editor #pvLab{display:none}
+/* And it is the piece alone. The reader's own ways out — the sections
+   beside the library, and the masthead that goes back to the shelf —
+   lead to a magazine this proof is not in, so they are not offered. */
+body.etab-write #editor .pv #reader .tabs{display:none}
+body.etab-write #editor .pv #reader .flag{pointer-events:none}
 
 /* ---------- the magazine shown whole ----------
    Not half a screen but all of it: the editor steps aside, the divider
@@ -1942,7 +1991,7 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
    when the file changes. It is unrelated to the database's own VERSION,
    which governs schema upgrades and must not be moved for a cosmetic
    change. */
-const APP_VERSION = '1.24';
+const APP_VERSION = '1.26';
 
 /* Nothing is imported at the top any more. The Firebase libraries are
    several hundred kilobytes and, loaded this way, the browser must fetch
@@ -2555,6 +2604,33 @@ function cropGeom(b, f){
            lx: -(c.x / c.w) * 100, ly: -(c.y / c.h) * 100,
            sw: 100 / c.w, sh: 100 / c.h };
 }
+/* ---------- a photograph stood on its side ----------
+   A quarter at a time, remembered on the block rather than burnt into
+   the file, so it can be turned back and nothing is uploaded twice.
+   A crop is measured on the picture the right way up, so turning one
+   lets its crop go: you crop after turning, which is the order anybody
+   works in anyway. */
+const ROTS = [90, 180, 270];
+const rotOf = (b) => ROTS.includes(b && b.rot) ? b.rot : 0;
+const isQuarterTurn = (r) => r === 90 || r === 270;
+/* the shape it is seen at, which is the picture's own unless it is on
+   its side */
+function rotRatio(b, f){
+  const r = (f && f.w && f.h) ? f.w / f.h : 1;
+  return isQuarterTurn(rotOf(b)) ? 1 / r : r;
+}
+const rotClass = (b) => rotOf(b) ? 'rot rot-' + rotOf(b) : '';
+/* `--rr` is the shape of the file, `--er` the shape it is seen at, and
+   `--nw` how wide it really is once turned — the file's own height, for
+   a quarter turn. The website never draws a photograph larger than its
+   pixels, and a turned one must not be the exception. */
+const rotStyle = (b, f) => {
+  const r = (f && f.w && f.h) ? f.w / f.h : 1;
+  const k = (v) => Math.round(v * 10000) / 10000;
+  const nw = isQuarterTurn(rotOf(b)) ? (f && f.h) : (f && f.w);
+  return `--rr:${k(r)};--er:${k(rotRatio(b, f))}` + (nw ? `;--nw:${Math.round(nw)}px` : '');
+};
+
 const cropAttr = (g) => [g.c.x, g.c.y, g.c.w, g.c.h]
   .map(n => Math.round(n * 10000) / 10000).join(',');
 function cropFromAttr(s){
@@ -2604,7 +2680,10 @@ function figureHtml(b, fallbackBase){
     `data-src="${escapeHtml(f.src)}" data-full="${escapeHtml(f.src)}" ` +
     (f.sizes ? `data-sizes="${escapeHtml(f.sizes)}" ` : '') +
     `data-base="${escapeHtml(f.base)}" ` +
-    (f.w ? `width="${f.w}" height="${f.h}" ` : '') +
+    /* the shape it is seen at, so whatever reads these downstream is
+       told about the turn rather than the file */
+    (f.w ? (isQuarterTurn(rotOf(b)) ? `width="${f.h}" height="${f.w}" `
+                                    : `width="${f.w}" height="${f.h}" `) : '') +
     /* Written out even at the full hundred, because the reader widens a
        big landscape photograph of its own accord and must not do that to
        one somebody has deliberately held to the column. An issue
@@ -2618,7 +2697,9 @@ function figureHtml(b, fallbackBase){
      be read back into a block a year from now. */
   const inner = g
     ? `<span class="crop" data-crop="${cropAttr(g)}" style="${cropStyle(g)}">${img}</span>`
-    : img;
+    : rotOf(b)
+      ? `<span class="${rotClass(b)}" data-rot="${rotOf(b)}" style="${rotStyle(b, f)}">${img}</span>`
+      : img;
   return `<figure${cls.length ? ` class="${cls.join(' ')}"` : ''}>${inner}` +
     (cap.length ? `<figcaption>${cap.join(' ')}</figcaption>` : '') + `</figure>`;
 }
@@ -2914,6 +2995,10 @@ function blocksFromHtml(html, base){
            cropped the way it went out */
         crop: cropFromAttr(n.querySelector('.crop') &&
                            n.querySelector('.crop').getAttribute('data-crop')) || undefined,
+        /* and which way up it was sent */
+        rot: (() => { const w = n.querySelector('[data-rot]');
+                      const v = w && +w.getAttribute('data-rot');
+                      return ROTS.includes(v) ? v : undefined; })(),
         size: n.classList.contains('wide') ? 'span' : 'col',
         /* the editor's own class, or WordPress's — the old site centred
            most of its small pictures and said so this way */
@@ -2959,7 +3044,7 @@ const State = {
   /* The preview beside the editor on the magazine, put away until it is
      asked for: the two whole-screen views are the ordinary way to look
      at a magazine, and the split is the extra. */
-  pvOff: { issue:true },
+  pvOff: { issue:true, write:true },
   /* the block the next thing added goes after: the one last written in
      or pressed on, of whatever kind. Kept apart from focusBlock, which
      the format buttons read and which only ever means a block with
@@ -3037,7 +3122,28 @@ const isPooled = (a) => !!a && !(a.magazine && State.magazines[a.magazine]);
 /* What the preview is of: the magazine that is open, and nothing else.
    The pool used to dress the piece in hand in a magazine it was not in,
    which is exactly the confusion the pool's preview was removed for. */
-function previewMag(){ return curMag(); }
+/* The pool previews the piece in hand, and nothing around it: a loose
+   proof, which the reader already knows how to show — no contents, no
+   neighbours, no way out to a shelf it is not on. It is dressed in the
+   open magazine's design if there is one, so a piece being written for
+   an issue reads as it will in it, and in the plain default otherwise. */
+let bareMag = null;
+function previewMag(){
+  if(State.etab !== 'write') return curMag();
+  const a = curArt();
+  if(!a) return null;
+  const m = curMag();
+  if(!bareMag) bareMag = Object.assign(newMagazine(), { bare:true });
+  bareMag.num = 'draft';
+  bareMag.month = m ? m.month : bareMag.month;
+  bareMag.year = m ? m.year : bareMag.year;
+  bareMag.masthead = m ? m.masthead : 'JRA Magazine';
+  bareMag.mediaBase = m ? m.mediaBase : '';
+  bareMag.design = m ? m.design : DEFAULT_DESIGN;
+  bareMag.cover = null; bareMag.coverSrc = null;
+  bareMag.contents = [a.id];
+  return bareMag;
+}
 
 /* The name an article answers to in a published issue — and so in the
    address a reader has bookmarked. It is normally the same as its own id,
@@ -3699,7 +3805,8 @@ function hydrateImages(root, base, want){
     /* a cropped photograph is held by its window, not by the picture
        inside it, so the width goes on whichever of the two is outermost */
     const par = img.parentElement;
-    const box = (par && par.classList.contains('crop')) ? par : img;
+    const box = (par && (par.classList.contains('crop') ||
+                         par.classList.contains('rot'))) ? par : img;
     if(px) box.style.setProperty('--w', px + 'px');
     else if(pct > 0 && pct < 100) box.style.setProperty('--w', pct + '%');
 
@@ -4671,7 +4778,7 @@ const MV_ROUTE = { web:'web', pdf:'pdf' };
    alone now, so this says what it means rather than what it used to */
 const ARTICLE_TAB = (t) => t === 'write' || t === 'issue';
 /* a preview is mounted wherever the magazine is being shown */
-const PREVIEWING_TAB = () => State.etab === 'issue';
+const PREVIEWING_TAB = () => ARTICLE_TAB(State.etab);
 const tabOf = (a) => isPooled(a) ? 'write' : 'issue';
 
 function routeEditor(raw){
@@ -4726,8 +4833,8 @@ function routeEditor(raw){
 
   State.etab = tab;
   /* The web preview is the reader itself, moved into the pane, so it is
-     mounted wherever a magazine is being shown and handed back
-     everywhere else — the pool included, which no longer has one. */
+     mounted wherever a piece is being written — a magazine or the pool —
+     and handed back everywhere else. */
   setPreviewing(PREVIEWING_TAB());
   setMode('edit');
   closeMenu();
@@ -4790,14 +4897,26 @@ function loadSplit(){
   if(v >= 0.2 && v <= 0.8) State.spWide = v;
   if(store(PV_KIND) === 'web') State.pvKind = 'web';
   const kept = store(PV_OFF);
-  if(kept != null) State.pvOff.issue = String(kept).split(',').includes('issue');
+  if(kept != null){
+    const put = String(kept).split(',');
+    State.pvOff.issue = put.includes('issue');
+    State.pvOff.write = put.includes('write');
+  }
 }
-/* put away unless the magazine is being edited with it open */
-const pvIsOff = () => State.etab !== 'issue' || State.mview !== 'edit' || !!State.pvOff.issue;
+/* Which tab's preview is in question. Settings has none, and a magazine
+   shown whole is not a split at all. */
+const pvTab = () => ARTICLE_TAB(State.etab) ? State.etab : null;
+const pvIsOff = () => {
+  const t = pvTab();
+  if(!t) return true;
+  if(t === 'issue' && State.mview !== 'edit') return true;
+  return !!State.pvOff[t];
+};
 function setPvOff(off){
-  if(State.etab !== 'issue' || State.mview !== 'edit') return;
-  State.pvOff.issue = !!off;
-  store(PV_OFF, State.pvOff.issue ? 'issue' : '');
+  const t = pvTab();
+  if(!t || (t === 'issue' && State.mview !== 'edit')) return;
+  State.pvOff[t] = !!off;
+  store(PV_OFF, ['issue','write'].filter(k => State.pvOff[k]).join(','));
   applySplit();
   renderSplitBar();
   if(!off){ if(!showingWeb()) fitted = false; drawPreview(); }
@@ -4808,11 +4927,15 @@ function setPvOff(off){
    that hides the grip, and the two must agree. */
 const SP_NARROW = '(max-width:1080px)';
 const tooNarrow = () => window.matchMedia(SP_NARROW).matches;
-const showingWeb = () => State.pvKind === 'web';
+/* The pool has no printed pages to show, so its half is the web version
+   whatever the switcher last said on the magazine. */
+const showingWeb = () => State.etab === 'write' || State.pvKind === 'web';
 /* Whether the preview is actually on screen — on a narrow window it may
    be the article's turn, and then there is nothing to redraw. */
-const pvVisible = () => State.etab === 'issue' &&
-  (State.mview !== 'edit' || (!pvIsOff() && (!tooNarrow() || State.showPv)));
+const pvVisible = () => !!pvTab() &&
+  (State.etab === 'issue' && State.mview !== 'edit'
+    ? true
+    : (!pvIsOff() && (!tooNarrow() || State.showPv)));
 
 /* Which of the two is being shown, wherever it is being shown: the
    whole-screen views say so themselves, and the split asks its own
@@ -4835,12 +4958,21 @@ function applySplit(){
 /* What is on screen, said once above both halves. */
 function renderSplitBar(){
   const a = curArt(), m = curMag();
-  $('#spWhat').textContent = m
-    ? (m.num ? `Issue ${m.num}` : 'Unnumbered issue') : 'No magazine open';
-  $('#spNote').textContent = m
-    ? `${magArticles(m).length} article${magArticles(m).length === 1 ? '' : 's'}`
-      + (a ? ` · ${a.title || 'Untitled'}` : '')
-    : 'Start a magazine, then fill it from the pool.';
+  if(State.etab === 'write'){
+    /* The pool is one piece at a time, so the bar says which, and that
+       what is beside it is the piece on its own rather than an issue. */
+    $('#spWhat').textContent = a ? (a.title || 'Untitled article') : 'The pool';
+    $('#spNote').textContent = a
+      ? 'As it will read on the web'
+      : 'Choose a piece on the left.';
+  }else{
+    $('#spWhat').textContent = m
+      ? (m.num ? `Issue ${m.num}` : 'Unnumbered issue') : 'No magazine open';
+    $('#spNote').textContent = m
+      ? `${magArticles(m).length} article${magArticles(m).length === 1 ? '' : 's'}`
+        + (a ? ` · ${a.title || 'Untitled'}` : '')
+      : 'Start a magazine, then fill it from the pool.';
+  }
   const off = pvIsOff();
   $('#pvKind').hidden = off;
   $('#pvLab').hidden = off;
@@ -6181,7 +6313,7 @@ function fmtBar(){
   /* Three faces and a fourth choice — the magazine's own — which is one
      too many for a row of buttons and exactly right for a list. */
   const face = h('select', { class:'facesel', 'aria-label':'Typeface', title:'Typeface' });
-  face.append(h('option', { value:'', text:'Magazine face' }));
+  face.append(h('option', { value:'', text:'Default font' }));
   FACE_KEYS.forEach(k => face.append(h('option', { value:k, text: FACES[k].label })));
   face.onmousedown = e => e.stopPropagation();
   face.onchange = () => setFace(face.value);
@@ -6408,7 +6540,8 @@ function blockNode(b){
      had. What is done to it is on the other side. */
   const lead = h('div', { class:'blkside' });
   if(isHeadBlock(b)) lead.append(h('div', { class:'kind kind-head', text: HEAD_LABEL[b.t] }));
-  else if(b.t === 'fig') lead.append(h('div', { class:'kind', text:'▣ Photo', style:'padding-top:.5rem' }));
+  else if(b.t === 'fig') lead.append(h('div', { class:'kind',
+    text: isIcon(b) ? '▣ Icons' : '▣ Photo', style:'padding-top:.5rem' }));
   else if(b.t === 'video') lead.append(h('div', { class:'kind', text:'▶ Video', style:'padding-top:.5rem' }));
   else{
     const sel = h('select', { class:'kind', 'aria-label':'Kind of block' });
@@ -6523,6 +6656,8 @@ function figControls(b, f, onChange){
   const unit = h('span', { class:'wunit' });
   const across = h('span', { class:'aligns' });
   const crop = h('button', { type:'button', class:'btn small', title:'Crop this photograph' });
+  const turn = h('button', { type:'button', class:'btn small', text:'\u21BB',
+    title:'Turn it a quarter clockwise' });
   const meta = h('div', { class:'fig-meta' });
 
   Object.keys(ACROSS).forEach(a => across.append(h('button', {
@@ -6531,6 +6666,16 @@ function figControls(b, f, onChange){
     onclick: () => { b.align = a; sync(); onChange(); }
   })));
   crop.onclick = () => openCrop(b, f, () => { sync(); onChange(); });
+  turn.onclick = () => {
+    undoLabel('turning the photograph');
+    const had = !!cropGeom(b, f);
+    b.rot = (rotOf(b) + 90) % 360 || undefined;
+    /* A crop is measured on the picture the right way up, so it cannot
+       follow it round. Say so rather than quietly cutting elsewhere. */
+    if(had){ b.crop = undefined; b.shape = undefined; }
+    sync(); onChange();
+    if(had) toast('Turned. Its crop is cleared — crop it again now it is this way up.');
+  };
 
   /* An icon is sized in pixels and a photograph in a share of its
      measure, so the presets are not the same two lists. */
@@ -6586,6 +6731,10 @@ function figControls(b, f, onChange){
     crop.disabled = icon;                     // an icon is never cropped
     crop.textContent = g ? `Crop · ${ratioName(g.ar)}` : 'Crop…';
     crop.setAttribute('aria-pressed', String(!!g));
+    turn.setAttribute('aria-pressed', String(!!rotOf(b)));
+    turn.title = rotOf(b)
+      ? `Turned ${rotOf(b)}° — press to turn it another quarter`
+      : 'Turn it a quarter clockwise';
     meta.textContent = f ? dpiNote(b, f) : '';
     meta.className = 'fig-meta' + (f && dpiOf(b, f) < 200 ? ' low' : '');
   }
@@ -6593,7 +6742,7 @@ function figControls(b, f, onChange){
   box.append(h('div', { class:'fig-row' },
     h('span', { class:'ctl-lab', text:'Width' }), presets, num, unit));
   box.append(h('div', { class:'fig-row' },
-    h('span', { class:'ctl-lab', text:'Across' }), across, setIn, crop));
+    h('span', { class:'ctl-lab', text:'Across' }), across, setIn, crop, turn));
   box.append(meta);
   drawPresets();
   sync();
@@ -6978,9 +7127,11 @@ function openCrop(b, f, done){
    photograph, so what the list shows is what the page will print. */
 function figThumb(b, f){
   const g = isIcon(b) ? null : cropGeom(b, f);
-  if(!g) return h('img', { class:'fig-thumb', alt:'', src: figUrl(f, 480) });
-  return h('span', { class:'fig-thumb crop-thumb', style: cropStyle(g) },
+  if(g) return h('span', { class:'fig-thumb crop-thumb', style: cropStyle(g) },
     h('img', { alt:'', src: figUrl(f, 480) }));
+  if(rotOf(b)) return h('span', { class:'fig-thumb ' + rotClass(b), style: rotStyle(b, f) },
+    h('img', { alt:'', src: figUrl(f, 480) }));
+  return h('img', { class:'fig-thumb', alt:'', src: figUrl(f, 480) });
 }
 /* …and put it right after a crop, from wherever the crop was made: the
    block's own row, or the panel over the laid-out page, which is beside
@@ -7007,6 +7158,11 @@ function figNode(b){
     refreshFigThumb(b);
     saveDoc({ fast:true });
   }));
+
+  /* An icon is a small mark — a burgee ending a column — not a
+     photograph. It is not captioned, not credited, and not something the
+     gallery shows, so it is not asked about any of them. */
+  if(isIcon(b)){ box.append(col); return box; }
 
   const cap = h('div', { class:'ed ed-cap', contenteditable:'true', spellcheck:'true',
     'aria-label':'Caption', role:'textbox' });
@@ -8710,6 +8866,19 @@ function figureEl(b, f, G, span){
     fig.appendChild(win);
     win.appendChild(im);
     sizeCropWin(win, W, G.textH * (span ? 0.55 : 0.66));
+  }else if(rotOf(b)){
+    /* the same window the website uses, so the page and the screen
+       agree about the shape, and the writer is told which way to turn
+       the pixels when it comes to draw them */
+    const win = document.createElement('div');
+    win.className = rotClass(b);
+    win.setAttribute('style', rotStyle(b, f));
+    win.dataset.rot = String(rotOf(b));
+    const seen = rotRatio(b, f) || 1;
+    const natural = W / seen;
+    win.style.height = (icon ? natural : Math.min(natural, G.textH * (span ? 0.55 : 0.66))) + 'px';
+    win.appendChild(im);
+    fig.appendChild(win);
   }else{
     const natural = f.w ? W * f.h / f.w : W * 0.7;
     im.style.height = (icon ? natural : Math.min(natural, G.textH * (span ? 0.55 : 0.66))) + 'px';
@@ -8751,6 +8920,11 @@ function sizeCropWin(win, W, cap){
 
 function fitFigure(el, maxH, lh){
   const win = el.querySelector('.mcrop');
+  /* A turned picture is sized off its window's width, so the window is
+     what gives way — shortened, it shows less of the picture, the same
+     as an untouched photograph does. Shortening the picture itself
+     would be read as the shape it is meant to be seen at. */
+  const turned = el.querySelector('.rot');
   const im = el.querySelector('img');
   const target = Math.floor(maxH / lh) * lh;
   el.style.height = '';
@@ -8763,6 +8937,13 @@ function fitFigure(el, maxH, lh){
       const w = parseFloat(win.style.width) || win.offsetWidth;
       if(h - over < lh * 2) break;
       sizeCropWin(win, w * (h - over) / h, h - over);
+    }
+  }else if(turned){
+    for(let i = 0; i < 4 && hOf(el) > target; i++){
+      const over = hOf(el) - target;
+      const h = parseFloat(turned.style.height) || turned.offsetHeight;
+      if(h - over < lh * 2){ turned.style.height = lh * 2 + 'px'; break; }
+      turned.style.height = (h - over) + 'px';
     }
   }else if(im){
     for(let i = 0; i < 4 && hOf(el) > target; i++){
@@ -9582,7 +9763,21 @@ function collectPage(page, H){
         paint.push({ image:true, el: inner, ...r, crop: cropFromAttr(el.dataset.crop) });
       return;
     }
-    if(el.tagName === 'IMG' && el.naturalWidth){ paint.push({ image:true, el, ...r }); return; }
+    /* A turned photograph is the same case. Its own rectangle, read
+       off the page, is the rectangle it takes up after the turn, which
+       stands outside the window whenever the column shortened it — so
+       again it is the window that is drawn, and the writer is told
+       which way round to put the pixels in it. */
+    if(el.dataset && el.dataset.rot){
+      const inner = el.querySelector('img');
+      if(inner && inner.naturalWidth)
+        paint.push({ image:true, el: inner, ...r, rot: +el.dataset.rot });
+      return;
+    }
+    if(el.tagName === 'IMG' && el.naturalWidth){
+      paint.push({ image:true, el, ...r, rot:0 });
+      return;
+    }
 
     const spacing = parseFloat(st.letterSpacing) || 0;
     const colour = rgb(st.color);
@@ -9645,17 +9840,22 @@ function collectPage(page, H){
 }
 
 /* A photograph as JPEG bytes, cropped the way the page crops it. */
-async function jpegFor(im, boxW, boxH, dpi, crop){
+async function jpegFor(im, boxW, boxH, dpi, crop, rot){
   const nw = im.naturalWidth, nh = im.naturalHeight;
+  /* A quarter turn means the box, seen from the picture's side, is on
+     its side too: the fit is worked out against the swapped box and the
+     turning is done when it is drawn. */
+  const quarter = isQuarterTurn(rot);
+  const fitW = quarter ? boxH : boxW, fitH = quarter ? boxW : boxH;
   /* The crop first — the region of the original anyone chose to keep —
      and then, within that, the ordinary centred fit into the box, which
      is what takes up any further shortening the column forced on it. */
   const rx = crop ? crop.x * nw : 0, ry = crop ? crop.y * nh : 0;
   const rw = crop ? crop.w * nw : nw, rh = crop ? crop.h * nh : nh;
-  const scale = Math.max(boxW / rw, boxH / rh);
-  const sw = Math.min(rw, boxW / scale), sh = Math.min(rh, boxH / scale);
+  const scale = Math.max(fitW / rw, fitH / rh);
+  const sw = Math.min(rw, fitW / scale), sh = Math.min(rh, fitH / scale);
   const sx = rx + (rw - sw) / 2, sy = ry + (rh - sh) / 2;
-  const want = Math.min(sw, boxW / 96 * dpi);
+  const want = Math.min(quarter ? sh : sw, boxW / 96 * dpi);
   const cw = Math.max(1, Math.round(want));
   const ch = Math.max(1, Math.round(cw * boxH / boxW));
   const c = document.createElement('canvas');
@@ -9663,7 +9863,14 @@ async function jpegFor(im, boxW, boxH, dpi, crop){
   const g = c.getContext('2d');
   g.fillStyle = '#fff'; g.fillRect(0, 0, cw, ch);
   g.imageSmoothingQuality = 'high';
-  g.drawImage(im, sx, sy, sw, sh, 0, 0, cw, ch);
+  if(rot){
+    g.translate(cw / 2, ch / 2);
+    g.rotate(rot * Math.PI / 180);
+    const dw = quarter ? ch : cw, dh = quarter ? cw : ch;
+    g.drawImage(im, sx, sy, sw, sh, -dw / 2, -dh / 2, dw, dh);
+  }else{
+    g.drawImage(im, sx, sy, sw, sh, 0, 0, cw, ch);
+  }
   const blob = await new Promise(res => c.toBlob(res, 'image/jpeg', 0.84));
   return { bytes: new Uint8Array(await blob.arrayBuffer()), w:cw, h:ch };
 }
@@ -9717,7 +9924,7 @@ async function buildPdf(host, m, opts){
         continue;
       }
       let jpeg;
-      try{ jpeg = await jpegFor(it.el, it.w, it.h, dpi, it.crop); }
+      try{ jpeg = await jpegFor(it.el, it.w, it.h, dpi, it.crop, it.rot); }
       catch(e){ missed++; continue; }     // a photograph the canvas refused
       const id = objs.length;
       objs.push({ dict: `<< /Type /XObject /Subtype /Image /Width ${jpeg.w} /Height ${jpeg.h} ` +
