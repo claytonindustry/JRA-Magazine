@@ -506,6 +506,18 @@ body{background:var(--paper)}
 #reader .body .standfirst{font-size:calc(1.12em * var(--tz,1));line-height:1.5;font-style:italic;color:var(--brine)}
 /* a word set the other way round inside an italic run */
 #reader .upright,.mag .upright,#editor .upright{font-style:normal}
+/* Words a translator is told to leave as written. The reader is shown
+   nothing at all: a boat's name simply does not turn into French, and
+   there is no reason to point at it on the page. The tint is for the
+   person writing, and it is kept to the box they write in — not the
+   preview beside it, which is meant to be exactly what a reader sees,
+   and above all not the printed pages, where the PDF writer paints
+   every background it finds and would set a coloured box behind every
+   boat in the issue. */
+#editor .ed .notranslate{
+  background:#fbf0cf;box-shadow:0 0 0 1px rgba(150,120,30,.3);
+  border-radius:3px;
+}
 #reader .body figcaption .credit{font-style:normal}
 #reader .getpdf{margin:.9rem 0 0;font-family:var(--sans);font-size:.88rem}
 #reader .getpdf a{color:var(--tanbark);text-underline-offset:.15em}
@@ -1997,7 +2009,7 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
    when the file changes. It is unrelated to the database's own VERSION,
    which governs schema upgrades and must not be moved for a cosmetic
    change. */
-const APP_VERSION = '1.27';
+const APP_VERSION = '1.28';
 
 /* Nothing is imported at the top any more. The Firebase libraries are
    several hundred kilobytes and, loaded this way, the browser must fetch
@@ -2180,14 +2192,34 @@ const faceOf = (b) => FACE_KEYS.includes(b && b.face) ? b.face : '';
 const faceClass = (b) => faceOf(b) ? 'ff-' + faceOf(b) : '';
 const faceFromEl = (n) => FACE_KEYS.find(k => n.classList.contains('ff-' + k)) || null;
 
+/* ---------------------------------------------------------------------
+   Words to be left as written
+
+   A reader in Brest presses Translate and the page turns into French —
+   boat names, yards and classes with it. Mirror becomes Miroir, which is
+   nobody's boat. The web has a way of saying leave this alone, and it
+   goes on the words themselves rather than on the paragraph around them:
+   what wants protecting is a boat's name in the middle of a sentence
+   that should translate perfectly well without it.
+
+   Both spellings are written. Chrome and Google Translate read the
+   class, Edge, Safari and Firefox read the attribute. It is a request
+   rather than a promise — a reader who pastes the words somewhere else
+   gets none of it — and it has no meaning in the PDF, which nothing
+   translates.
+   --------------------------------------------------------------------- */
+const ASIS = 'notranslate';
+const ASIS_OPEN = `<span class="${ASIS}" translate="no">`;
+
 const esc = s => String(s == null ? '' : s)
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
   .replace(/"/g, '&quot;');
 const escapeHtml = esc;
 
 /* Italics, bold and links survive — the magazine italicises boat names,
-   and the Links page is nothing without its links. Everything else is
-   dropped. */
+   and the Links page is nothing without its links. So does the mark that
+   tells a translator to leave a phrase as it was written. Everything
+   else is dropped. */
 function sanitizeInline(html){
   const box = document.createElement('div');
   box.innerHTML = String(html || '');
@@ -2209,10 +2241,16 @@ function sanitizeInline(html){
          then changed back the moment it was saved. */
       const upright = /font-style:\s*normal/.test(style) ||
                       (tag === 'span' && n.classList.contains('upright'));
+      /* Words a translator is told not to touch. Both spellings are
+         read back, because an issue imported from elsewhere may carry
+         only the attribute, and both are written out again. */
+      const asis = (tag === 'span' && n.classList.contains(ASIS)) ||
+                   (n.getAttribute('translate') || '').toLowerCase() === 'no';
       if(tag === 'br'){ out.push(' '); return; }
       if(tag === 'script' || tag === 'style') return;
       const href = tag === 'a' ? safeHref(n.getAttribute('href')) : '';
       if(href) out.push(`<a href="${escapeHtml(href)}">`);
+      if(asis) out.push(ASIS_OPEN);
       if(italic) out.push('<em>');
       if(upright) out.push('<span class="upright">');
       if(bold) out.push('<strong>');
@@ -2222,11 +2260,13 @@ function sanitizeInline(html){
       if(bold) out.push('</strong>');
       if(upright) out.push('</span>');
       if(italic) out.push('</em>');
+      if(asis) out.push('</span>');
       if(href) out.push('</a>');
     });
   })(box);
   return out.join('').replace(/\u00a0/g, ' ').replace(/[ \t\r\n]+/g, ' ')
-    .replace(/<em><\/em>|<strong><\/strong>|<span class="upright"><\/span>|<a [^>]*><\/a>/g, '').trim();
+    .replace(/<em><\/em>|<strong><\/strong>|<span class="upright"><\/span>|<a [^>]*><\/a>/g, '')
+    .split(ASIS_OPEN + '</span>').join('').trim();
 }
 
 /* The web, an email, or a place in the reader. Anything else is dropped. */
@@ -6278,6 +6318,179 @@ function toolbars(){
   return h('div', { class:'toolbars' }, fmtBar(), addBar());
 }
 
+/* ---------------------------------------------------------------------
+   Putting the mark on and taking it off
+
+   Everything here is counted in characters of the block's own text
+   rather than in nodes, because characters are the one thing that does
+   not move while the markup underneath is pulled apart and built again.
+   So: read off where the marks currently begin and end, add or remove
+   the stretch in hand, strip every mark from the block, and lay the
+   list back down. A selection that takes in half of a marked phrase, or
+   half an italic one, comes out right without a single special case.
+   --------------------------------------------------------------------- */
+const ASIS_SEL = '.' + ASIS;
+function newAsIs(){
+  const n = document.createElement('span');
+  n.className = ASIS;
+  n.setAttribute('translate', 'no');
+  return n;
+}
+/* the box being written in, if the cursor is in one at all */
+function edAt(node){
+  const n = node && node.nodeType === 3 ? node.parentElement : node;
+  const e = n && n.closest ? n.closest('#editor .ed') : null;
+  return (e && e.isContentEditable) ? e : null;
+}
+/* how many characters of this box come before a point in it */
+function charOffset(ed, container, offset){
+  const r = document.createRange();
+  r.selectNodeContents(ed);
+  try{ r.setEnd(container, offset); }catch(e){ return 0; }
+  return r.toString().length;
+}
+/* a range over characters [a, b) of the box */
+function rangeOfChars(ed, a, b){
+  const walk = document.createTreeWalker(ed, NodeFilter.SHOW_TEXT);
+  const r = document.createRange();
+  let seen = 0, started = false, n;
+  while((n = walk.nextNode())){
+    const len = n.nodeValue.length;
+    if(!started && seen + len >= a){ r.setStart(n, a - seen); started = true; }
+    if(started && seen + len >= b){ r.setEnd(n, b - seen); return r; }
+    seen += len;
+  }
+  if(!started) return null;
+  r.setEnd(ed, ed.childNodes.length);
+  return r;
+}
+/* what is marked at the moment, as stretches of characters */
+function asIsRuns(ed){
+  const out = [];
+  ed.querySelectorAll(ASIS_SEL).forEach(n =>
+    out.push([charOffset(ed, n, 0), charOffset(ed, n, n.childNodes.length)]));
+  return tidyRuns(out);
+}
+function tidyRuns(runs){
+  const in_ = runs.filter(r => r[1] > r[0]).sort((x, y) => x[0] - y[0]);
+  const out = [];
+  for(const r of in_){
+    const last = out[out.length - 1];
+    if(last && r[0] <= last[1]) last[1] = Math.max(last[1], r[1]);
+    else out.push([r[0], r[1]]);
+  }
+  return out;
+}
+const cutRuns = (runs, a, b) => {
+  const out = [];
+  for(const [x, y] of runs){
+    if(y <= a || x >= b){ out.push([x, y]); continue; }
+    if(x < a) out.push([x, a]);
+    if(y > b) out.push([b, y]);
+  }
+  return out;
+};
+/* whether every character of a stretch is already marked */
+function runsCover(runs, a, b){
+  let at = a;
+  for(const [x, y] of runs){
+    if(x <= at && y > at) at = Math.min(y, b);
+    if(at >= b) return true;
+  }
+  return at >= b;
+}
+function unwrapEl(el){
+  const p = el.parentNode;
+  if(!p) return;
+  while(el.firstChild) p.insertBefore(el.firstChild, el);
+  p.removeChild(el);
+}
+/* Cutting a stretch out of the middle of an italic run leaves the shell
+   of it behind — an empty <em> where the italics used to carry on. It
+   shows as nothing and the sanitiser drops it on the way out, but while
+   it sits in the box being written in it is somewhere for the cursor to
+   fall into and stick. */
+function dropEmptyInline(ed){
+  for(let pass = 0; pass < 3; pass++){
+    const empty = [...ed.querySelectorAll('em,strong,u,i,b,span,a')]
+      .filter(n => !n.textContent && !n.querySelector('img,br'));
+    if(!empty.length) return;
+    empty.forEach(n => n.remove());
+  }
+}
+function layAsIs(ed, a, b){
+  const r = rangeOfChars(ed, a, b);
+  if(!r || r.collapsed) return;
+  const span = newAsIs();
+  span.appendChild(r.extractContents());
+  r.insertNode(span);
+}
+/* Which box the mark would act on, and whether the words there can
+   carry one at all. A heading holds plain text by design — it is
+   stripped to it on every keystroke — so there is nowhere for a mark to
+   live in one, and saying so is better than letting it vanish. */
+function asIsTarget(){
+  const sel = getSelection();
+  const range = sel && sel.rangeCount ? sel.getRangeAt(0) : null;
+  const ed = range ? edAt(range.commonAncestorContainer) : null;
+  if(!ed) return { why:'Put the cursor in the words first.' };
+  if(ed.classList.contains('ed-h2') || ed.classList.contains('ed-h3'))
+    return { why:'A heading is held as plain words, so a mark cannot be kept in one.' };
+  let a = charOffset(ed, range.startContainer, range.startOffset);
+  let b = charOffset(ed, range.endContainer, range.endOffset);
+  if(a > b){ const t = a; a = b; b = t; }
+  return { ed, range, a, b };
+}
+function toggleAsIs(){
+  const t = asIsTarget();
+  if(t.why){ toast(t.why); return; }
+  const { ed } = t;
+  let { a, b } = t;
+  let runs = asIsRuns(ed);
+  if(a === b){
+    /* A cursor rather than a selection: inside a marked phrase it takes
+       the mark off the whole of it, there being nothing chosen to be
+       more particular about. */
+    const hit = runs.find(r => a > r[0] && a < r[1]);
+    if(!hit){ toast('Select the words to be left as written.'); return; }
+    a = hit[0]; b = hit[1];
+  }
+  const on = !runsCover(runs, a, b);
+  undoLabel(on ? 'marking words to be left as written'
+               : 'taking the mark off those words');
+  runs = on ? tidyRuns(runs.concat([[a, b]])) : cutRuns(runs, a, b);
+  ed.querySelectorAll(ASIS_SEL).forEach(unwrapEl);
+  ed.normalize();
+  /* laid back down from the end, so that the earlier stretches are
+     still where the list says they are */
+  runs.slice().reverse().forEach(([x, y]) => layAsIs(ed, x, y));
+  dropEmptyInline(ed);
+  ed.normalize();
+  ed.dispatchEvent(new Event('input'));
+  const back = rangeOfChars(ed, a, b);
+  if(back){
+    const sel = getSelection();
+    sel.removeAllRanges();
+    sel.addRange(back);
+  }
+  ed.focus();
+  markAsIs();
+}
+/* The button says whether the words the cursor is in are already
+   marked, the way the alignment buttons say what the paragraph is set
+   to. */
+function markAsIs(){
+  const btn = $('#asIsBtn');
+  if(!btn) return;
+  const t = asIsTarget();
+  if(t.why){ btn.setAttribute('aria-pressed', 'false'); return; }
+  const runs = asIsRuns(t.ed);
+  const on = t.a === t.b
+    ? runs.some(r => t.a > r[0] && t.a < r[1])
+    : runsCover(runs, t.a, t.b);
+  btn.setAttribute('aria-pressed', String(on));
+}
+
 function fmtBar(){
   const bar = h('div', { class:'fmtbar' });
   [['italic','<i>I</i>','Italic (Ctrl+I) — boat names'],
@@ -6288,6 +6501,17 @@ function fmtBar(){
     b.onclick = () => document.execCommand(cmd);
     bar.append(b);
   });
+  /* Words the translator is to leave alone. It sits with the other
+     marks on a run of words rather than in the typeface list, because
+     it is a phrase that wants protecting — a boat, a yard, a class —
+     inside a sentence that should translate perfectly well around it. */
+  const asis = h('button', { class:'btn small', id:'asIsBtn',
+    text:'As written', 'aria-pressed':'false',
+    title:'Leave these words as written — a translator will not change them' });
+  asis.onmousedown = e => e.preventDefault();
+  asis.onclick = toggleAsIs;
+  bar.append(asis);
+
   const link = h('button', { class:'btn small', title:'Link (Ctrl+K)', text:'🔗 Link' });
   link.onmousedown = e => e.preventDefault();
   link.onclick = addLink;
@@ -6609,8 +6833,11 @@ function textNode(b){
      on showing the block that was last aligned by hand. */
   ed.addEventListener('focus', () => {
     State.focusBlock = b.id; setAtBlock(b.id);
-    markAligns(); markTsizes(); markFace();
+    markAligns(); markTsizes(); markFace(); markAsIs();
   });
+  /* Unlike alignment, which belongs to the whole paragraph, this one
+     changes as the cursor moves within it. */
+  ['keyup', 'mouseup'].forEach(ev => ed.addEventListener(ev, () => markAsIs()));
   ed.addEventListener('input', () => {
     b.html = (b.t === 'h2' || b.t === 'h3') ? escapeHtml(plainText(ed.innerHTML)) : sanitizeInline(ed.innerHTML);
     if(isHeadBlock(b)){
