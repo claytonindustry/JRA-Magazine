@@ -3,16 +3,16 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Which words survive a browser translation</title>
+<title>Words that arrive late</title>
 <style>
   :root{
     --paper:#f4f2ed; --ink:#1d2328; --muted:#5d6a73; --line:#d9d4c9;
-    --good:#1f5f7a;
+    --good:#1f5f7a; --panel:#fffdf9;
   }
   @media (prefers-color-scheme: dark){
     :root:not([data-theme="light"]){
       --paper:#15191c; --ink:#e8e6e0; --muted:#9aa5ac; --line:#2e3539;
-      --good:#6fb3cf;
+      --good:#6fb3cf; --panel:#1b2024;
     }
   }
   html{background:var(--paper)}
@@ -22,149 +22,92 @@
     font:17px/1.6 Georgia,"Times New Roman",serif;
   }
   h1{font-size:1.6rem;line-height:1.25;margin:0 0 .4rem}
-  h2{font-size:1.05rem;margin:2.4rem 0 .6rem;font-family:system-ui,sans-serif}
-  .lede{color:var(--muted);margin:0 0 1.6rem}
+  h2{font-size:1.1rem;margin:2.6rem 0 .2rem;font-family:system-ui,sans-serif}
+  .lede,.sub{color:var(--muted);margin:0 0 1.4rem;font-size:.95rem}
+  .sub{font-family:system-ui,sans-serif;margin:.2rem 0 1rem}
   .how{
     border:1px solid var(--line);border-radius:10px;padding:.9rem 1.1rem;
+    background:var(--panel);
     font-family:system-ui,sans-serif;font-size:.92rem;line-height:1.55;
   }
   .how ol{margin:.5rem 0 0;padding-inline-start:1.3rem}
-  .row{
-    border-top:1px solid var(--line);padding:1rem 0 .9rem;
-  }
+  .how li{margin-bottom:.35rem}
+  .row{border-top:1px solid var(--line);padding:.85rem 0 .75rem}
   .tag{
     font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.76rem;
-    color:var(--muted);display:block;margin-bottom:.3rem;
+    color:var(--muted);display:block;margin-bottom:.25rem;
   }
   .n{
-    display:inline-block;min-width:1.7em;font-family:system-ui,sans-serif;
+    display:inline-block;min-width:2.3em;font-family:system-ui,sans-serif;
     font-weight:700;color:var(--good);
   }
   p.t{margin:0}
-  /* The point of row 3: the very elements Chrome stepped over, with
-     every trace of their styling taken back off, so the words look like
-     ordinary words. */
-  .plain{font-style:normal;font-weight:inherit;text-decoration:none}
-  as-is,as-shut{display:inline}
-  footer{
-    margin-top:3rem;border-top:1px solid var(--line);padding-top:1rem;
-    font-family:system-ui,sans-serif;font-size:.85rem;color:var(--muted);
+  as-is{display:inline}
+  button{
+    font:600 1rem/1 system-ui,sans-serif;padding:.8rem 1.2rem;
+    border:1px solid var(--good);border-radius:8px;cursor:pointer;
+    background:var(--good);color:#fff;
   }
+  button:disabled{opacity:.5;cursor:default}
+  .waiting{color:var(--muted);font-style:italic}
 </style>
 </head>
 <body>
 
-<h1>Which words survive a browser translation</h1>
-<p class="lede">Eight ways of asking Chrome to leave a word alone. Every line below
-is ordinary English prose with the word <b>lighthouse</b> in it, marked up a
-different way each time. Translate this page and see which ones still say
-<b>lighthouse</b>.</p>
+<h1>Words that arrive late</h1>
+<p class="lede">The magazine does not have its articles when the page opens — it
+fetches them and writes them in a moment later. This asks whether that is what
+breaks the protection, by showing the same four sentences twice: once sitting
+in the page from the start, and once arriving after you have already
+translated.</p>
 
 <div class="how">
-  <b>How to run it</b>
+  <b>How to run it — the order matters</b>
   <ol>
-    <li>Right-click anywhere on this page and choose <b>Translate to…</b>, or use
-      the translate icon in the address bar. French or German is fine.</li>
-    <li>Read down the list. Any line still showing the English word
-      <b>lighthouse</b> was left alone; any line showing
-      <i>phare</i>, <i>Leuchtturm</i> or similar was translated.</li>
-    <li>Tell me the numbers that survived. That is the whole result.</li>
+    <li>Right-click the page and choose <b>Translate to…</b> French. Wait for
+      part one to turn French.</li>
+    <li>Read part one and note which lines still say <b>lighthouse</b>.</li>
+    <li><b>Now</b> press the button in part two. Four more sentences appear.</li>
+    <li>Read those and note which of them still say <b>lighthouse</b>.</li>
+    <li>Tell me both lists. If the two differ, arriving late is the whole
+      problem and the markup was never at fault.</li>
   </ol>
 </div>
 
-<h2>The eight ways</h2>
+<h2>Part one — in the page from the start</h2>
+<p class="sub">This is the easy case, and it already passed last time.</p>
+<div id="early"></div>
 
-<div class="row">
-  <span class="tag">1 &middot; nothing at all — the control</span>
-  <p class="t"><span class="n">1.</span>
-  The keeper rowed out to the lighthouse before the weather turned.</p>
-</div>
+<h2>Part two — written in after you translate</h2>
+<p class="sub">This is what the magazine actually does. Press the button only
+once part one has turned French.</p>
+<p><button id="go" type="button">Write in four more sentences</button></p>
+<div id="late"><p class="waiting">Nothing here yet.</p></div>
 
-<div class="row">
-  <span class="tag">2 &middot; a plain span, both opt-outs — what the editor writes today</span>
-  <p class="t"><span class="n">2.</span>
-  The keeper rowed out to the
-  <span class="notranslate" translate="no">lighthouse</span>
-  before the weather turned.</p>
-</div>
-
-<div class="row">
-  <span class="tag">3 &middot; italic + bold + underline, styling removed, plus both opt-outs</span>
-  <p class="t"><span class="n">3.</span>
-  The keeper rowed out to the
-  <i class="plain" translate="no"><b class="plain"><u class="plain">lighthouse</u></b></i>
-  before the weather turned.</p>
-</div>
-
-<div class="row">
-  <span class="tag">4 &middot; italic + bold + underline, styling removed, no opt-out at all</span>
-  <p class="t"><span class="n">4.</span>
-  The keeper rowed out to the
-  <i class="plain"><b class="plain"><u class="plain">lighthouse</u></b></i>
-  before the weather turned.</p>
-</div>
-
-<div class="row">
-  <span class="tag">5 &middot; three plain spans, one inside the next, plus both opt-outs</span>
-  <p class="t"><span class="n">5.</span>
-  The keeper rowed out to the
-  <span><span><span class="notranslate" translate="no">lighthouse</span></span></span>
-  before the weather turned.</p>
-</div>
-
-<div class="row">
-  <span class="tag">6 &middot; the word held in an open shadow root</span>
-  <p class="t"><span class="n">6.</span>
-  The keeper rowed out to the <as-is>lighthouse</as-is>
-  before the weather turned.</p>
-</div>
-
-<div class="row">
-  <span class="tag">7 &middot; the word held in a closed shadow root</span>
-  <p class="t"><span class="n">7.</span>
-  The keeper rowed out to the <as-shut>lighthouse</as-shut>
-  before the weather turned.</p>
-</div>
-
-<div class="row">
-  <span class="tag">8 &middot; the whole paragraph opted out — the one we know works</span>
-  <p class="t notranslate" translate="no"><span class="n">8.</span>
-  The keeper rowed out to the lighthouse before the weather turned.</p>
-</div>
-
-<h2>What each answer would mean</h2>
+<h2>What the answer would mean</h2>
 <div class="how">
-  <p style="margin:.2rem 0">
-  <b>1 translated and 8 survived</b> — the test ran properly. If that is not so,
-  the translation did not take and nothing else below is worth reading.</p>
-  <p style="margin:.6rem 0 .2rem">
-  <b>3 or 4 survived</b> — the shape Chrome stepped over in issue 300 can be
-  reproduced without changing how a word looks. Fragile, but free. If only
-  <b>4</b> survives, the opt-out attribute is actively unhelpful, which is
-  worth knowing.</p>
-  <p style="margin:.6rem 0 .2rem">
-  <b>5 survived</b> — depth alone is enough, and the marked words need no
-  formatting elements at all. This is the tidiest of the tricks.</p>
-  <p style="margin:.6rem 0 .2rem">
-  <b>6 or 7 survived</b> — the sturdiest answer available in the browser: the
-  words are real, selectable, searchable text that the translator cannot
-  reach. More machinery, and it leans on JavaScript.</p>
-  <p style="margin:.6rem 0 .2rem">
-  <b>Only 8 survived</b> — there is no way to protect a phrase mid-sentence in
-  Chrome, and owning the translation is the only route to it.</p>
+  <p style="margin:.2rem 0"><b>Both parts behave the same</b> — arriving late is
+  not the problem, and I am still looking in the wrong place.</p>
+  <p style="margin:.6rem 0 .2rem"><b>Part one protected, part two translated</b>
+  — confirmed. Chrome reads the opt-out when it first walks the page and
+  forgets it for anything written in afterwards. The markup in the magazine is
+  correct and always was.</p>
+  <p style="margin:.6rem 0 .2rem"><b>Part two protected only on the paragraph,
+  or only in the shadow root</b> — that tells us which of the two is worth
+  building, which is the whole point of asking.</p>
 </div>
 
-<footer>
+<footer style="margin-top:3rem;border-top:1px solid var(--line);padding-top:1rem;
+  font-family:system-ui,sans-serif;font-size:.85rem;color:var(--muted)">
 A scratch page for one question. It is not part of the magazine and nothing
-links to it; delete it once we have the answer.
+links to it; it comes out once we have the answer.
 </footer>
 
 <script>
-/* Rows 6 and 7. The word is moved out of the page's own tree and into a
-   shadow root, which is a different tree hanging off the element. The
-   question this page exists to answer is whether Chrome's translator
-   walks into one of those or stops at the boundary. */
-class AsIsOpen extends HTMLElement {
+/* The word is moved out of the page's own tree and into a shadow root
+   hanging off the element, which may be somewhere the translator does
+   not walk. */
+class AsIs extends HTMLElement {
   connectedCallback(){
     if(this.dataset.done) return;
     this.dataset.done = '1';
@@ -173,17 +116,56 @@ class AsIsOpen extends HTMLElement {
     this.attachShadow({ mode: 'open' }).textContent = words;
   }
 }
-class AsIsShut extends HTMLElement {
-  connectedCallback(){
-    if(this.dataset.done) return;
-    this.dataset.done = '1';
-    const words = this.textContent;
-    this.textContent = '';
-    this.attachShadow({ mode: 'closed' }).textContent = words;
-  }
+customElements.define('as-is', AsIs);
+
+/* The same four sentences in both halves, so the only thing that differs
+   between them is when they were put on the page. */
+const SENTENCE = (inner) =>
+  'The keeper rowed out to the ' + inner + ' before the weather turned.';
+const ways = (tag) => [
+  ['nothing at all — the control',
+   '<p class="t">' + SENTENCE('lighthouse') + '</p>'],
+  ['a span with both opt-outs — what the editor writes',
+   '<p class="t">' + SENTENCE(
+     '<span class="notranslate" translate="no">lighthouse</span>') + '</p>'],
+  ['the whole paragraph opted out',
+   '<p class="t notranslate" translate="no">' + SENTENCE('lighthouse') + '</p>'],
+  ['the word held in a shadow root',
+   '<p class="t">' + SENTENCE('<as-is>lighthouse</as-is>') + '</p>']
+].map(([label, html], i) => {
+  const n = tag + (i + 1);
+  return '<div class="row"><span class="tag">' + n + ' · ' + label + '</span>' +
+    html.replace('<p class="t', '<p data-n="' + n + '" class="t') + '</div>';
+}).join('');
+
+/* Each sentence is numbered after it is placed, so the number is a
+   plain text node beside the words rather than something woven into
+   the markup being tested. */
+function number(box){
+  box.querySelectorAll('p.t').forEach(p => {
+    const s = document.createElement('span');
+    s.className = 'n';
+    s.textContent = p.dataset.n + '.';
+    p.prepend(s, ' ');
+  });
 }
-customElements.define('as-is', AsIsOpen);
-customElements.define('as-shut', AsIsShut);
+
+/* Part one goes in while the page is still parsing, so it is on screen
+   before anything could have translated it — as good as having been
+   typed into the file. */
+const early = document.getElementById('early');
+early.innerHTML = ways('A');
+number(early);
+
+/* Part two goes in on a press, which is the whole point: by then the
+   page has already been translated once. */
+document.getElementById('go').onclick = (e) => {
+  const box = document.getElementById('late');
+  box.innerHTML = ways('B');
+  number(box);
+  e.target.disabled = true;
+  e.target.textContent = 'Written in — now read them';
+};
 </script>
 </body>
 </html>
