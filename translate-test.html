@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Words that arrive late</title>
+<title>How much can be marked at once</title>
 <style>
   :root{
     --paper:#f4f2ed; --ink:#1d2328; --muted:#5d6a73; --line:#d9d4c9;
@@ -17,155 +17,136 @@
   }
   html{background:var(--paper)}
   body{
-    margin:0 auto;padding:2rem 16px 5rem;max-width:46rem;
+    margin:0 auto;padding:2rem 16px 5rem;max-width:44rem;
     background:var(--paper);color:var(--ink);
-    font:17px/1.6 Georgia,"Times New Roman",serif;
+    font:17px/1.65 Georgia,"Times New Roman",serif;
   }
   h1{font-size:1.6rem;line-height:1.25;margin:0 0 .4rem}
-  h2{font-size:1.1rem;margin:2.6rem 0 .2rem;font-family:system-ui,sans-serif}
-  .lede,.sub{color:var(--muted);margin:0 0 1.4rem;font-size:.95rem}
-  .sub{font-family:system-ui,sans-serif;margin:.2rem 0 1rem}
+  h2{font-size:1.1rem;margin:2.4rem 0 1rem;font-family:system-ui,sans-serif}
+  .lede{color:var(--muted);margin:0 0 1.4rem;font-size:.95rem}
   .how{
     border:1px solid var(--line);border-radius:10px;padding:.9rem 1.1rem;
     background:var(--panel);
     font-family:system-ui,sans-serif;font-size:.92rem;line-height:1.55;
   }
   .how ol{margin:.5rem 0 0;padding-inline-start:1.3rem}
-  .how li{margin-bottom:.35rem}
-  .row{border-top:1px solid var(--line);padding:.85rem 0 .75rem}
+  .how li{margin-bottom:.3rem}
+  .row{border-top:1px solid var(--line);padding:1rem 0 .9rem}
   .tag{
     font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.76rem;
-    color:var(--muted);display:block;margin-bottom:.25rem;
+    color:var(--muted);display:block;margin-bottom:.35rem;
   }
   .n{
-    display:inline-block;min-width:2.3em;font-family:system-ui,sans-serif;
-    font-weight:700;color:var(--good);
+    font-family:system-ui,sans-serif;font-weight:700;color:var(--good);
+    margin-inline-end:.3rem;
   }
   p.t{margin:0}
-  as-is{display:inline}
-  button{
-    font:600 1rem/1 system-ui,sans-serif;padding:.8rem 1.2rem;
-    border:1px solid var(--good);border-radius:8px;cursor:pointer;
-    background:var(--good);color:#fff;
+  footer{
+    margin-top:3rem;border-top:1px solid var(--line);padding-top:1rem;
+    font-family:system-ui,sans-serif;font-size:.85rem;color:var(--muted);
   }
-  button:disabled{opacity:.5;cursor:default}
-  .waiting{color:var(--muted);font-style:italic}
 </style>
 </head>
 <body>
 
-<h1>Words that arrive late</h1>
-<p class="lede">The magazine does not have its articles when the page opens — it
-fetches them and writes them in a moment later. This asks whether that is what
-breaks the protection, by showing the same four sentences twice: once sitting
-in the page from the start, and once arriving after you have already
-translated.</p>
+<h1>How much can be marked at once</h1>
+<p class="lede">The last two pages marked a single word and it was protected every
+time. The sentence that failed in issue 300 was not a single word — it was a whole
+sentence among four. This changes only one thing down the list: how much of the
+paragraph is wrapped.</p>
 
 <div class="how">
-  <b>How to run it — the order matters</b>
+  <b>How to run it</b>
   <ol>
-    <li>Right-click the page and choose <b>Translate to…</b> French. Wait for
-      part one to turn French.</li>
-    <li>Read part one and note which lines still say <b>lighthouse</b>.</li>
-    <li><b>Now</b> press the button in part two. Four more sentences appear.</li>
-    <li>Read those and note which of them still say <b>lighthouse</b>.</li>
-    <li>Tell me both lists. If the two differ, arriving late is the whole
-      problem and the markup was never at fault.</li>
+    <li>Right-click the page, choose <b>Translate to…</b>, French.</li>
+    <li>Read down the six paragraphs. Each one says underneath it which part was
+      meant to be protected.</li>
+    <li>Tell me which numbers kept their protected part in English.</li>
   </ol>
+  <p style="margin:.7rem 0 0">Row 1 is the exact markup from issue 300 that failed.
+  If it fails here too, we have it cornered.</p>
 </div>
 
-<h2>Part one — in the page from the start</h2>
-<p class="sub">This is the easy case, and it already passed last time.</p>
-<div id="early"></div>
+<h2>Six paragraphs, one difference</h2>
 
-<h2>Part two — written in after you translate</h2>
-<p class="sub">This is what the magazine actually does. Press the button only
-once part one has turned French.</p>
-<p><button id="go" type="button">Write in four more sentences</button></p>
-<div id="late"><p class="waiting">Nothing here yet.</p></div>
+<div class="row">
+  <span class="tag">1 &middot; one whole sentence of four &mdash; the markup that failed in issue 300</span>
+  <p class="t"><span class="n">1.</span>He accused other sailors of being lazy.
+  <span class="notranslate" translate="no">He declared that easing a sail was a sign of weakness.</span>
+  He insisted that anyone who wasn't pulling every rope as tightly as possible had
+  no business being on the water. His crew grew increasingly exhausted.</p>
+  <span class="tag">&uarr; protected: the second sentence</span>
+</div>
+
+<div class="row">
+  <span class="tag">2 &middot; one word, in the same long paragraph</span>
+  <p class="t"><span class="n">2.</span>He accused other sailors of being lazy.
+  He declared that easing a
+  <span class="notranslate" translate="no">lighthouse</span>
+  was a sign of weakness. He insisted that anyone who wasn't pulling every rope as
+  tightly as possible had no business being on the water. His crew grew
+  increasingly exhausted.</p>
+  <span class="tag">&uarr; protected: the word lighthouse</span>
+</div>
+
+<div class="row">
+  <span class="tag">3 &middot; half a sentence &mdash; a clause, not a whole one</span>
+  <p class="t"><span class="n">3.</span>He accused other sailors of being lazy. He
+  declared that
+  <span class="notranslate" translate="no">easing a sail was a sign of weakness</span>.
+  He insisted that anyone who wasn't pulling every rope as tightly as possible had
+  no business being on the water. His crew grew increasingly exhausted.</p>
+  <span class="tag">&uarr; protected: easing a sail was a sign of weakness</span>
+</div>
+
+<div class="row">
+  <span class="tag">4 &middot; two whole sentences of four</span>
+  <p class="t"><span class="n">4.</span>He accused other sailors of being lazy.
+  <span class="notranslate" translate="no">He declared that easing a sail was a sign
+  of weakness. He insisted that anyone who wasn't pulling every rope as tightly as
+  possible had no business being on the water.</span>
+  His crew grew increasingly exhausted.</p>
+  <span class="tag">&uarr; protected: the middle two sentences</span>
+</div>
+
+<div class="row">
+  <span class="tag">5 &middot; a span around every word of the paragraph</span>
+  <p class="t"><span class="n">5.</span><span class="notranslate" translate="no">He
+  accused other sailors of being lazy. He declared that easing a sail was a sign of
+  weakness. He insisted that anyone who wasn't pulling every rope as tightly as
+  possible had no business being on the water. His crew grew increasingly
+  exhausted.</span></p>
+  <span class="tag">&uarr; protected: all of it, by a span &mdash; this is what issue 300 holds now</span>
+</div>
+
+<div class="row">
+  <span class="tag">6 &middot; the paragraph element itself marked &mdash; the one we know works</span>
+  <p class="t notranslate" translate="no"><span class="n">6.</span>He accused other
+  sailors of being lazy. He declared that easing a sail was a sign of weakness. He
+  insisted that anyone who wasn't pulling every rope as tightly as possible had no
+  business being on the water. His crew grew increasingly exhausted.</p>
+  <span class="tag">&uarr; protected: all of it, by the paragraph</span>
+</div>
 
 <h2>What the answer would mean</h2>
 <div class="how">
-  <p style="margin:.2rem 0"><b>Both parts behave the same</b> — arriving late is
-  not the problem, and I am still looking in the wrong place.</p>
-  <p style="margin:.6rem 0 .2rem"><b>Part one protected, part two translated</b>
-  — confirmed. Chrome reads the opt-out when it first walks the page and
-  forgets it for anything written in afterwards. The markup in the magazine is
-  correct and always was.</p>
-  <p style="margin:.6rem 0 .2rem"><b>Part two protected only on the paragraph,
-  or only in the shadow root</b> — that tells us which of the two is worth
-  building, which is the whole point of asking.</p>
+  <p style="margin:.2rem 0"><b>1 fails and 2 holds</b> &mdash; it is the size of the
+  marked run. Chrome protects an island inside a sentence but loses a whole sentence
+  marked among others. That is a rule we can work with: protect words and phrases,
+  never whole sentences.</p>
+  <p style="margin:.6rem 0 .2rem"><b>1 and 3 both hold</b> &mdash; the markup is fine
+  in every shape, and something about the magazine itself is the cause after all,
+  not the content. I would want to see the real page failing before building
+  anything else.</p>
+  <p style="margin:.6rem 0 .2rem"><b>Only 5 and 6 hold</b> &mdash; nothing short of
+  the whole paragraph is safe, and the control should mark blocks rather than
+  phrases.</p>
 </div>
 
-<footer style="margin-top:3rem;border-top:1px solid var(--line);padding-top:1rem;
-  font-family:system-ui,sans-serif;font-size:.85rem;color:var(--muted)">
-A scratch page for one question. It is not part of the magazine and nothing
-links to it; it comes out once we have the answer.
+<footer>
+A scratch page for one question. It is not part of the magazine and nothing links
+to it; it comes out once we have the answer.
 </footer>
 
-<script>
-/* The word is moved out of the page's own tree and into a shadow root
-   hanging off the element, which may be somewhere the translator does
-   not walk. */
-class AsIs extends HTMLElement {
-  connectedCallback(){
-    if(this.dataset.done) return;
-    this.dataset.done = '1';
-    const words = this.textContent;
-    this.textContent = '';
-    this.attachShadow({ mode: 'open' }).textContent = words;
-  }
-}
-customElements.define('as-is', AsIs);
-
-/* The same four sentences in both halves, so the only thing that differs
-   between them is when they were put on the page. */
-const SENTENCE = (inner) =>
-  'The keeper rowed out to the ' + inner + ' before the weather turned.';
-const ways = (tag) => [
-  ['nothing at all — the control',
-   '<p class="t">' + SENTENCE('lighthouse') + '</p>'],
-  ['a span with both opt-outs — what the editor writes',
-   '<p class="t">' + SENTENCE(
-     '<span class="notranslate" translate="no">lighthouse</span>') + '</p>'],
-  ['the whole paragraph opted out',
-   '<p class="t notranslate" translate="no">' + SENTENCE('lighthouse') + '</p>'],
-  ['the word held in a shadow root',
-   '<p class="t">' + SENTENCE('<as-is>lighthouse</as-is>') + '</p>']
-].map(([label, html], i) => {
-  const n = tag + (i + 1);
-  return '<div class="row"><span class="tag">' + n + ' · ' + label + '</span>' +
-    html.replace('<p class="t', '<p data-n="' + n + '" class="t') + '</div>';
-}).join('');
-
-/* Each sentence is numbered after it is placed, so the number is a
-   plain text node beside the words rather than something woven into
-   the markup being tested. */
-function number(box){
-  box.querySelectorAll('p.t').forEach(p => {
-    const s = document.createElement('span');
-    s.className = 'n';
-    s.textContent = p.dataset.n + '.';
-    p.prepend(s, ' ');
-  });
-}
-
-/* Part one goes in while the page is still parsing, so it is on screen
-   before anything could have translated it — as good as having been
-   typed into the file. */
-const early = document.getElementById('early');
-early.innerHTML = ways('A');
-number(early);
-
-/* Part two goes in on a press, which is the whole point: by then the
-   page has already been translated once. */
-document.getElementById('go').onclick = (e) => {
-  const box = document.getElementById('late');
-  box.innerHTML = ways('B');
-  number(box);
-  e.target.disabled = true;
-  e.target.textContent = 'Written in — now read them';
-};
-</script>
 </body>
 </html>
