@@ -505,7 +505,7 @@ body{background:var(--paper)}
 #reader .body blockquote p:last-child{margin-bottom:0}
 #reader .body .standfirst{font-size:calc(1.12em * var(--tz,1));line-height:1.5;font-style:italic;color:var(--brine)}
 /* a word set the other way round inside an italic run */
-#reader .upright,.mag .upright,#editor .upright{font-style:normal}
+#reader .upright,.mag .upright,#editor .upright,dialog .upright{font-style:normal}
 /* Words a translator is told to leave as written. The reader is shown
    nothing at all: a boat's name simply does not turn into French, and
    there is no reason to point at it on the page. The tint is for the
@@ -514,10 +514,15 @@ body{background:var(--paper)}
    and above all not the printed pages, where the PDF writer paints
    every background it finds and would set a coloured box behind every
    boat in the issue. */
-#editor .ed .notranslate{
+#editor .ed .notranslate,dialog .ed .notranslate{
   background:#fbf0cf;box-shadow:0 0 0 1px rgba(150,120,30,.3);
   border-radius:3px;
 }
+/* The few marks worth having wherever a caption is written away from
+   the writing bar — inside a dialog, which stands in front of that bar,
+   and in the panel beside a photograph on the printed page. */
+.capmarks{display:flex;gap:.3rem;align-items:center;margin:.1rem 0 .35rem}
+.capmarks .btn{padding:.1rem .4rem;font-size:.78rem}
 #reader .body figcaption .credit{font-style:normal}
 #reader .getpdf{margin:.9rem 0 0;font-family:var(--sans);font-size:.88rem}
 #reader .getpdf a{color:var(--tanbark);text-underline-offset:.15em}
@@ -971,12 +976,17 @@ dialog #coverBody .subhead:first-child{margin-top:.2rem}
 #editor .blk .tools button:hover{background:#fff;color:var(--e-ink)}
 #editor .ed.al-center{text-align:center}
 #editor .ed.al-right{text-align:right}
-#editor .ed{
+/* A dialog is not inside the editor in the page — it cannot be, being a
+   dialog — but it is the editor's own, and what is written in one is
+   written the same way and must look the same while you write it. */
+#editor .ed,dialog .ed{
   min-height:1.5em;padding:.3rem .5rem;border:1px solid transparent;border-radius:6px;
   outline:none;font-family:var(--mag-body);font-size:calc(1.08rem * var(--tz,1));line-height:1.55;
   background:#fff;overflow-wrap:anywhere;
 }
-#editor .ed:focus{border-color:var(--e-accent)}
+#editor .ed:focus,dialog .ed:focus{border-color:var(--e-accent)}
+dialog .ed{border-color:var(--e-line)}
+dialog .ed-cap{font-size:.95rem;min-height:2.2em}
 #editor .ed-h3{font-weight:700}
 #editor .ed-h2{font-weight:700;font-size:calc(1.3rem * var(--tz,1))}
 /* The title and the headings are set in the magazine's heading face, as
@@ -1019,7 +1029,7 @@ dialog #coverBody .subhead:first-child{margin-top:.2rem}
 }
 #editor .caphead .check.tiny input{width:auto;margin:0}
 /* words kept but not printed: still editable, visibly set aside */
-#editor .ed-cap.muted{opacity:.55;background:var(--e-bg);font-style:italic}
+#editor .ed-cap.muted,dialog .ed-cap.muted{opacity:.55;background:var(--e-bg);font-style:italic}
 #editor .gal-note{margin:.2rem 0 0}
 .boxlab.inline{margin:0;white-space:nowrap;align-self:center}
 /* the one set of width-and-placement controls, wherever it is shown:
@@ -1191,6 +1201,11 @@ body.pdf-building #editor .work,body.pdf-building #editor .sp-grip{display:none!
 }
 #editor .fp-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:.4rem;font-size:.85rem}
 #editor .fp-x{border:0;background:none;cursor:pointer;color:var(--e-muted);font-size:.9rem}
+#editor .figpanel label{display:block;font-size:.75rem;color:var(--e-muted)}
+#editor .figpanel .ed-cap{
+  font-size:.85rem;min-height:2.4em;max-height:7em;overflow:auto;
+  border:1px solid var(--e-line);margin-top:.15rem;
+}
 #editor .fp-row{display:flex;gap:.3rem;margin-top:.1rem}
 #editor .fp-row .btn{flex:1}
 #editor .fp-meta{margin-top:.45rem;font-size:.75rem;color:var(--e-muted)}
@@ -1745,7 +1760,9 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
             <div class="fp-head"><b id="fpTitle">Photograph</b>
               <button class="fp-x" id="fpClose" aria-label="Close">✕</button></div>
             <div id="fpCtl"></div>
-            <label>Caption<input id="fpCap"></label>
+            <label>Caption<span class="capmarks" id="fpMarks"></span>
+              <div class="ed ed-cap" id="fpCap" contenteditable="true"
+                   spellcheck="true" role="textbox" aria-label="Caption"></div></label>
             <div class="fp-row">
               <button class="btn small" id="fpUp">↑ Earlier</button>
               <button class="btn small" id="fpDown">↓ Later</button>
@@ -2009,7 +2026,7 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
    when the file changes. It is unrelated to the database's own VERSION,
    which governs schema upgrades and must not be moved for a cosmetic
    change. */
-const APP_VERSION = '1.28';
+const APP_VERSION = '1.29';
 
 /* Nothing is imported at the top any more. The Firebase libraries are
    several hundred kilobytes and, loaded this way, the browser must fetch
@@ -6336,10 +6353,13 @@ function newAsIs(){
   n.setAttribute('translate', 'no');
   return n;
 }
-/* the box being written in, if the cursor is in one at all */
+/* The box being written in, if the cursor is in one at all. A caption
+   edited in a dialog is as much a writing box as a paragraph in the
+   article, and a dialog is not inside the editor in the page, so this
+   asks what the thing is rather than where it sits. */
 function edAt(node){
   const n = node && node.nodeType === 3 ? node.parentElement : node;
-  const e = n && n.closest ? n.closest('#editor .ed') : null;
+  const e = n && n.closest ? n.closest('.ed') : null;
   return (e && e.isContentEditable) ? e : null;
 }
 /* how many characters of this box come before a point in it */
@@ -6480,15 +6500,41 @@ function toggleAsIs(){
    marked, the way the alignment buttons say what the paragraph is set
    to. */
 function markAsIs(){
-  const btn = $('#asIsBtn');
-  if(!btn) return;
+  const btns = $$('.asisbtn');
+  if(!btns.length) return;
   const t = asIsTarget();
-  if(t.why){ btn.setAttribute('aria-pressed', 'false'); return; }
-  const runs = asIsRuns(t.ed);
-  const on = t.a === t.b
-    ? runs.some(r => t.a > r[0] && t.a < r[1])
-    : runsCover(runs, t.a, t.b);
-  btn.setAttribute('aria-pressed', String(on));
+  const on = (() => {
+    if(t.why) return false;
+    const runs = asIsRuns(t.ed);
+    return t.a === t.b ? runs.some(r => t.a > r[0] && t.a < r[1])
+                       : runsCover(runs, t.a, t.b);
+  })();
+  btns.forEach(x => x.setAttribute('aria-pressed', String(on)));
+}
+/* The same button wherever words are written — the writing bar above an
+   article, and the small row above a caption in a dialog, which cannot
+   reach that bar through the dialog standing in front of it. */
+function asIsButton(){
+  const btn = h('button', { type:'button', class:'btn small asisbtn',
+    text:'As written', 'aria-pressed':'false',
+    title:'Leave these words as written — a translator will not change them' });
+  btn.onmousedown = e => e.preventDefault();
+  btn.onclick = toggleAsIs;
+  return btn;
+}
+/* Italic, bold and the mark, for a caption written inside a dialog. */
+function capMarks(){
+  const row = h('div', { class:'capmarks' });
+  [['italic', '<i>I</i>', 'Italic (Ctrl+I) — boat names'],
+   ['bold', '<b>B</b>', 'Bold (Ctrl+B)']].forEach(pair => {
+    const b = h('button', { type:'button', class:'btn small',
+      title: pair[2], html: pair[1] });
+    b.onmousedown = e => e.preventDefault();
+    b.onclick = () => document.execCommand(pair[0]);
+    row.append(b);
+  });
+  row.append(asIsButton());
+  return row;
 }
 
 function fmtBar(){
@@ -6505,12 +6551,7 @@ function fmtBar(){
      marks on a run of words rather than in the typeface list, because
      it is a phrase that wants protecting — a boat, a yard, a class —
      inside a sentence that should translate perfectly well around it. */
-  const asis = h('button', { class:'btn small', id:'asIsBtn',
-    text:'As written', 'aria-pressed':'false',
-    title:'Leave these words as written — a translator will not change them' });
-  asis.onmousedown = e => e.preventDefault();
-  asis.onclick = toggleAsIs;
-  bar.append(asis);
+  bar.append(asIsButton());
 
   const link = h('button', { class:'btn small', title:'Link (Ctrl+K)', text:'🔗 Link' });
   link.onmousedown = e => e.preventDefault();
@@ -7026,20 +7067,37 @@ function openPhotoInfo(p){
   };
 
   if(b){
-    /* the caption under the picture, and whether it is printed */
+    /* The caption under the picture, and whether it is printed. It is
+       written here exactly as it is written beside the block — the same
+       kind of box, keeping its italics, its links and the words marked
+       to be left as written. It was a plain line of text before, which
+       showed none of those and flattened all of them the moment
+       anything was typed in it: a caption with a boat's name in it came
+       out of this dialog with the name in upright letters and open to
+       the translator. */
     const showCap = h('input', { type:'checkbox' });
     showCap.checked = capShown(b);
-    const cap = h('input', { value: plainText(b.caption || ''), 'aria-label':'Caption' });
+    const cap = h('div', { class:'ed ed-cap', contenteditable:'true', spellcheck:'true',
+      'aria-label':'Caption', role:'textbox' });
+    cap.innerHTML = b.caption || '';
     showCap.onchange = () => {
       b.capOff = !showCap.checked;
       cap.classList.toggle('muted', !showCap.checked);
       save();
     };
-    cap.oninput = () => { b.caption = escapeHtml(cap.value); save(); };
+    cap.oninput = () => { b.caption = sanitizeInline(cap.innerHTML); save(); };
+    cap.addEventListener('keydown', e => { if(e.key === 'Enter') e.preventDefault(); });
+    cap.addEventListener('paste', e => {
+      e.preventDefault();
+      document.execCommand('insertText', false,
+        (e.clipboardData.getData('text/plain') || '').replace(/\s+/g, ' '));
+    });
+    ['keyup', 'mouseup', 'focus'].forEach(ev => cap.addEventListener(ev, () => markAsIs()));
     if(!capShown(b)) cap.classList.add('muted');
     body.append(h('div', { class:'caphead' },
       h('span', { class:'boxlab', text:'Caption' }),
       h('label', { class:'check tiny' }, showCap, ' Show it')));
+    body.append(capMarks());
     body.append(cap);
 
     const credit = h('input', { value: b.credit || '', 'aria-label':'Photo credit' });
@@ -8161,9 +8219,23 @@ function openPlaceSheet(cands, after){
     row.append(box);
     const col = h('div', { class:'place-fields' });
 
-    const cap = h('input', { value: plainText(c.caption || ''), 'aria-label':'Caption' });
-    cap.oninput = () => { c.caption = escapeHtml(cap.value); };
+    /* A photograph being placed may already carry a caption from
+       wherever it was last used, italics and all, so this is the same
+       box as the others rather than a plain line that would flatten it
+       the moment anything was typed. */
+    const cap = h('div', { class:'ed ed-cap', contenteditable:'true', spellcheck:'true',
+      'aria-label':'Caption', role:'textbox' });
+    cap.innerHTML = c.caption || '';
+    cap.oninput = () => { c.caption = sanitizeInline(cap.innerHTML); };
+    cap.addEventListener('keydown', e => { if(e.key === 'Enter') e.preventDefault(); });
+    cap.addEventListener('paste', e => {
+      e.preventDefault();
+      document.execCommand('insertText', false,
+        (e.clipboardData.getData('text/plain') || '').replace(/\s+/g, ' '));
+    });
+    ['keyup', 'mouseup', 'focus'].forEach(ev => cap.addEventListener(ev, () => markAsIs()));
     col.append(h('p', { class:'boxlab', text:'Caption' }));
+    col.append(capMarks());
     col.append(cap);
 
     const credit = h('input', { value: c.credit || '', 'aria-label':'Photo credit' });
@@ -9812,7 +9884,7 @@ function select(id){
     later('fpdraw', () => drawLayout().then(reselect), 160);
     later('web', refreshWeb, 320);
   }));
-  $('#fpCap').value = plainText(b.caption || '');
+  $('#fpCap').innerHTML = b.caption || '';
   panel.hidden = false;
   placePanel();
 }
@@ -11149,12 +11221,25 @@ function wire(){
   /* Width, across, set-in and shape are built by figControls when the
      photograph is selected, and carry their own handlers. */
   $('#fpClose').onclick = () => select(null);
-  $('#fpCap').oninput = e => {
+  /* The same box as everywhere else, so a caption edited here off the
+     printed page keeps its italics and whatever in it was marked to be
+     left as written, rather than being flattened by the one field that
+     happened to be a plain line of text. */
+  const fpCap = $('#fpCap');
+  $('#fpMarks').append(capMarks());
+  fpCap.oninput = () => {
     const b = blockById(selected); if(!b) return;
-    b.caption = escapeHtml(e.target.value);
+    b.caption = sanitizeInline(fpCap.innerHTML);
     saveBlockOwner(selected);
     later('cap', () => drawLayout().then(reselect), 500);
   };
+  fpCap.addEventListener('keydown', e => { if(e.key === 'Enter') e.preventDefault(); });
+  fpCap.addEventListener('paste', e => {
+    e.preventDefault();
+    document.execCommand('insertText', false,
+      (e.clipboardData.getData('text/plain') || '').replace(/\s+/g, ' '));
+  });
+  ['keyup', 'mouseup', 'focus'].forEach(ev => fpCap.addEventListener(ev, () => markAsIs()));
   $('#fpUp').onclick = () => { const b = blockById(selected); if(b){ moveBlock(b, -1); drawLayout().then(reselect); } };
   $('#fpDown').onclick = () => { const b = blockById(selected); if(b){ moveBlock(b, 1); drawLayout().then(reselect); } };
   $('#fpEdit').onclick = () => { if(selected) goToBlock(selected); };

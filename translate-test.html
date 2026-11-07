@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Which words survive a browser translation</title>
+<style>
+  :root{
+    --paper:#f4f2ed; --ink:#1d2328; --muted:#5d6a73; --line:#d9d4c9;
+    --good:#1f5f7a;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --paper:#15191c; --ink:#e8e6e0; --muted:#9aa5ac; --line:#2e3539;
+      --good:#6fb3cf;
+    }
+  }
+  html{background:var(--paper)}
+  body{
+    margin:0 auto;padding:2rem 16px 5rem;max-width:46rem;
+    background:var(--paper);color:var(--ink);
+    font:17px/1.6 Georgia,"Times New Roman",serif;
+  }
+  h1{font-size:1.6rem;line-height:1.25;margin:0 0 .4rem}
+  h2{font-size:1.05rem;margin:2.4rem 0 .6rem;font-family:system-ui,sans-serif}
+  .lede{color:var(--muted);margin:0 0 1.6rem}
+  .how{
+    border:1px solid var(--line);border-radius:10px;padding:.9rem 1.1rem;
+    font-family:system-ui,sans-serif;font-size:.92rem;line-height:1.55;
+  }
+  .how ol{margin:.5rem 0 0;padding-inline-start:1.3rem}
+  .row{
+    border-top:1px solid var(--line);padding:1rem 0 .9rem;
+  }
+  .tag{
+    font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.76rem;
+    color:var(--muted);display:block;margin-bottom:.3rem;
+  }
+  .n{
+    display:inline-block;min-width:1.7em;font-family:system-ui,sans-serif;
+    font-weight:700;color:var(--good);
+  }
+  p.t{margin:0}
+  /* The point of row 3: the very elements Chrome stepped over, with
+     every trace of their styling taken back off, so the words look like
+     ordinary words. */
+  .plain{font-style:normal;font-weight:inherit;text-decoration:none}
+  as-is,as-shut{display:inline}
+  footer{
+    margin-top:3rem;border-top:1px solid var(--line);padding-top:1rem;
+    font-family:system-ui,sans-serif;font-size:.85rem;color:var(--muted);
+  }
+</style>
+</head>
+<body>
+
+<h1>Which words survive a browser translation</h1>
+<p class="lede">Eight ways of asking Chrome to leave a word alone. Every line below
+is ordinary English prose with the word <b>lighthouse</b> in it, marked up a
+different way each time. Translate this page and see which ones still say
+<b>lighthouse</b>.</p>
+
+<div class="how">
+  <b>How to run it</b>
+  <ol>
+    <li>Right-click anywhere on this page and choose <b>Translate to…</b>, or use
+      the translate icon in the address bar. French or German is fine.</li>
+    <li>Read down the list. Any line still showing the English word
+      <b>lighthouse</b> was left alone; any line showing
+      <i>phare</i>, <i>Leuchtturm</i> or similar was translated.</li>
+    <li>Tell me the numbers that survived. That is the whole result.</li>
+  </ol>
+</div>
+
+<h2>The eight ways</h2>
+
+<div class="row">
+  <span class="tag">1 &middot; nothing at all — the control</span>
+  <p class="t"><span class="n">1.</span>
+  The keeper rowed out to the lighthouse before the weather turned.</p>
+</div>
+
+<div class="row">
+  <span class="tag">2 &middot; a plain span, both opt-outs — what the editor writes today</span>
+  <p class="t"><span class="n">2.</span>
+  The keeper rowed out to the
+  <span class="notranslate" translate="no">lighthouse</span>
+  before the weather turned.</p>
+</div>
+
+<div class="row">
+  <span class="tag">3 &middot; italic + bold + underline, styling removed, plus both opt-outs</span>
+  <p class="t"><span class="n">3.</span>
+  The keeper rowed out to the
+  <i class="plain" translate="no"><b class="plain"><u class="plain">lighthouse</u></b></i>
+  before the weather turned.</p>
+</div>
+
+<div class="row">
+  <span class="tag">4 &middot; italic + bold + underline, styling removed, no opt-out at all</span>
+  <p class="t"><span class="n">4.</span>
+  The keeper rowed out to the
+  <i class="plain"><b class="plain"><u class="plain">lighthouse</u></b></i>
+  before the weather turned.</p>
+</div>
+
+<div class="row">
+  <span class="tag">5 &middot; three plain spans, one inside the next, plus both opt-outs</span>
+  <p class="t"><span class="n">5.</span>
+  The keeper rowed out to the
+  <span><span><span class="notranslate" translate="no">lighthouse</span></span></span>
+  before the weather turned.</p>
+</div>
+
+<div class="row">
+  <span class="tag">6 &middot; the word held in an open shadow root</span>
+  <p class="t"><span class="n">6.</span>
+  The keeper rowed out to the <as-is>lighthouse</as-is>
+  before the weather turned.</p>
+</div>
+
+<div class="row">
+  <span class="tag">7 &middot; the word held in a closed shadow root</span>
+  <p class="t"><span class="n">7.</span>
+  The keeper rowed out to the <as-shut>lighthouse</as-shut>
+  before the weather turned.</p>
+</div>
+
+<div class="row">
+  <span class="tag">8 &middot; the whole paragraph opted out — the one we know works</span>
+  <p class="t notranslate" translate="no"><span class="n">8.</span>
+  The keeper rowed out to the lighthouse before the weather turned.</p>
+</div>
+
+<h2>What each answer would mean</h2>
+<div class="how">
+  <p style="margin:.2rem 0">
+  <b>1 translated and 8 survived</b> — the test ran properly. If that is not so,
+  the translation did not take and nothing else below is worth reading.</p>
+  <p style="margin:.6rem 0 .2rem">
+  <b>3 or 4 survived</b> — the shape Chrome stepped over in issue 300 can be
+  reproduced without changing how a word looks. Fragile, but free. If only
+  <b>4</b> survives, the opt-out attribute is actively unhelpful, which is
+  worth knowing.</p>
+  <p style="margin:.6rem 0 .2rem">
+  <b>5 survived</b> — depth alone is enough, and the marked words need no
+  formatting elements at all. This is the tidiest of the tricks.</p>
+  <p style="margin:.6rem 0 .2rem">
+  <b>6 or 7 survived</b> — the sturdiest answer available in the browser: the
+  words are real, selectable, searchable text that the translator cannot
+  reach. More machinery, and it leans on JavaScript.</p>
+  <p style="margin:.6rem 0 .2rem">
+  <b>Only 8 survived</b> — there is no way to protect a phrase mid-sentence in
+  Chrome, and owning the translation is the only route to it.</p>
+</div>
+
+<footer>
+A scratch page for one question. It is not part of the magazine and nothing
+links to it; delete it once we have the answer.
+</footer>
+
+<script>
+/* Rows 6 and 7. The word is moved out of the page's own tree and into a
+   shadow root, which is a different tree hanging off the element. The
+   question this page exists to answer is whether Chrome's translator
+   walks into one of those or stops at the boundary. */
+class AsIsOpen extends HTMLElement {
+  connectedCallback(){
+    if(this.dataset.done) return;
+    this.dataset.done = '1';
+    const words = this.textContent;
+    this.textContent = '';
+    this.attachShadow({ mode: 'open' }).textContent = words;
+  }
+}
+class AsIsShut extends HTMLElement {
+  connectedCallback(){
+    if(this.dataset.done) return;
+    this.dataset.done = '1';
+    const words = this.textContent;
+    this.textContent = '';
+    this.attachShadow({ mode: 'closed' }).textContent = words;
+  }
+}
+customElements.define('as-is', AsIsOpen);
+customElements.define('as-shut', AsIsShut);
+</script>
+</body>
+</html>
