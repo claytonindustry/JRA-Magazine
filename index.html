@@ -1013,29 +1013,15 @@ dialog .ed-cap{font-size:.95rem;min-height:2.2em}
 }
 #editor .fig .ed-cap{font-size:.95rem;min-height:2.2em}
 /* ---------- writing a translation ----------
-   The English on the left and the other language on the right, one
-   piece to a row, so the eye crosses rather than scrolls. */
+   The same screen as English, with the English itself a press away. */
 #editor .tonguesel{width:auto;margin:0;font-size:.85rem;padding:.25rem .4rem}
-#editor .trcard .hint.ready{color:var(--e-accent);font-weight:600}
-#editor .trlist{display:flex;flex-direction:column;gap:.5rem;margin-top:.8rem}
-#editor .trrow{
-  background:#fff;border:1px solid var(--e-line);border-radius:8px;padding:.5rem .6rem;
+#editor .trbar{
+  display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;
+  background:var(--e-panel);border:1px solid var(--e-line);border-radius:8px;
+  padding:.6rem .7rem;margin:.6rem 0 .4rem;
 }
-#editor .trrow .kind{margin-bottom:.3rem}
-#editor .trpair{display:grid;grid-template-columns:1fr 1fr;gap:.6rem;align-items:start}
-#editor .trsrc{
-  font-family:var(--mag-body);font-size:calc(1.02rem * var(--tz,1));line-height:1.5;
-  color:var(--e-muted);padding:.3rem .5rem;background:var(--e-bg);
-  border-radius:6px;overflow-wrap:anywhere;
-}
-#editor .trside .fp-row{margin-top:.35rem}
-#editor .ed-tr{min-height:3em;border-color:var(--e-line)}
-/* a piece still wanting words is marked, so what is left shows at a glance */
-#editor .trrow:not(.filled) .ed-tr{background:#fffaf0;border-color:#e3c98a}
-#editor .trrow.filled .kind::after{content:" \2713";color:var(--e-accent)}
-@media (max-width:760px){
-  #editor .trpair{grid-template-columns:minmax(0,1fr)}
-}
+#editor .trbar .hint{margin:0;flex:1 1 16rem;min-width:0}
+#editor .trwhich{margin:0 0 .5rem;font-weight:600;color:var(--e-accent)}
 #editor .fig-row{display:flex;gap:.4rem;align-items:center;margin-bottom:.35rem;flex-wrap:wrap}
 #editor .fig-row select{width:auto;margin:0}
 #editor .fig-meta{font-size:.78rem;color:var(--e-muted)}
@@ -3124,8 +3110,9 @@ const State = {
      tabs, so it does not have to be made twice. */
   spWide: 0.5, pvKind: 'pdf', showPv: false,
   /* which language the writing half is showing: the article itself, or
-     one of its translations */
-  tongue: 'en',
+     one of its translations — and the languages this magazine is
+     published in, which are added rather than built in */
+  tongue: 'en', tongues: [],
   /* what the web preview was last showing, so a redraw of the same page
      can be told apart from a move to another one */
   pvHash: '',
@@ -3246,9 +3233,11 @@ function pubId(a){ return a.pubId || a.id; }
 
 /* ---------- loading and saving ---------- */
 async function loadEditorData(){
-  const [articles, magazines, images, pages] = await Promise.all([
-    dbGet('articles'), dbGet('magazines'), dbGet('images'), dbGet('pages')
+  const [articles, magazines, images, pages, langs] = await Promise.all([
+    dbGet('articles'), dbGet('magazines'), dbGet('images'), dbGet('pages'),
+    dbGet('site/langs').catch(() => null)
   ]);
+  State.tongues = arr(langs);
   /* The icon set is a convenience, not the magazine. If its node is
      unreachable — most likely because the rules have not caught up with
      it — that costs the icon list and nothing else, rather than taking
@@ -3415,7 +3404,7 @@ let undoLabelNext = null;
 function undoKey(){
   if(State.etab === 'settings') return 'page:' + (State.curPage || '-');
   const a = curArt();
-  if(a) return 'art:' + a.id;
+  if(a) return 'art:' + a.id + (State.tongue === 'en' ? '' : '@' + State.tongue);
   if(State.etab === 'issue'){ const m = curMag(); return 'mag:' + (m ? m.id : '-'); }
   return 'pool';
 }
@@ -3687,21 +3676,64 @@ function mediaBase(num){
   return (m && typeof m.mediaBase === 'string' && m.mediaBase) ? m.mediaBase : MEDIA_BASE;
 }
 
+/* A language the magazine has been published in becomes one the reader
+   can choose. Its own words — Contents, Search, the reading times — are
+   still English: it is the articles that have been translated, and the
+   furniture follows another day. The picker shows itself as soon as
+   there is more than one language to pick. */
+function registerTongues(list){
+  let added = 0;
+  arr(list).forEach(t => {
+    if(!t || !t.code || LANGS[t.code]) return;
+    LANGS[t.code] = {
+      name: t.name || t.code,
+      dir: t.rtl ? 'rtl' : 'ltr',
+      measure: LANGS.en.measure,
+      tag: t.code,
+      s: LANGS.en.s
+    };
+    added++;
+  });
+  return added;
+}
+
 async function loadLibrary(force){
   if(Reader.library && !force) return Reader.library;
-  if(State.previewing){ Reader.library = previewLibrary(); return Reader.library; }
-  const node = await restGet('library/issues');
+  if(State.previewing){
+    registerTongues(State.tongues);
+    Reader.library = previewLibrary();
+    return Reader.library;
+  }
+  const [node, langs] = await Promise.all([
+    restGet('library/issues'),
+    restGet('site/langs').catch(() => null)
+  ]);
+  if(registerTongues(langs)){
+    buildLangControl();
+    /* a language chosen on an earlier visit, which could not be
+       restored at the start because nothing yet knew of it */
+    const was = store('jra-lang');
+    if(was && was !== LANG && LANGS[was]) setLang(was);
+  }
   const issues = arr(node).slice().sort((a, b) => Number(b.num) - Number(a.num));
   Reader.library = { issues };
   return Reader.library;
 }
 async function loadIssue(num){
   num = String(num);
-  if(Reader.issues[num]) return Reader.issues[num];
+  /* An issue is held once per language, because a reader who has
+     changed language is reading a different set of words. */
+  const key = num + (LANG === 'en' ? '' : '~' + LANG);
+  if(Reader.issues[key]) return (Reader.issues[num] = Reader.issues[key]);
   if(!issueMeta(num)) return null;
-  const data = State.previewing ? previewIssue() : await restGet('issues/' + num);
+  let data = State.previewing ? previewIssue() : null;
+  if(!data && LANG !== 'en'){
+    /* the language first, and the English if this issue has none of it */
+    data = await restGet('issues/' + num + '~' + LANG).catch(() => null);
+  }
+  if(!data) data = State.previewing ? previewIssue() : await restGet('issues/' + num);
   if(data){ data.articles = arr(data.articles); data.contents = arr(data.contents);
-            Reader.issues[num] = data; }
+            Reader.issues[key] = data; Reader.issues[num] = data; }
   return Reader.issues[num] || null;
 }
 async function loadGallery(){
@@ -4805,7 +4837,13 @@ function buildLangControl(){
   sel.hidden = false;
   sel.innerHTML = codes.map(c =>
     `<option value="${c}"${c === LANG ? ' selected' : ''}>${esc(LANGS[c].name)}</option>`).join('');
-  sel.onchange = () => { setLang(sel.value); routeReader(readerHash()); };
+  sel.onchange = () => {
+    setLang(sel.value);
+    /* the words are different in a different language, so what was
+       loaded for the last one is not an answer for this one */
+    Reader.issues = {};
+    routeReader(readerHash());
+  };
 }
 
 /* =====================================================================
@@ -5336,81 +5374,94 @@ const KINDS = { p:'¶ Text', h2:'H Head', h3:'h Sub', quote:'“” Quote' };
 /* =====================================================================
    The same piece in another language
 
-   A translation is not a copy of an article. It is a set of words kept
-   against the blocks of the one article there is — so the photographs,
-   their crops and turns, the order of everything and what the printed
-   page does with it are all settled once, in English, and go on being
-   true in every language. Add a photograph next year and every
-   translation still fits: the new block simply reads English until
-   somebody writes it in.
+   A translation is a whole article of its own, kept inside the English
+   one. Not a set of replacement words laid over it — an article, with
+   its own blocks, its own photographs and its own captions, written and
+   rearranged with every tool the English one has.
 
-   Nothing here translates anything. The words are fetched, pasted and
-   read by a person, which is both free and the only way a magazine
-   should put another language out under its own name.
+   That is what makes it cheap. `curDoc` is the one place the editor
+   asks which piece of writing is in front of it, so handing back the
+   French document there is very nearly the whole change: the block
+   rows, the photographs, the toolbars, the undo book and the saving all
+   go on working without knowing another language is involved.
+
+   Nothing here translates anything. A person copies the English, takes
+   it to whatever translator they like, and pastes it back — which is
+   free, and the only way a magazine should put another language out
+   under its own name.
    ===================================================================== */
-const TONGUES = { fr:'French', de:'German', es:'Spanish', zh:'Chinese' };
-const TONGUE_KEYS = Object.keys(TONGUES);
-const tongueName = (k) => TONGUES[k] || k;
-
-/* What in a block is words, and what is furniture. A byline and a
-   photographer's credit are people's names: translating them would be
-   wrong, so they are never asked for. */
-function trPiecesOf(b){
-  if(!b || b.t === 'byline') return [];
-  if(b.t === 'fig' || b.t === 'video')
-    return plainText(b.caption || '')
-      ? [{ field:'caption', label: b.t === 'fig' ? 'Caption' : 'Video caption' }] : [];
-  return plainText(b.html || '')
-    ? [{ field:'html', label: HEAD_LABEL[b.t] || (KINDS[b.t] || 'Text').replace(/^\S+\s/, '') }] : [];
-}
-/* every piece of an article wanting words, in the order they are read */
-function trPieces(a){
-  const out = [];
-  arr(a && a.blocks).forEach(b =>
-    trPiecesOf(b).forEach(x => out.push({ b, field:x.field, label:x.label })));
-  return out;
-}
-const trGet = (a, lang, id, field) => {
-  const n = a && a.tr && a.tr[lang] && a.tr[lang][id];
-  return (n && typeof n[field] === 'string') ? n[field] : '';
+/* Languages are added as they are wanted rather than written into this
+   file. These are only the names offered when adding one; any code and
+   any name can be typed instead. */
+const LANG_NAMES = {
+  fr:'French', de:'German', es:'Spanish', it:'Italian', pt:'Portuguese',
+  nl:'Dutch', sv:'Swedish', no:'Norwegian', da:'Danish', fi:'Finnish',
+  pl:'Polish', ru:'Russian', zh:'Chinese', ja:'Japanese', ko:'Korean',
+  ar:'Arabic', he:'Hebrew', tr:'Turkish', el:'Greek', cs:'Czech'
 };
-function trSet(a, lang, id, field, html){
-  if(!a.tr) a.tr = {};
-  if(!a.tr[lang]) a.tr[lang] = {};
-  if(!a.tr[lang][id]) a.tr[lang][id] = {};
-  a.tr[lang][id][field] = html;
-}
-const trDone = (a, lang) =>
-  trPieces(a).filter(x => plainText(trGet(a, lang, x.b.id, x.field))).length;
-/* An article is offered in a language when every piece of it has words.
-   Not a paragraph less: a page half in one language and half in another
-   is worse than a page honestly in English. */
-function trReady(a, lang){
-  const n = trPieces(a).length;
-  return n > 0 && trDone(a, lang) === n;
+const RTL_LANGS = ['ar','he','fa','ur'];
+const tongues = () => arr(State.tongues).filter(t => t && t.code);
+const tongueName = (code) => {
+  const t = tongues().find(x => x.code === code);
+  return (t && t.name) || LANG_NAMES[code] || code;
+};
+function saveTongues(){
+  setStatus('Saving…');
+  later('savelangs', async () => {
+    try{ await dbSet('site/langs', State.tongues); setStatus('Saved'); }
+    catch(e){ setStatus('Not saved — ' + e.message); }
+    afterSavedChange();
+  }, 400);
 }
 
-/* ---------- the phrases that are to come back as they went ----------
-   A translator will not touch a number in brackets, there being nothing
-   in it to translate. So everything marked to be left as written goes
-   out as a token and comes home as itself, whatever was used to
-   translate the rest and whatever that thing thinks of our markup. */
-const TOK_OPEN = '\u27E6', TOK_SHUT = '\u27E7';
-function tokenise(html){
-  const box = document.createElement('div');
-  box.innerHTML = html || '';
-  const kept = [];
-  box.querySelectorAll('.' + ASIS).forEach(n => {
-    kept.push(n.innerHTML);
-    n.replaceWith(document.createTextNode(TOK_OPEN + kept.length + TOK_SHUT));
-  });
-  return { html: box.innerHTML, kept };
+/* The French document of an English article, made the first time it is
+   asked for. Shaped exactly like an article, because that is what it
+   is: everything downstream treats it as one. */
+function trDoc(a, lang){
+  if(!a || !lang || lang === 'en') return a;
+  if(!a.tr) a.tr = {};
+  if(!a.tr[lang]) a.tr[lang] = { title:'', author:'', standfirst:'', blocks:[] };
+  const d = a.tr[lang];
+  /* An id of its own, so a block knows which document it belongs to and
+     the undo book keeps one language apart from another. */
+  d.id = a.id + '@' + lang;
+  d.of = a.id;
+  d.lang = lang;
+  d.blocks = arr(d.blocks);
+  d.magazine = a.magazine;          // laid out for the same page
+  return d;
 }
-function detokenise(html, kept){
-  return String(html || '').replace(
-    new RegExp(TOK_OPEN + '\\s*(\\d+)\\s*' + TOK_SHUT, 'g'),
-    (whole, n) => kept[+n - 1] !== undefined
-      ? ASIS_OPEN + kept[+n - 1] + '</span>' : whole);
+/* Whether there is a translation here at all: a title, and something
+   under it. A document holding nothing but empty header blocks is a
+   language somebody opened and thought better of. */
+function trHas(a, lang){
+  const d = a && a.tr && a.tr[lang];
+  if(!d) return false;
+  const under = arr(d.blocks).some(b => !isHeadBlock(b) &&
+    (plainText(b.html || '') || b.t === 'fig' || b.t === 'video'));
+  return !!(plainText((headBlock(d, 'title') || {}).html || '') && under);
+}
+/* Which languages this article can actually be read in. */
+const trReadable = (a) => tongues().map(t => t.code).filter(c => trHas(a, c));
+
+/* ---------- the English, ready to be taken to a translator ----------
+   Flowing prose rather than a numbered list, because that is what a
+   translator is good at, with a blank line where one piece ends and the
+   next begins. Captions come last under a heading of their own, since
+   they belong to photographs rather than to the run of the text. */
+function englishText(a){
+  const out = [], caps = [];
+  arr(a && a.blocks).forEach(b => {
+    if(b.t === 'fig' || b.t === 'video'){
+      const c = plainText(b.caption || '');
+      if(c) caps.push(c);
+      return;
+    }
+    const t = plainText(b.html || '');
+    if(t) out.push(t);
+  });
+  if(caps.length){ out.push('PHOTOGRAPH CAPTIONS'); caps.forEach(c => out.push(c)); }
+  return out.join('\n\n');
 }
 /* what the header's three blocks are called beside them */
 const HEAD_LABEL = { title:'Title', byline:'By', stand:'Standfirst' };
@@ -5422,14 +5473,27 @@ const HEAD_LABEL = { title:'Title', byline:'By', stand:'Standfirst' };
 State.curPage = 'about';
 
 /* Whichever document the block editor is pointed at. */
+/* The piece of writing in front of you. With a language chosen this is
+   that language's own document, which is how every row, every tool and
+   the undo book come to work on a translation without being told. */
 function curDoc(){
   if(State.etab === 'settings' && (State.spane === 'about' || State.spane === 'links'))
     return State.pages[State.curPage];
-  return curArt();
+  const a = curArt();
+  if(!a || State.tongue === 'en') return a;
+  return trDoc(a, State.tongue);
 }
 function saveDoc(opts){
   if(State.etab === 'settings') savePages();
-  else { const a = curArt(); if(a) saveArticle(a, opts); }
+  else {
+    const a = curArt();
+    /* A translation lives inside its article, so writing the article
+       writes the translation with it. The header strings of whichever
+       document is in hand are taken from its blocks first. */
+    const d = curDoc();
+    if(d && d !== a) syncHead(d);
+    if(a) saveArticle(a, opts);
+  }
   redrawPreview((opts && opts.fast) ? 120 : 450);
 }
 /* Which article or written page a block belongs to. The two pages are
@@ -5438,7 +5502,12 @@ function saveDoc(opts){
    rather than throwing on every photograph it tries to draw. */
 function docOfBlock(id){
   const pages = State.pages || {};
-  const docs = Object.values(State.articles).concat([pages.about, pages.links]);
+  const docs = [];
+  Object.values(State.articles).forEach(a => {
+    docs.push(a);
+    Object.keys((a && a.tr) || {}).forEach(k => docs.push(a.tr[k]));
+  });
+  docs.push(pages.about, pages.links);
   return docs.find(d => d && arr(d.blocks).some(b => b.id === id));
 }
 /* The page geometry an article is being written for, so the editor can
@@ -6367,97 +6436,29 @@ function workAccount(work){
 
 function sheet(){ return h('div', { class:'sheet' }); }
 
-/* ---------------------------------------------------------------------
-   Writing a translation
-
-   The article on the left, a box beside it on the right, and a press
-   that puts the English on the clipboard ready to be translated
-   wherever you like. The English it copies is not quite the English:
-   anything marked to be left as written has already become a token, so
-   whatever you paste back brings those words home untouched.
-   --------------------------------------------------------------------- */
-function workTranslation(s, a, lang){
-  const pieces = trPieces(a);
-  const card = h('section', { class:'card trcard' });
-  const count = h('p', { class:'hint' });
-  const say = () => {
-    const done = trDone(a, lang), all = pieces.length;
-    count.textContent = all
-      ? `${done} of ${all} pieces written` +
-        (done === all ? ' — ready, this article can be read in ' + tongueName(lang) + '.'
-                      : ' — not offered to readers until every piece has words.')
-      : 'There is nothing to translate in this article yet.';
-    count.classList.toggle('ready', !!all && done === all);
-    const sel = $('#work .tonguesel');
-    if(sel){
-      const opt = [...sel.options].find(o => o.value === lang);
-      if(opt) opt.textContent = tongueName(lang) + ' — ' + done + ' of ' + all;
-    }
-  };
-  card.append(h('h2', { text: tongueName(lang) }));
-  card.append(count);
-  card.append(h('p', { class:'hint', text:
-    'Press Copy, translate the words wherever you like, and paste the result back. '
-    + 'Anything in ⟦1⟧ brackets is a name to be left alone — leave the brackets '
-    + 'where they are and the words come back as they were written.' }));
-  s.append(card);
-
-  if(!pieces.length) return;
-
-  const list = h('div', { class:'trlist' });
-  pieces.forEach((x, i) => {
-    const src = x.field === 'caption' ? x.b.caption : x.b.html;
-    const { html: tokened, kept } = tokenise(src);
-
-    const row = h('div', { class:'trrow' });
-    row.append(h('div', { class:'kind', text: x.label }));
-
-    const left = h('div', { class:'trsrc' });
-    left.innerHTML = tokened;
-    const copy = h('button', { class:'btn small', type:'button', text:'Copy' });
-    copy.onclick = async () => {
-      const words = plainText(tokened);
-      try{
-        await navigator.clipboard.writeText(words);
-        copy.textContent = 'Copied';
-        setTimeout(() => { copy.textContent = 'Copy'; }, 1200);
-      }catch(e){
-        /* a browser that will not hand over the clipboard without a
-           gesture it recognises: select the words instead, so the
-           ordinary copy still works */
-        const r = document.createRange();
-        r.selectNodeContents(left);
-        const sel2 = getSelection(); sel2.removeAllRanges(); sel2.addRange(r);
-        toast('Press Ctrl+C — the words are selected.');
-      }
-    };
-
-    const box = h('div', { class:'ed ed-tr', contenteditable:'true', spellcheck:'false',
-      role:'textbox', 'aria-label': tongueName(lang) + ' — ' + x.label });
-    box.innerHTML = trGet(a, lang, x.b.id, x.field);
-    box.oninput = () => {
-      trSet(a, lang, x.b.id, x.field, detokenise(sanitizeInline(box.innerHTML), kept));
-      row.classList.toggle('filled', !!plainText(box.innerHTML));
-      say();
-      saveArticle(a, { fast:true });
-    };
-    box.addEventListener('paste', e => {
-      /* Whatever a translator puts on the clipboard — its own markup,
-         its own colours — comes in as the words alone. */
-      e.preventDefault();
-      const t = (e.clipboardData.getData('text/plain') || '').replace(/\s+/g, ' ').trim();
-      document.execCommand('insertText', false, t);
-    });
-    ['keyup', 'mouseup', 'focus'].forEach(ev => box.addEventListener(ev, () => markAsIs()));
-    if(plainText(box.innerHTML)) row.classList.add('filled');
-
-    row.append(h('div', { class:'trpair' },
-      h('div', { class:'trside' }, left, h('div', { class:'fp-row' }, copy)),
-      box));
-    list.append(row);
-  });
-  s.append(list);
-  say();
+/* Adding a language. A code, because that is what a browser and a
+   search engine are told, and a name, because that is what a reader
+   picks from. Any language at all: the list is the magazine's, not
+   this file's. */
+function addTongue(){
+  const code = (prompt('A two-letter code for the language — fr, de, es, zh…') || '')
+    .trim().toLowerCase();
+  if(!code) return;
+  if(!/^[a-z]{2,3}(-[a-z0-9]{2,8})?$/.test(code)){
+    toast('That does not look like a language code. Two or three letters, such as fr or pt-br.');
+    return;
+  }
+  if(tongues().some(t => t.code === code)){
+    toast(tongueName(code) + ' is already on the list.');
+    return;
+  }
+  const name = (prompt('What should readers see it called?', LANG_NAMES[code] || '') || '').trim();
+  if(!name) return;
+  State.tongues = tongues().concat([{ code, name, rtl: RTL_LANGS.includes(code) || undefined }]);
+  saveTongues();
+  State.tongue = code;
+  renderWork();
+  toast(name + ' added. Copy the English, translate it, and paste it in.');
 }
 
 function workArticle(work){
@@ -6488,14 +6489,24 @@ function workArticle(work){
     saveArticle(a, { fast:true });
     renderSide(); relayout();
   };
-  /* Which language this half is showing. The article itself is always
-     the English one — everything else is words kept against it. */
+  /* Which language this half is writing. English is the article; every
+     other choice is that language's own version of it, written with the
+     same tools and holding its own photographs. */
   const tongue = h('select', { class:'tonguesel', 'aria-label':'Language' });
-  tongue.append(h('option', { value:'en', text:'English — the article' }));
-  TONGUE_KEYS.forEach(k => tongue.append(h('option', { value:k,
-    text: tongueName(k) + ' — ' + trDone(a, k) + ' of ' + trPieces(a).length })));
-  tongue.value = State.tongue;
-  tongue.onchange = () => { State.tongue = tongue.value; renderWork(); };
+  const fillTongues = () => {
+    tongue.textContent = '';
+    tongue.append(h('option', { value:'en', text:'English — the article' }));
+    tongues().forEach(t => tongue.append(h('option', { value:t.code,
+      text: t.name + (trHas(a, t.code) ? ' — written' : ' — empty') })));
+    tongue.append(h('option', { value:'+', text:'Add a language…' }));
+    tongue.value = State.tongue;
+  };
+  fillTongues();
+  tongue.onchange = () => {
+    if(tongue.value === '+'){ tongue.value = State.tongue; addTongue(); return; }
+    State.tongue = tongue.value;
+    renderWork();
+  };
 
   head.append(h('div', { class:'row' },
     h('label', { class:'check' }, newPage, ' Start on a new page'),
@@ -6504,7 +6515,36 @@ function workArticle(work){
     h('span', { class:'spacer' }), tongue));
   s.append(head);
 
-  if(State.tongue !== 'en'){ workTranslation(s, a, State.tongue); work.append(s); return; }
+  /* Writing a translation. The one thing this screen needs that the
+     English one does not is the English itself, on the clipboard. */
+  if(State.tongue !== 'en'){
+    const lang = State.tongue;
+    const bar = h('div', { class:'trbar' });
+    const copy = h('button', { class:'btn primary', type:'button',
+      text:'Copy the English' });
+    copy.onclick = async () => {
+      const words = englishText(a);
+      if(!words){ toast('There is nothing written in this article yet.'); return; }
+      try{
+        await navigator.clipboard.writeText(words);
+        copy.textContent = 'Copied — now translate it';
+        setTimeout(() => { copy.textContent = 'Copy the English'; }, 2000);
+      }catch(e){
+        toast('This browser would not hand over the clipboard. Open the English and copy it by hand.');
+      }
+    };
+    bar.append(copy);
+    bar.append(h('span', { class:'hint', text:
+      'Take it to any translator, then paste the result in below — pasting several '
+      + 'paragraphs makes several blocks. Add the photographs as you would in English.' }));
+    s.append(bar);
+    const d = trDoc(a, lang);
+    ensureHead(d);
+    s.append(h('p', { class:'hint trwhich',
+      text: tongueName(lang) + (trHas(a, lang)
+        ? ' — readers can read this piece in ' + tongueName(lang) + '.'
+        : ' — not shown to readers until it has a title and something under it.') }));
+  }
 
   s.append(toolbars());
   const blocks = h('div', { id:'blocks' });
@@ -10599,6 +10639,22 @@ function articlePayload(a, m){
   };
 }
 
+/* The same article in one of its languages. The translation is a
+   document of its own, so it goes through the very same builder — only
+   its address is the English one's, because a piece keeps a single
+   address whatever language it is being read in, and a reader changing
+   language should stay where they are. Where there is no translation,
+   the English is sent and the piece reads in English. */
+function articlePayloadIn(a, m, lang){
+  if(!lang || lang === 'en' || !trHas(a, lang)) return articlePayload(a, m);
+  const out = articlePayload(trDoc(a, lang), m);
+  out.id = pubId(a);
+  out.lang = lang;
+  if(a.webOnly) out.webOnly = true;
+  out.correctedAt = a.correctedAt || null;
+  return out;
+}
+
 /* ---------- the lettering, for a cover that is not a printed page ----------
    The masthead and the rest were drawn only by the PDF, so the shelf
    showed a bare photograph of a cover whose whole design was the words
@@ -10688,9 +10744,19 @@ function galleryPayload(){
   return out;
 }
 
-function buildIssue(m){
+/* Which languages anything in this issue has been written in. An issue
+   is offered in a language as soon as one piece of it has been
+   translated; the pieces that have not read in English, which is the
+   whole point of counting this per article rather than per issue. */
+function magTongues(m){
+  const seen = new Set();
+  magArticles(m).forEach(a => trReadable(a).forEach(c => seen.add(c)));
+  return tongues().map(t => t.code).filter(c => seen.has(c));
+}
+
+function buildIssue(m, lang){
   const num = String(m.num || 'draft');
-  const arts = magArticles(m).map(a => articlePayload(a, m));
+  const arts = magArticles(m).map(a => articlePayloadIn(a, m, lang));
   const cover = m.cover && State.images[m.cover];
   const pics = magArticles(m).reduce((n, a) => n + arr(a.blocks).filter(b => b.t === 'fig').length, 0);
   const issue = {
@@ -10717,9 +10783,13 @@ function buildIssue(m){
     pdfOnly: false
   };
   const index = arts.map(a => ({
-    id: a.id, title: a.title, author: a.author, text: articleText(num, a)
+    id: a.id, title: a.title, author: a.author, text: articleText(num + (lang ? '/' + lang : ''), a)
   }));
-  return { num, issue, card, index };
+  /* and the same issue again in each language anything in it has been
+     written in, for the reader to fetch instead of this one */
+  const langs = {};
+  if(!lang) magTongues(m).forEach(c => { langs[c] = buildIssue(m, c).issue; });
+  return { num, issue, card, index, langs };
 }
 
 /* ---------- preview: the same build, never written down ---------- */
@@ -11032,6 +11102,15 @@ async function doPublish(m){
     }
 
     await dbSet('issues/' + num, built.issue);
+    /* Each language beside the issue it belongs to, so a reader fetches
+       the one they are reading in and nothing else. A language this
+       issue no longer has anything written in is cleared away rather
+       than left behind to go stale. */
+    for(const code of Object.keys(built.langs))
+      await dbSet('issues/' + num + '~' + code, built.langs[code]);
+    await Promise.all(tongues().map(t => t.code)
+      .filter(c => !built.langs[c])
+      .map(c => dbDel('issues/' + num + '~' + c).catch(() => {})));
     await dbSet('library/issues/' + num, built.card);
     await dbSet('searchindex/' + num, built.index);
     /* The gallery goes out with the issue, so a photograph featured
