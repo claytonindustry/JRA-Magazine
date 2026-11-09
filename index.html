@@ -1033,6 +1033,30 @@ dialog .ed-cap{font-size:.95rem;min-height:2.2em}
   white-space:nowrap;
 }
 #editor .tongue-chip.on{color:var(--e-accent);border-color:var(--e-accent)}
+#editor .tongue-chip.ready{color:var(--e-ink);border-color:var(--e-ink)}
+#editor .trbehind{margin:-.3rem 0 .6rem;color:var(--e-warn)}
+/* pasting a whole translation, shown against the English first */
+dialog#dlgPaste{max-width:min(46rem,96vw)}
+#dlgPaste textarea{
+  width:100%;min-height:7rem;font:inherit;font-size:.9rem;padding:.5rem;
+  border:1px solid var(--e-line);border-radius:6px;background:#fff;color:var(--e-ink);
+}
+#dlgPaste .pastesum{margin:.5rem 0 .3rem;font-weight:600}
+#dlgPaste .pastesum.ok{color:var(--e-accent)}
+#dlgPaste .pastesum.off{color:var(--e-warn)}
+#dlgPaste .pastelist{max-height:40vh;overflow:auto;border:1px solid var(--e-line);border-radius:6px}
+#dlgPaste .pasterow{padding:.4rem .5rem;border-bottom:1px solid var(--e-line)}
+#dlgPaste .pasterow:last-child{border-bottom:0}
+#dlgPaste .pasterow.none{background:var(--e-bg)}
+#dlgPaste .pastepair{display:grid;grid-template-columns:1fr 1fr;gap:.6rem}
+#dlgPaste .pasteen{color:var(--e-muted)}
+#dlgPaste .pasterow.none .pastefr{color:var(--e-warn);font-style:italic}
+@media (max-width:640px){ #dlgPaste .pastepair{grid-template-columns:minmax(0,1fr)} }
+/* the reader, told when an issue is not in the language it chose */
+#reader .notlang{
+  margin:.6rem 0 0;padding:.4rem .7rem;border-inline-start:3px solid var(--rule);
+  font-family:var(--sans);font-size:.86rem;color:var(--brine);
+}
 #editor .fig-row{display:flex;gap:.4rem;align-items:center;margin-bottom:.35rem;flex-wrap:wrap}
 #editor .fig-row select{width:auto;margin:0}
 #editor .fig-meta{font-size:.78rem;color:var(--e-muted)}
@@ -1919,6 +1943,23 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
   </form>
 </dialog>
 
+<!-- A whole translation, pasted in one go, shown against the English
+     it would replace before anything is changed. -->
+<dialog id="dlgPaste">
+  <form method="dialog">
+    <h3>Paste the translation</h3>
+    <p class="hint" id="pasteNote"></p>
+    <textarea id="pasteBox" rows="8" spellcheck="false"
+      placeholder="Paste the whole translated article here"></textarea>
+    <div id="pasteMatch"></div>
+    <div class="fp-row">
+      <button class="btn" value="cancel">Cancel</button>
+      <div class="spacer"></div>
+      <button class="btn primary" type="button" id="pasteGo" disabled>Put it in</button>
+    </div>
+  </form>
+</dialog>
+
 <!-- What a photograph says, edited where it is rather than in the
      article it happens to be in. -->
 <dialog id="dlgPhoto">
@@ -2050,7 +2091,7 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
    when the file changes. It is unrelated to the database's own VERSION,
    which governs schema upgrades and must not be moved for a cosmetic
    change. */
-const APP_VERSION = '1.32';
+const APP_VERSION = '1.33';
 
 /* Nothing is imported at the top any more. The Firebase libraries are
    several hundred kilobytes and, loaded this way, the browser must fetch
@@ -3722,7 +3763,12 @@ async function loadLibrary(force){
     restGet('library/issues'),
     restGet('site/langs').catch(() => null)
   ]);
-  if(registerTongues(langs)){
+  /* A language is offered only where there is a whole issue to read in
+     it. Being on the magazine's list means somebody has begun; it does
+     not mean a reader choosing it would be given anything. */
+  const out = new Set();
+  arr(node).forEach(c => arr(c && c.langs).forEach(x => out.add(x)));
+  if(registerTongues(arr(langs).filter(t => t && out.has(t.code)))){
     buildLangControl();
     /* a language chosen on an earlier visit, which could not be
        restored at the start because nothing yet knew of it */
@@ -4466,6 +4512,11 @@ function renderArticle(num, id, query, mode){
   const prevIssue = !bare && here > 0 ? all[here - 1] : null;
 
   const where = bare ? S().draft : S().issueN(num);
+  /* A reader who has chosen a language and opened an issue that does not
+     have it is reading the English, and is told so once rather than left
+     to wonder why the words did not change. */
+  const inLang = LANG !== 'en' && arr(issueMeta(num) && issueMeta(num).langs).includes(LANG);
+  const notInLang = LANG !== 'en' && !inLang;
   /* A loose proof is not in an issue, so there is no contents to send
      anyone back to; it still says which piece this is. */
   setNowBar(where, a.title || '', bare ? '' : num);
@@ -4484,6 +4535,9 @@ function renderArticle(num, id, query, mode){
             ${bare ? '' : `<button class="crumb" id="back">← ${esc(query ? S().backToResults : S().backToContents)}</button>`}
             <h1${headAttr(a.titleSize, a.titleFace)}>${a.titleHtml || esc(a.title)}</h1>
             ${a.author ? `<p class="by${headCls(a.bylineSize, a.bylineFace)}">${a.authorHtml || esc(a.author)}</p>` : ''}
+            ${notInLang ? `<p class="notlang">${esc(
+              (LANGS[LANG] || {}).name || LANG)}: ${esc(S().issueN(num))} ${
+              esc('has not been translated \u2014 this is the English.')}</p>` : ''}
             <p class="meta">${esc(bare
               ? (a.words ? `${a.words.toLocaleString()} words, about ${longSpan(mins(a.words))}. ${where}.`
                          : `${S().picturePage}. ${where}.`)
@@ -5431,10 +5485,34 @@ function saveTongues(){
 /* The French document of an English article, made the first time it is
    asked for. Shaped exactly like an article, because that is what it
    is: everything downstream treats it as one. */
+/* Everything in a block that is not its words, carried over as it
+   stands: a photograph keeps its crop and its turn, a paragraph its
+   alignment, its face and its size, and a marked phrase its mark. None
+   of that is language, so none of it should be done twice. */
+function cloneBlocks(blocks){
+  return arr(blocks).map(b => Object.assign(JSON.parse(JSON.stringify(b)), { id: uid('b') }));
+}
+/* The English as it stood, so that editing it afterwards can be
+   noticed. Ids are left out: a block rewritten is a change, a block
+   given a new id by some tidying is not. */
+function artShape(a){
+  return stampOf(JSON.stringify(arr(a && a.blocks).map(b => [
+    b.t, b.html || '', b.caption || '', b.img || b.src || '',
+    b.align || '', b.face || '', b.tsize || '', b.crop || null, b.rot || 0
+  ])));
+}
+
 function trDoc(a, lang){
   if(!a || !lang || lang === 'en') return a;
   if(!a.tr) a.tr = {};
-  if(!a.tr[lang]) a.tr[lang] = { title:'', author:'', standfirst:'', blocks:[] };
+  /* A new language starts as the whole English article rather than a
+     blank page: every photograph already placed and cropped, every
+     setting already made, every name already marked. Only the words are
+     wrong, and the words are the only thing a translation is. */
+  if(!a.tr[lang]) a.tr[lang] = {
+    title: a.title || '', author: a.author || '', standfirst: a.standfirst || '',
+    blocks: cloneBlocks(a.blocks), from: artShape(a), fresh: true
+  };
   const d = a.tr[lang];
   /* An id of its own, so a block knows which document it belongs to and
      the undo book keeps one language apart from another. */
@@ -5445,18 +5523,57 @@ function trDoc(a, lang){
   d.magazine = a.magazine;          // laid out for the same page
   return d;
 }
-/* Whether there is a translation here at all: a title, and something
-   under it. A document holding nothing but empty header blocks is a
-   language somebody opened and thought better of. */
+/* Whether anything here has actually been translated.
+
+   A language now begins as a copy of the English, so having a title and
+   a body no longer means anything — a piece merely glanced at in French
+   would have both, in English, and an issue could have gone out in
+   "French" reading entirely in English. What settles it is whether the
+   words have moved since the copy was taken: a document still matching
+   the shape it was made from has been opened and not written.
+
+   A translation made before there were shapes to compare carries no
+   mark of its origin, and is taken at its word. */
 function trHas(a, lang){
   const d = a && a.tr && a.tr[lang];
   if(!d) return false;
   const under = arr(d.blocks).some(b => !isHeadBlock(b) &&
     (plainText(b.html || '') || b.t === 'fig' || b.t === 'video'));
-  return !!(plainText((headBlock(d, 'title') || {}).html || '') && under);
+  if(!plainText((headBlock(d, 'title') || {}).html || '') || !under) return false;
+  return !d.from || artShape(d) !== d.from;
 }
+/* ---------- the phrases that come home as they went ----------
+   A translator will not touch a number in brackets, there being nothing
+   in it to translate, so everything marked to be left as written goes
+   out as a token and comes back as itself. */
+const TOK_OPEN = '\u27E6', TOK_SHUT = '\u27E7';
+function tokenise(html){
+  const box = document.createElement('div');
+  box.innerHTML = html || '';
+  const kept = [];
+  box.querySelectorAll('.' + ASIS).forEach(n => {
+    kept.push(n.innerHTML);
+    n.replaceWith(document.createTextNode(TOK_OPEN + kept.length + TOK_SHUT));
+  });
+  return { html: box.innerHTML, kept };
+}
+function detokenise(text, kept){
+  return escapeHtml(String(text || '')).replace(
+    new RegExp(TOK_OPEN + '\\s*(\\d+)\\s*' + TOK_SHUT, 'g'),
+    (whole, n) => kept[+n - 1] !== undefined
+      ? ASIS_OPEN + kept[+n - 1] + '</span>' : whole);
+}
+
 /* Which languages this article can actually be read in. */
 const trReadable = (a) => tongues().map(t => t.code).filter(c => trHas(a, c));
+/* Whether the English has been changed since this language was copied
+   from it — a photograph added, a paragraph rewritten. A translation
+   written before there was a stamp to take says nothing, which is
+   honest: nobody knows what the English looked like then. */
+function trBehind(a, lang){
+  const d = a && a.tr && a.tr[lang];
+  return !!(d && d.from && d.from !== artShape(a));
+}
 
 /* Where a language has got to for one article, which is the question
    the editor could not answer before: nothing written, written but not
@@ -5479,19 +5596,54 @@ const TR_SAID = { empty:'nothing written', written:'written, not published', liv
    translator is good at, with a blank line where one piece ends and the
    next begins. Captions come last under a heading of their own, since
    they belong to photographs rather than to the run of the text. */
-function englishText(a){
-  const out = [], caps = [];
+/* Every piece of an article that is words, in the order they are read:
+   the text first, then the captions, which belong to photographs rather
+   than to the run of the text. The byline is left out, being a name.
+
+   Each piece is given twice — as it is written, and with every phrase
+   marked to be left as written swapped for a numbered token. Nothing
+   translates a number in brackets, so those words come home untouched
+   whatever did the translating. */
+const CAPS_MARK = 'PHOTOGRAPH CAPTIONS';
+function englishPieces(a){
+  const text = [], caps = [];
   arr(a && a.blocks).forEach(b => {
+    if(b.t === 'byline') return;
     if(b.t === 'fig' || b.t === 'video'){
-      const c = plainText(b.caption || '');
-      if(c) caps.push(c);
+      if(plainText(b.caption || ''))
+        caps.push({ b, field:'caption', html: b.caption,
+                    kind: b.t === 'fig' ? 'Caption' : 'Video caption' });
       return;
     }
-    const t = plainText(b.html || '');
-    if(t) out.push(t);
+    if(plainText(b.html || ''))
+      text.push({ b, field:'html', html: b.html,
+                  kind: HEAD_LABEL[b.t] || (KINDS[b.t] || 'Text').replace(/^\S+\s/, '') });
   });
-  if(caps.length){ out.push('PHOTOGRAPH CAPTIONS'); caps.forEach(c => out.push(c)); }
+  return text.concat(caps).map(x => {
+    const tok = tokenise(x.html);
+    return Object.assign({}, x, { tokened: plainText(tok.html), kept: tok.kept });
+  });
+}
+/* …and those pieces as one run of prose for the clipboard. */
+function englishText(a){
+  const pieces = englishPieces(a);
+  const out = [];
+  let said = false;
+  pieces.forEach(x => {
+    if(x.kind === 'caption' && !said){ out.push(CAPS_MARK); said = true; }
+    out.push(x.tokened);
+  });
   return out.join('\n\n');
+}
+/* What comes back, cut into the same kind of pieces: paragraphs divided
+   by blank lines, with the captions heading dropped if it survived. */
+function pastedPieces(text){
+  return String(text || '')
+    .replace(/\r/g, '')
+    .split(/\n\s*\n/)
+    .map(t => t.replace(/\s+/g, ' ').trim())
+    .filter(t => t && t.toUpperCase() !== CAPS_MARK &&
+                 !/^(photograph captions|légendes|bildunterschriften)/i.test(t));
 }
 /* what the header's three blocks are called beside them */
 const HEAD_LABEL = { title:'Title', byline:'By', stand:'Standfirst' };
@@ -5643,19 +5795,25 @@ function renderEditorChrome(){
 function sayTongues(m, onIssue){
   const bar = $('#tongueSay');
   if(!bar) return;
-  const here = (onIssue && m && tongues().length) ? magTongues(m) : [];
-  if(!here.length){ bar.hidden = true; return; }
+  /* Every language anybody has started on, whether or not the issue is
+     ready to go out in it — the point is to see how far each has got. */
+  const started = (onIssue && m && tongues().length)
+    ? tongues().map(t => t.code).filter(c => magTongueCount(m, c).done) : [];
+  if(!started.length){ bar.hidden = true; return; }
   const live = arr(m.publishedLangs), stale = magIsStale(m);
   bar.hidden = false;
   bar.textContent = '';
   bar.append(h('span', { class:'boxlab inline', text:'Languages' }));
-  here.forEach(c => {
-    const on = m.published && live.includes(c) && !stale;
-    bar.append(h('span', { class:'tongue-chip' + (on ? ' on' : ''),
+  started.forEach(c => {
+    const t = magTongueCount(m, c);
+    const whole = t.done === t.all;
+    const on = whole && m.published && live.includes(c) && !stale;
+    bar.append(h('span', { class:'tongue-chip' + (on ? ' on' : whole ? ' ready' : ''),
       title: on ? tongueName(c) + ' is on the shelf'
+        : !whole ? t.missing.map(x => x.title || 'Untitled').join(', ') + ' still to translate'
         : m.published ? tongueName(c) + ' is written but not yet sent — press Publish correction'
                       : tongueName(c) + ' goes out when this issue is published' },
-      tongueName(c) + (on ? ' ✓' : ' · not sent')));
+      tongueName(c) + (on ? ' ✓' : whole ? ' · not sent' : ` · ${t.done} of ${t.all}`)));
   });
 }
 
@@ -6490,6 +6648,96 @@ function workAccount(work){
 
 function sheet(){ return h('div', { class:'sheet' }); }
 
+/* ---------------------------------------------------------------------
+   Putting a translation in
+
+   The French document is a copy of the English, so its blocks stand in
+   the same order; the Nth piece of words in one is the Nth in the
+   other. Pairing them is therefore a matter of counting, and counting
+   is a thing that can be shown before it is done — which is the whole
+   point of the screen below. Nothing is changed until it is approved,
+   and a translator that merged two paragraphs shows up as a short
+   column rather than as half an article quietly in the wrong place.
+   --------------------------------------------------------------------- */
+function trTargets(a, d){
+  const out = [];
+  const src = arr(a.blocks), dst = arr(d.blocks);
+  englishPieces(a).forEach(piece => {
+    const i = src.indexOf(piece.b);
+    out.push(Object.assign({}, piece, { to: i > -1 ? dst[i] : null }));
+  });
+  return out;
+}
+
+function openPasteTranslation(a, lang, done){
+  const dlg = $('#dlgPaste');
+  const box = $('#pasteBox');
+  const where = $('#pasteMatch');
+  const go = $('#pasteGo');
+  const d = trDoc(a, lang);
+  const targets = trTargets(a, d);
+
+  box.value = '';
+  where.textContent = '';
+  go.disabled = true;
+  $('#pasteNote').textContent =
+    `The English has ${targets.length} piece${targets.length === 1 ? '' : 's'} of words. `
+    + `Paste the ${tongueName(lang)} here and it will show you what goes where before changing anything.`;
+
+  let pairs = [];
+  const draw = () => {
+    const lines = pastedPieces(box.value);
+    pairs = targets.map((t, i) => ({ t, line: lines[i] }));
+    const spare = lines.slice(targets.length);
+    where.textContent = '';
+
+    if(!lines.length){ go.disabled = true; return; }
+
+    const sum = h('p', { class: 'hint pastesum' + (lines.length === targets.length ? ' ok' : ' off') });
+    sum.textContent = lines.length === targets.length
+      ? `${lines.length} pieces pasted, ${targets.length} wanted — they line up.`
+      : `${lines.length} pieces pasted, ${targets.length} wanted. `
+        + (lines.length < targets.length
+            ? 'The ones with nothing beside them will be left in English.'
+            : 'The last ' + spare.length + ' will be ignored.');
+    where.append(sum);
+
+    const list = h('div', { class:'pastelist' });
+    pairs.forEach(({ t, line }) => {
+      list.append(h('div', { class:'pasterow' + (line ? '' : ' none') },
+        h('div', { class:'kind', text: t.kind }),
+        h('div', { class:'pastepair' },
+          h('div', { class:'pasteen', text: t.tokened }),
+          h('div', { class:'pastefr', text: line || '— nothing pasted, stays English' }))));
+    });
+    where.append(list);
+    go.disabled = !pairs.some(x => x.line);
+  };
+
+  box.oninput = () => later('pastematch', draw, 150);
+  box.onpaste = () => setTimeout(draw, 0);
+
+  go.onclick = () => {
+    let n = 0;
+    pairs.forEach(({ t, line }) => {
+      if(!line || !t.to) return;
+      const words = detokenise(line, t.kept);
+      if(t.field === 'caption') t.to.caption = words;
+      else t.to.html = (t.to.t === 'h2' || t.to.t === 'h3')
+        ? escapeHtml(plainText(words)) : words;
+      n++;
+    });
+    d.fresh = undefined;
+    syncHead(d);
+    dlg.close();
+    toast(n + ' piece' + (n === 1 ? '' : 's') + ' put in. The photographs and settings are as they were.');
+    if(done) done();
+  };
+
+  if(!dlg.open) dlg.showModal();
+  setTimeout(() => box.focus(), 30);
+}
+
 /* Adding a language. A code, because that is what a browser and a
    search engine are told, and a name, because that is what a reader
    picks from. Any language at all: the list is the magazine's, not
@@ -6588,9 +6836,17 @@ function workArticle(work){
       }
     };
     bar.append(copy);
+    const paste = h('button', { class:'btn', type:'button',
+      text:'Paste the translation…' });
+    paste.onclick = () => openPasteTranslation(a, lang, () => {
+      saveArticle(a, { fast:true });
+      renderWork();
+    });
+    bar.append(paste);
     bar.append(h('span', { class:'hint', text:
-      'Take it to any translator, then paste the result in below — pasting several '
-      + 'paragraphs makes several blocks. Add the photographs as you would in English.' }));
+      'This is the English article with its photographs, crops and settings already in '
+      + 'place — only the words want changing. Copy them, translate them anywhere, and '
+      + 'paste the whole thing back.' }));
     s.append(bar);
     const d = trDoc(a, lang);
     ensureHead(d);
@@ -6599,16 +6855,31 @@ function workArticle(work){
        again before anybody can read the French of it. */
     const state = trState(a, lang);
     const mag = a.magazine && State.magazines[a.magazine];
+    /* An issue goes out in a language whole or not at all, so what
+       stands between this piece and a reader is usually the other
+       pieces beside it. Say which, and how many. */
+    const tally = mag ? magTongueCount(mag, lang) : null;
     const said = state === 'empty'
-      ? 'Readers see this piece in English. It needs a title and something under it.'
+      ? 'Readers see this piece in English. It still reads as the English copy it was made from.'
       : state === 'live'
         ? 'Readers who choose ' + tongueName(lang) + ' get this.'
-        : 'Nobody can read it yet. '
-          + (!mag ? 'This piece is in the pool; it goes out when its issue does.'
-             : !mag.published ? 'Publish issue ' + (mag.num || '—') + ' and it goes out with it.'
-             : 'Issue ' + (mag.num || '—') + ' is already on the shelf: press Publish correction to send it.');
+        : !mag
+          ? 'This piece is in the pool; it goes out when its issue does.'
+          : tally.done < tally.all
+            ? `Issue ${mag.num || '—'} needs all ${tally.all} of its articles in `
+              + `${tongueName(lang)} before it can go out in it — ${tally.done} done, `
+              + `${tally.all - tally.done} to go: ` + tally.missing.map(x => '“' +
+                (x.title || 'Untitled') + '”').join(', ') + '.'
+            : !mag.published
+              ? 'Every article is written. Publish issue ' + (mag.num || '—') + ' and it goes out.'
+              : 'Every article is written. Issue ' + (mag.num || '—')
+                + ' is on the shelf: press Publish correction to send it.';
+    const behind = trBehind(a, lang);
     s.append(h('p', { class:'hint trwhich tr-' + state },
       h('b', { text: tongueName(lang) + ' · ' + TR_SAID[state] + '. ' }), said));
+    if(behind) s.append(h('p', { class:'hint trbehind' },
+      h('b', { text:'The English has changed since this was copied. ' }),
+      'Something has been written, moved or added to it that is not here.'));
   }
 
   s.append(toolbars());
@@ -10817,10 +11088,20 @@ function galleryPayload(){
    is offered in a language as soon as one piece of it has been
    translated; the pieces that have not read in English, which is the
    whole point of counting this per article rather than per issue. */
+/* An issue goes out in a language only when every article in it has
+   been written in that language. Counted per issue rather than per
+   article, so a reader choosing Français is never handed an issue that
+   turns back into English half way down the contents. */
 function magTongues(m){
-  const seen = new Set();
-  magArticles(m).forEach(a => trReadable(a).forEach(c => seen.add(c)));
-  return tongues().map(t => t.code).filter(c => seen.has(c));
+  const arts = magArticles(m);
+  if(!arts.length) return [];
+  return tongues().map(t => t.code).filter(c => arts.every(a => trHas(a, c)));
+}
+/* How far a language has got through an issue, for the editor to show. */
+function magTongueCount(m, lang){
+  const arts = magArticles(m);
+  return { done: arts.filter(a => trHas(a, lang)).length, all: arts.length,
+           missing: arts.filter(a => !trHas(a, lang)) };
 }
 
 function buildIssue(m, lang){
@@ -10849,7 +11130,10 @@ function buildIssue(m, lang){
     images: pics + (cover ? 1 : 0),
     mediaBase: m.mediaBase || '',
     pdf: m.pdf || '',
-    pdfOnly: false
+    pdfOnly: false,
+    /* which languages this issue can be read in, so the shelf can say so
+       and the reader is offered only languages it can actually serve */
+    ...(magTongues(m).length ? { langs: magTongues(m) } : {})
   };
   const index = arts.map(a => ({
     id: a.id, title: a.title, author: a.author, text: articleText(num + (lang ? '/' + lang : ''), a)
