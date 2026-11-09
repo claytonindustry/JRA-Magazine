@@ -1012,6 +1012,30 @@ dialog .ed-cap{font-size:.95rem;min-height:2.2em}
   background:#eee;border-radius:4px;
 }
 #editor .fig .ed-cap{font-size:.95rem;min-height:2.2em}
+/* ---------- writing a translation ----------
+   The English on the left and the other language on the right, one
+   piece to a row, so the eye crosses rather than scrolls. */
+#editor .tonguesel{width:auto;margin:0;font-size:.85rem;padding:.25rem .4rem}
+#editor .trcard .hint.ready{color:var(--e-accent);font-weight:600}
+#editor .trlist{display:flex;flex-direction:column;gap:.5rem;margin-top:.8rem}
+#editor .trrow{
+  background:#fff;border:1px solid var(--e-line);border-radius:8px;padding:.5rem .6rem;
+}
+#editor .trrow .kind{margin-bottom:.3rem}
+#editor .trpair{display:grid;grid-template-columns:1fr 1fr;gap:.6rem;align-items:start}
+#editor .trsrc{
+  font-family:var(--mag-body);font-size:calc(1.02rem * var(--tz,1));line-height:1.5;
+  color:var(--e-muted);padding:.3rem .5rem;background:var(--e-bg);
+  border-radius:6px;overflow-wrap:anywhere;
+}
+#editor .trside .fp-row{margin-top:.35rem}
+#editor .ed-tr{min-height:3em;border-color:var(--e-line)}
+/* a piece still wanting words is marked, so what is left shows at a glance */
+#editor .trrow:not(.filled) .ed-tr{background:#fffaf0;border-color:#e3c98a}
+#editor .trrow.filled .kind::after{content:" \2713";color:var(--e-accent)}
+@media (max-width:760px){
+  #editor .trpair{grid-template-columns:minmax(0,1fr)}
+}
 #editor .fig-row{display:flex;gap:.4rem;align-items:center;margin-bottom:.35rem;flex-wrap:wrap}
 #editor .fig-row select{width:auto;margin:0}
 #editor .fig-meta{font-size:.78rem;color:var(--e-muted)}
@@ -2026,7 +2050,7 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
    when the file changes. It is unrelated to the database's own VERSION,
    which governs schema upgrades and must not be moved for a cosmetic
    change. */
-const APP_VERSION = '1.29';
+const APP_VERSION = '1.30';
 
 /* Nothing is imported at the top any more. The Firebase libraries are
    several hundred kilobytes and, loaded this way, the browser must fetch
@@ -3099,6 +3123,9 @@ const State = {
      which of the two is on screen. The preview choice is shared by both
      tabs, so it does not have to be made twice. */
   spWide: 0.5, pvKind: 'pdf', showPv: false,
+  /* which language the writing half is showing: the article itself, or
+     one of its translations */
+  tongue: 'en',
   /* what the web preview was last showing, so a redraw of the same page
      can be told apart from a move to another one */
   pvHash: '',
@@ -5305,6 +5332,86 @@ async function onUser(user){
 const RATIO  = { auto:0, free:0, wide:16/9, four:4/3, square:1, tall:3/4 };
 
 const KINDS = { p:'¶ Text', h2:'H Head', h3:'h Sub', quote:'“” Quote' };
+
+/* =====================================================================
+   The same piece in another language
+
+   A translation is not a copy of an article. It is a set of words kept
+   against the blocks of the one article there is — so the photographs,
+   their crops and turns, the order of everything and what the printed
+   page does with it are all settled once, in English, and go on being
+   true in every language. Add a photograph next year and every
+   translation still fits: the new block simply reads English until
+   somebody writes it in.
+
+   Nothing here translates anything. The words are fetched, pasted and
+   read by a person, which is both free and the only way a magazine
+   should put another language out under its own name.
+   ===================================================================== */
+const TONGUES = { fr:'French', de:'German', es:'Spanish', zh:'Chinese' };
+const TONGUE_KEYS = Object.keys(TONGUES);
+const tongueName = (k) => TONGUES[k] || k;
+
+/* What in a block is words, and what is furniture. A byline and a
+   photographer's credit are people's names: translating them would be
+   wrong, so they are never asked for. */
+function trPiecesOf(b){
+  if(!b || b.t === 'byline') return [];
+  if(b.t === 'fig' || b.t === 'video')
+    return plainText(b.caption || '')
+      ? [{ field:'caption', label: b.t === 'fig' ? 'Caption' : 'Video caption' }] : [];
+  return plainText(b.html || '')
+    ? [{ field:'html', label: HEAD_LABEL[b.t] || (KINDS[b.t] || 'Text').replace(/^\S+\s/, '') }] : [];
+}
+/* every piece of an article wanting words, in the order they are read */
+function trPieces(a){
+  const out = [];
+  arr(a && a.blocks).forEach(b =>
+    trPiecesOf(b).forEach(x => out.push({ b, field:x.field, label:x.label })));
+  return out;
+}
+const trGet = (a, lang, id, field) => {
+  const n = a && a.tr && a.tr[lang] && a.tr[lang][id];
+  return (n && typeof n[field] === 'string') ? n[field] : '';
+};
+function trSet(a, lang, id, field, html){
+  if(!a.tr) a.tr = {};
+  if(!a.tr[lang]) a.tr[lang] = {};
+  if(!a.tr[lang][id]) a.tr[lang][id] = {};
+  a.tr[lang][id][field] = html;
+}
+const trDone = (a, lang) =>
+  trPieces(a).filter(x => plainText(trGet(a, lang, x.b.id, x.field))).length;
+/* An article is offered in a language when every piece of it has words.
+   Not a paragraph less: a page half in one language and half in another
+   is worse than a page honestly in English. */
+function trReady(a, lang){
+  const n = trPieces(a).length;
+  return n > 0 && trDone(a, lang) === n;
+}
+
+/* ---------- the phrases that are to come back as they went ----------
+   A translator will not touch a number in brackets, there being nothing
+   in it to translate. So everything marked to be left as written goes
+   out as a token and comes home as itself, whatever was used to
+   translate the rest and whatever that thing thinks of our markup. */
+const TOK_OPEN = '\u27E6', TOK_SHUT = '\u27E7';
+function tokenise(html){
+  const box = document.createElement('div');
+  box.innerHTML = html || '';
+  const kept = [];
+  box.querySelectorAll('.' + ASIS).forEach(n => {
+    kept.push(n.innerHTML);
+    n.replaceWith(document.createTextNode(TOK_OPEN + kept.length + TOK_SHUT));
+  });
+  return { html: box.innerHTML, kept };
+}
+function detokenise(html, kept){
+  return String(html || '').replace(
+    new RegExp(TOK_OPEN + '\\s*(\\d+)\\s*' + TOK_SHUT, 'g'),
+    (whole, n) => kept[+n - 1] !== undefined
+      ? ASIS_OPEN + kept[+n - 1] + '</span>' : whole);
+}
 /* what the header's three blocks are called beside them */
 const HEAD_LABEL = { title:'Title', byline:'By', stand:'Standfirst' };
 /* An empty box used to carry a line of grey text saying what belonged
@@ -6260,6 +6367,99 @@ function workAccount(work){
 
 function sheet(){ return h('div', { class:'sheet' }); }
 
+/* ---------------------------------------------------------------------
+   Writing a translation
+
+   The article on the left, a box beside it on the right, and a press
+   that puts the English on the clipboard ready to be translated
+   wherever you like. The English it copies is not quite the English:
+   anything marked to be left as written has already become a token, so
+   whatever you paste back brings those words home untouched.
+   --------------------------------------------------------------------- */
+function workTranslation(s, a, lang){
+  const pieces = trPieces(a);
+  const card = h('section', { class:'card trcard' });
+  const count = h('p', { class:'hint' });
+  const say = () => {
+    const done = trDone(a, lang), all = pieces.length;
+    count.textContent = all
+      ? `${done} of ${all} pieces written` +
+        (done === all ? ' — ready, this article can be read in ' + tongueName(lang) + '.'
+                      : ' — not offered to readers until every piece has words.')
+      : 'There is nothing to translate in this article yet.';
+    count.classList.toggle('ready', !!all && done === all);
+    const sel = $('#work .tonguesel');
+    if(sel){
+      const opt = [...sel.options].find(o => o.value === lang);
+      if(opt) opt.textContent = tongueName(lang) + ' — ' + done + ' of ' + all;
+    }
+  };
+  card.append(h('h2', { text: tongueName(lang) }));
+  card.append(count);
+  card.append(h('p', { class:'hint', text:
+    'Press Copy, translate the words wherever you like, and paste the result back. '
+    + 'Anything in ⟦1⟧ brackets is a name to be left alone — leave the brackets '
+    + 'where they are and the words come back as they were written.' }));
+  s.append(card);
+
+  if(!pieces.length) return;
+
+  const list = h('div', { class:'trlist' });
+  pieces.forEach((x, i) => {
+    const src = x.field === 'caption' ? x.b.caption : x.b.html;
+    const { html: tokened, kept } = tokenise(src);
+
+    const row = h('div', { class:'trrow' });
+    row.append(h('div', { class:'kind', text: x.label }));
+
+    const left = h('div', { class:'trsrc' });
+    left.innerHTML = tokened;
+    const copy = h('button', { class:'btn small', type:'button', text:'Copy' });
+    copy.onclick = async () => {
+      const words = plainText(tokened);
+      try{
+        await navigator.clipboard.writeText(words);
+        copy.textContent = 'Copied';
+        setTimeout(() => { copy.textContent = 'Copy'; }, 1200);
+      }catch(e){
+        /* a browser that will not hand over the clipboard without a
+           gesture it recognises: select the words instead, so the
+           ordinary copy still works */
+        const r = document.createRange();
+        r.selectNodeContents(left);
+        const sel2 = getSelection(); sel2.removeAllRanges(); sel2.addRange(r);
+        toast('Press Ctrl+C — the words are selected.');
+      }
+    };
+
+    const box = h('div', { class:'ed ed-tr', contenteditable:'true', spellcheck:'false',
+      role:'textbox', 'aria-label': tongueName(lang) + ' — ' + x.label });
+    box.innerHTML = trGet(a, lang, x.b.id, x.field);
+    box.oninput = () => {
+      trSet(a, lang, x.b.id, x.field, detokenise(sanitizeInline(box.innerHTML), kept));
+      row.classList.toggle('filled', !!plainText(box.innerHTML));
+      say();
+      saveArticle(a, { fast:true });
+    };
+    box.addEventListener('paste', e => {
+      /* Whatever a translator puts on the clipboard — its own markup,
+         its own colours — comes in as the words alone. */
+      e.preventDefault();
+      const t = (e.clipboardData.getData('text/plain') || '').replace(/\s+/g, ' ').trim();
+      document.execCommand('insertText', false, t);
+    });
+    ['keyup', 'mouseup', 'focus'].forEach(ev => box.addEventListener(ev, () => markAsIs()));
+    if(plainText(box.innerHTML)) row.classList.add('filled');
+
+    row.append(h('div', { class:'trpair' },
+      h('div', { class:'trside' }, left, h('div', { class:'fp-row' }, copy)),
+      box));
+    list.append(row);
+  });
+  s.append(list);
+  say();
+}
+
 function workArticle(work){
   const a = curArt();
   const s = sheet();
@@ -6288,11 +6488,23 @@ function workArticle(work){
     saveArticle(a, { fast:true });
     renderSide(); relayout();
   };
+  /* Which language this half is showing. The article itself is always
+     the English one — everything else is words kept against it. */
+  const tongue = h('select', { class:'tonguesel', 'aria-label':'Language' });
+  tongue.append(h('option', { value:'en', text:'English — the article' }));
+  TONGUE_KEYS.forEach(k => tongue.append(h('option', { value:k,
+    text: tongueName(k) + ' — ' + trDone(a, k) + ' of ' + trPieces(a).length })));
+  tongue.value = State.tongue;
+  tongue.onchange = () => { State.tongue = tongue.value; renderWork(); };
+
   head.append(h('div', { class:'row' },
     h('label', { class:'check' }, newPage, ' Start on a new page'),
     h('label', { class:'check', title:'Read on the web, left out of the printed issue' },
-      webOnly, ' Online only')));
+      webOnly, ' Online only'),
+    h('span', { class:'spacer' }), tongue));
   s.append(head);
+
+  if(State.tongue !== 'en'){ workTranslation(s, a, State.tongue); work.append(s); return; }
 
   s.append(toolbars());
   const blocks = h('div', { id:'blocks' });
