@@ -1021,7 +1021,18 @@ dialog .ed-cap{font-size:.95rem;min-height:2.2em}
   padding:.6rem .7rem;margin:.6rem 0 .4rem;
 }
 #editor .trbar .hint{margin:0;flex:1 1 16rem;min-width:0}
-#editor .trwhich{margin:0 0 .5rem;font-weight:600;color:var(--e-accent)}
+#editor .trwhich{margin:0 0 .5rem}
+#editor .trwhich b{color:var(--e-ink)}
+#editor .trwhich.tr-live b{color:var(--e-accent)}
+#editor .trwhich.tr-written b{color:var(--e-warn)}
+/* which languages this issue holds, beside the publish buttons */
+#editor .tonguesay{display:flex;gap:.3rem;align-items:center;flex-wrap:wrap}
+#editor .tongue-chip{
+  font-family:var(--ui);font-size:.72rem;padding:.1rem .4rem;border-radius:999px;
+  border:1px solid var(--e-line);color:var(--e-warn);background:var(--e-panel);
+  white-space:nowrap;
+}
+#editor .tongue-chip.on{color:var(--e-accent);border-color:var(--e-accent)}
 #editor .fig-row{display:flex;gap:.4rem;align-items:center;margin-bottom:.35rem;flex-wrap:wrap}
 #editor .fig-row select{width:auto;margin:0}
 #editor .fig-meta{font-size:.78rem;color:var(--e-muted)}
@@ -1718,6 +1729,9 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
       <button role="tab" id="tabPdf" data-mv="pdf" aria-selected="false">PDF</button>
     </nav>
     <div class="where" id="whereLabel"></div>
+    <!-- Which languages this issue holds, and whether they have been
+         sent. Beside the publish buttons, where the question arises. -->
+    <div class="tonguesay" id="tongueSay" hidden></div>
     <div class="spacer"></div>
     <span class="status" id="status" aria-live="polite"></span>
     <button class="btn primary" id="btnPublish" hidden>Publish…</button>
@@ -2036,7 +2050,7 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
    when the file changes. It is unrelated to the database's own VERSION,
    which governs schema upgrades and must not be moved for a cosmetic
    change. */
-const APP_VERSION = '1.30';
+const APP_VERSION = '1.32';
 
 /* Nothing is imported at the top any more. The Firebase libraries are
    several hundred kilobytes and, loaded this way, the browser must fetch
@@ -5444,6 +5458,22 @@ function trHas(a, lang){
 /* Which languages this article can actually be read in. */
 const trReadable = (a) => tongues().map(t => t.code).filter(c => trHas(a, c));
 
+/* Where a language has got to for one article, which is the question
+   the editor could not answer before: nothing written, written but not
+   sent, or on the shelf and being read.
+
+   'live' is the strict reading — the issue is published, it went out
+   carrying this language, and nothing has changed since. A piece still
+   in the pool belongs to no issue and can only ever be 'written'. */
+function trState(a, lang){
+  if(!trHas(a, lang)) return 'empty';
+  const m = a && a.magazine && State.magazines[a.magazine];
+  if(!m || !m.published) return 'written';
+  if(!arr(m.publishedLangs).includes(lang)) return 'written';
+  return magIsStale(m) ? 'written' : 'live';
+}
+const TR_SAID = { empty:'nothing written', written:'written, not published', live:'published' };
+
 /* ---------- the English, ready to be taken to a translator ----------
    Flowing prose rather than a numbered list, because that is what a
    translator is good at, with a blank line where one piece ends and the
@@ -5602,7 +5632,31 @@ function renderEditorChrome(){
       ? 'Sends this issue again as it reads here, in place of the one on the shelf'
       : 'Nothing has changed since this issue was published';
   }
+  sayTongues(m, onIssue);
   document.title = (where ? where + ' — ' : '') + 'JRA Magazine';
+}
+
+/* What languages this issue holds, and which of them are on the shelf.
+   It sits beside the publish buttons because that is where the question
+   is asked: a language written but not sent reads to nobody, and there
+   was nothing anywhere that said so. */
+function sayTongues(m, onIssue){
+  const bar = $('#tongueSay');
+  if(!bar) return;
+  const here = (onIssue && m && tongues().length) ? magTongues(m) : [];
+  if(!here.length){ bar.hidden = true; return; }
+  const live = arr(m.publishedLangs), stale = magIsStale(m);
+  bar.hidden = false;
+  bar.textContent = '';
+  bar.append(h('span', { class:'boxlab inline', text:'Languages' }));
+  here.forEach(c => {
+    const on = m.published && live.includes(c) && !stale;
+    bar.append(h('span', { class:'tongue-chip' + (on ? ' on' : ''),
+      title: on ? tongueName(c) + ' is on the shelf'
+        : m.published ? tongueName(c) + ' is written but not yet sent — press Publish correction'
+                      : tongueName(c) + ' goes out when this issue is published' },
+      tongueName(c) + (on ? ' ✓' : ' · not sent')));
+  });
 }
 
 /* ---------- the sidebar ----------
@@ -6497,7 +6551,7 @@ function workArticle(work){
     tongue.textContent = '';
     tongue.append(h('option', { value:'en', text:'English — the article' }));
     tongues().forEach(t => tongue.append(h('option', { value:t.code,
-      text: t.name + (trHas(a, t.code) ? ' — written' : ' — empty') })));
+      text: t.name + ' · ' + TR_SAID[trState(a, t.code)] })));
     tongue.append(h('option', { value:'+', text:'Add a language…' }));
     tongue.value = State.tongue;
   };
@@ -6540,10 +6594,21 @@ function workArticle(work){
     s.append(bar);
     const d = trDoc(a, lang);
     ensureHead(d);
-    s.append(h('p', { class:'hint trwhich',
-      text: tongueName(lang) + (trHas(a, lang)
-        ? ' — readers can read this piece in ' + tongueName(lang) + '.'
-        : ' — not shown to readers until it has a title and something under it.') }));
+    /* Where this language has got to, said without euphemism. Written
+       is not published: an issue already on the shelf has to be sent
+       again before anybody can read the French of it. */
+    const state = trState(a, lang);
+    const mag = a.magazine && State.magazines[a.magazine];
+    const said = state === 'empty'
+      ? 'Readers see this piece in English. It needs a title and something under it.'
+      : state === 'live'
+        ? 'Readers who choose ' + tongueName(lang) + ' get this.'
+        : 'Nobody can read it yet. '
+          + (!mag ? 'This piece is in the pool; it goes out when its issue does.'
+             : !mag.published ? 'Publish issue ' + (mag.num || '—') + ' and it goes out with it.'
+             : 'Issue ' + (mag.num || '—') + ' is already on the shelf: press Publish correction to send it.');
+    s.append(h('p', { class:'hint trwhich tr-' + state },
+      h('b', { text: tongueName(lang) + ' · ' + TR_SAID[state] + '. ' }), said));
   }
 
   s.append(toolbars());
@@ -8749,9 +8814,13 @@ function stampOf(text){
   }
   return text.length.toString(36) + ':' + h.toString(36);
 }
+/* What went out, weighed. The translations are part of it: writing the
+   French of a piece in a published issue is a change to that issue, and
+   leaving it out of this left the correction button grey and insisting
+   nothing had happened — so there was no way to send the French at all. */
 function magStamp(m){
   const built = buildIssue(m);
-  return stampOf(JSON.stringify([built.issue, built.card]));
+  return stampOf(JSON.stringify([built.issue, built.card, built.langs]));
 }
 /* One article as it would go out. The date of a correction is left out
    of what is weighed, or stamping one would itself look like a change
@@ -11121,6 +11190,9 @@ async function doPublish(m){
     m.published = true;
     m.publishedAt = m.publishedAt || now;
     m.publishedNum = num;
+    /* which languages are on the shelf, so the editor can say so
+       plainly rather than leaving you to guess */
+    m.publishedLangs = Object.keys(built.langs);
     /* what went out, so the correction button can tell later whether
        anything has moved since */
     m.publishedStamp = magStamp(m);
