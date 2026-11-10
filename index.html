@@ -1037,6 +1037,34 @@ dialog .ed-cap{font-size:.95rem;min-height:2.2em}
 #editor .trbehind{margin:-.3rem 0 .6rem;color:var(--e-warn)}
 /* pasting a whole translation, shown against the English first */
 dialog#dlgPaste{max-width:min(46rem,96vw)}
+#dlgPaste .pasteart{
+  padding:.45rem .5rem;background:var(--e-bg);border-bottom:1px solid var(--e-line);
+  display:flex;gap:.6rem;align-items:baseline;flex-wrap:wrap;
+}
+#dlgPaste .pasteart .hint{margin:0}
+#dlgPaste .pasteart.off{background:#fdf0dd}
+#dlgPaste .pasteart.off .hint{color:var(--e-warn);font-weight:600}
+#dlgPaste .pasteart.none{opacity:.6}
+/* ---------- the translation sheet ----------
+   A page of plain words and nothing else, so that a browser asked to
+   translate it has only the issue in front of it. */
+/* A dialog is exempt: it is drawn above everything by the browser
+   and hiding it would make a press do nothing at all. */
+body.sheet-mode > *:not(#sheet):not(dialog){display:none!important}
+#sheet{
+  display:block;max-width:44rem;margin:0 auto;padding:2rem 16px 6rem;
+  font:17px/1.7 Georgia,"Times New Roman",serif;color:var(--e-ink);
+}
+#sheet .sh-head{border-bottom:1px solid var(--e-line);margin-bottom:1.4rem;padding-bottom:1rem}
+#sheet h1{font-size:1.5rem;margin:0 0 .5rem}
+#sheet .sh-note{
+  font-family:var(--ui);font-size:.9rem;line-height:1.55;color:var(--e-muted);margin:0 0 .8rem;
+}
+#sheet .sh-mark{
+  font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.8rem;font-weight:700;
+  color:var(--e-accent);margin:1.8rem 0 .6rem;letter-spacing:.02em;
+}
+#sheet .sh-p{margin:0 0 1em}
 #dlgPaste textarea{
   width:100%;min-height:7rem;font:inherit;font-size:.9rem;padding:.5rem;
   border:1px solid var(--e-line);border-radius:6px;background:#fff;color:var(--e-ink);
@@ -1768,6 +1796,11 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
 
   <div class="menu" id="brandMenu" role="menu" hidden></div>
 
+<!-- A whole issue as plain words, for handing to a translator. It is a
+     page of its own rather than a panel, because a browser will only
+     offer to translate a real page at a real address. -->
+<section id="sheet" hidden></section>
+
   <aside class="side" id="side"></aside>
 
   <!-- The article on the left and what it will look like on the right,
@@ -2091,7 +2124,7 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
    when the file changes. It is unrelated to the database's own VERSION,
    which governs schema upgrades and must not be moved for a cosmetic
    change. */
-const APP_VERSION = '1.33';
+const APP_VERSION = '1.34';
 
 /* Nothing is imported at the top any more. The Firebase libraries are
    several hundred kilobytes and, loaded this way, the browser must fetch
@@ -3284,6 +3317,8 @@ function previewMag(){
    2210. So the editable record gets a key of its own and remembers the
    published one here, and every link a reader already has keeps working. */
 function pubId(a){ return a.pubId || a.id; }
+const magByNum = (n) => Object.values(State.magazines)
+  .find(m => m && String(m.num) === String(n));
 
 
 /* ---------- loading and saving ---------- */
@@ -4987,6 +5022,15 @@ function routeEditor(raw){
      the tab and article we are about to leave */
   rememberWorkScroll();
   const parts = raw.split('/').filter(Boolean);     // ['editor', tab, id]
+  /* The sheet is a page of its own, not a tab: it takes the whole
+     window so that translating it translates the issue and nothing
+     else. */
+  if(parts[1] === 'sheet'){
+    const m = magByNum(parts[2]) || curMag();
+    if(m){ State.curMag = m.id; renderSheet(m); return; }
+  }
+  $('#sheet').hidden = true;
+  document.body.classList.remove('sheet-mode');
   const asked = parts[1];
   /* #editor/web and #editor/pdf are the magazine shown whole */
   const mv = MV_ROUTE[asked] || 'edit';
@@ -5929,6 +5973,31 @@ function sideIssue(side){
   card.append(h('div', { class:'fp-row' }, set,
     h('button', { class:'btn small', onclick: () => openMagSettings(null) }, '+ New magazine')));
   side.append(card);
+
+  /* Translating a whole issue at once: out to a sheet, and back from
+     one. Only worth showing once there is a language to translate into. */
+  if(m && tongues().length){
+    const tr = h('section', { class:'card' }, h('h2', { text:'Translating' }));
+    tr.append(h('p', { class:'hint', text:
+      'Open the sheet, translate that page in your browser, select it all, copy, '
+      + 'and paste it back here. One pass for the whole issue.' }));
+    tr.append(h('div', { class:'fp-row' },
+      h('button', { class:'btn small primary',
+        title:'Opens the whole issue as plain words, in a new tab',
+        onclick: () => window.open(location.pathname + location.search
+          + '#editor/sheet/' + (m.num || ''), '_blank', 'noopener') }, 'Translation sheet…')));
+    const langRow = h('div', { class:'fp-row' });
+    tongues().forEach(t => {
+      const c = magTongueCount(m, t.code);
+      langRow.append(h('button', { class:'btn small',
+        title:'Paste the ' + t.name + ' sheet back into this issue',
+        onclick: () => openPasteIssue(m, t.code, () => { renderSide(); renderWork();
+          renderEditorChrome(); }) },
+        'Paste ' + t.name + ' \u00b7 ' + c.done + '/' + c.all));
+    });
+    tr.append(langRow);
+    side.append(tr);
+  }
 }
 
 /* ---------------------------------------------------------------------
@@ -6648,6 +6717,103 @@ function workAccount(work){
 
 function sheet(){ return h('div', { class:'sheet' }); }
 
+/* =====================================================================
+   The translation sheet
+
+   A translator's box takes five thousand characters and an issue runs
+   to two hundred thousand, so pasting one in was never one paste; it
+   was forty. A browser translating a page has no such limit, and we
+   have the measurements to prove it handles a page of plain paragraphs
+   correctly — what it cannot do is spare a phrase inside one, which is
+   why the names still travel as tokens.
+
+   So: the whole issue on one page, translated where it stands, copied
+   once, pasted back once. The markers between articles are held in
+   English by the one thing browsers do honour — an opt-out on a whole
+   block — and that is what the paste finds its way by.
+   ===================================================================== */
+const SHEET_MARK = '\u25A0';
+const sheetArticles = (m) => magArticles(m);
+
+function renderSheet(m){
+  const el = $('#sheet');
+  el.textContent = '';
+  el.hidden = false;
+  document.body.classList.add('sheet-mode');
+
+  const hold = (tag, text, cls) => {
+    const n = h(tag, { class: cls || '' , translate:'no' });
+    n.classList.add('notranslate');
+    n.textContent = text;
+    return n;
+  };
+
+  const head = h('div', { class:'sh-head' });
+  head.append(hold('h1', 'Issue ' + (m.num || '\u2014') + ' \u2014 for translating'));
+  head.append(hold('p',
+    'Translate this page in your browser, then select the whole of it, copy, '
+    + 'and paste it back into the editor. Leave every \u27E61\u27E7 bracket exactly '
+    + 'where it is \u2014 those are names that must stay as they were written. '
+    + 'The dark lines marked ' + SHEET_MARK + ' are signposts and will stay in English.',
+    'sh-note'));
+  const sel = h('button', { class:'btn primary', type:'button', translate:'no',
+    text:'Select the whole sheet' });
+  sel.classList.add('notranslate');
+  sel.onclick = () => {
+    const body = $('#sheetBody');
+    const r = document.createRange();
+    r.selectNodeContents(body);
+    const g = getSelection(); g.removeAllRanges(); g.addRange(r);
+    sel.textContent = 'Selected \u2014 now press Ctrl+C';
+  };
+  head.append(sel);
+  el.append(head);
+
+  const body = h('div', { id:'sheetBody' });
+  const arts = sheetArticles(m);
+  arts.forEach((a, i) => {
+    body.append(hold('p', SHEET_MARK + ' ARTICLE ' + (i + 1) + ' \u2014 '
+      + (a.title || 'Untitled'), 'sh-mark'));
+    const pieces = englishPieces(a);
+    if(!pieces.length){
+      body.append(hold('p', SHEET_MARK + ' (nothing written in this one yet)', 'sh-mark'));
+      return;
+    }
+    let saidCaps = false;
+    pieces.forEach(x => {
+      if(x.kind === 'Caption' && !saidCaps){
+        saidCaps = true;
+        body.append(hold('p', SHEET_MARK + ' CAPTIONS', 'sh-mark'));
+      }
+      body.append(h('p', { class:'sh-p', text: x.tokened }));
+    });
+  });
+  body.append(hold('p', SHEET_MARK + ' END', 'sh-mark'));
+  el.append(body);
+}
+
+/* Reading it back. Everything before the first signpost is the page's
+   own words and is thrown away; each signpost opens a new article, and
+   the blank-line-separated paragraphs under it belong to that one. A
+   translator that merges two paragraphs therefore spoils one article
+   rather than every article after it. */
+function readSheet(text){
+  const out = [];
+  let here = null;
+  String(text || '').replace(/\r/g, '').split(/\n/).forEach(raw => {
+    const line = raw.trim();
+    if(!line) return;
+    if(line.startsWith(SHEET_MARK)){
+      const m = /ARTICLE\s*(\d+)/i.exec(line);
+      if(m){ here = { n: +m[1], lines: [] }; out.push(here); }
+      return;                                   // CAPTIONS and END are signposts too
+    }
+    if(!here) return;                           // the instructions above the first one
+    here.lines.push(line.replace(/\s+/g, ' '));
+  });
+  return out;
+}
+
 /* ---------------------------------------------------------------------
    Putting a translation in
 
@@ -6667,6 +6833,107 @@ function trTargets(a, d){
     out.push(Object.assign({}, piece, { to: i > -1 ? dst[i] : null }));
   });
   return out;
+}
+
+/* A whole issue at once: the sheet comes back as one lump of words, is
+   cut up at its signposts, and each article's share is shown against
+   the English it would replace. Nothing is written until it is
+   approved, and an article whose count has drifted is called out on its
+   own rather than quietly shifting everything after it. */
+function openPasteIssue(m, lang, done){
+  const dlg = $('#dlgPaste');
+  const box = $('#pasteBox');
+  const where = $('#pasteMatch');
+  const go = $('#pasteGo');
+  const arts = sheetArticles(m);
+  const wanted = arts.map(a => ({ a, pieces: englishPieces(a) }));
+  const total = wanted.reduce((n, x) => n + x.pieces.length, 0);
+
+  box.value = '';
+  where.textContent = '';
+  go.disabled = true;
+  $('#pasteNote').textContent =
+    `Issue ${m.num || '\u2014'} has ${arts.length} article${arts.length === 1 ? '' : 's'} `
+    + `and ${total} pieces of words between them. Paste the translated sheet here.`;
+
+  let plan = [];
+  const draw = () => {
+    const chunks = readSheet(box.value);
+    const byNum = new Map(chunks.map(c => [c.n, c.lines]));
+    plan = wanted.map((x, i) => {
+      const lines = byNum.get(i + 1) || [];
+      return { a: x.a, pieces: x.pieces, lines, n: i + 1 };
+    });
+    where.textContent = '';
+    if(!chunks.length){
+      if(box.value.trim())
+        where.append(h('p', { class:'hint pastesum off', text:
+          'No signposts found. Make sure the whole sheet was copied \u2014 the lines '
+          + 'marked ' + SHEET_MARK + ' are what tells each article apart.' }));
+      go.disabled = true;
+      return;
+    }
+    const off = plan.filter(x => x.lines.length && x.lines.length !== x.pieces.length).length;
+    const none = plan.filter(x => !x.lines.length).length;
+    const sum = h('p', { class:'hint pastesum' + (off || none ? ' off' : ' ok') });
+    sum.textContent = (off || none)
+      ? `${plan.length - none} of ${plan.length} articles found`
+        + (off ? `, ${off} with a different number of pieces than expected` : '')
+        + '. Look down the list before putting it in.'
+      : `All ${plan.length} articles found and every one lines up.`;
+    where.append(sum);
+
+    const list = h('div', { class:'pastelist' });
+    plan.forEach(x => {
+      const bad = x.lines.length && x.lines.length !== x.pieces.length;
+      list.append(h('div', { class:'pasteart' + (bad ? ' off' : '') + (x.lines.length ? '' : ' none') },
+        h('b', { text: SHEET_MARK + ' ' + x.n + ' \u00b7 ' + (x.a.title || 'Untitled') }),
+        h('span', { class:'spacer' }),
+        h('span', { class:'hint', text: x.lines.length
+          ? `${x.lines.length} pasted, ${x.pieces.length} wanted`
+          : 'not in what was pasted \u2014 left alone' })));
+      x.pieces.forEach((pc, i) => {
+        const line = x.lines[i];
+        list.append(h('div', { class:'pasterow' + (line ? '' : ' none') },
+          h('div', { class:'kind', text: pc.kind }),
+          h('div', { class:'pastepair' },
+            h('div', { class:'pasteen', text: pc.tokened }),
+            h('div', { class:'pastefr', text: line || '\u2014 nothing pasted, stays English' }))));
+      });
+    });
+    where.append(list);
+    go.disabled = !plan.some(x => x.lines.length);
+  };
+
+  box.oninput = () => later('pastematch', draw, 150);
+  box.onpaste = () => setTimeout(draw, 0);
+
+  go.onclick = () => {
+    let pieces = 0, done2 = 0;
+    plan.forEach(x => {
+      if(!x.lines.length) return;
+      const d = trDoc(x.a, lang);
+      const targets = trTargets(x.a, d);
+      let any = false;
+      targets.forEach((t, i) => {
+        const line = x.lines[i];
+        if(!line || !t.to) return;
+        const words = detokenise(line, t.kept);
+        if(t.field === 'caption') t.to.caption = words;
+        else t.to.html = (t.to.t === 'h2' || t.to.t === 'h3')
+          ? escapeHtml(plainText(words)) : words;
+        pieces++; any = true;
+      });
+      if(any){ d.fresh = undefined; syncHead(d); saveArticle(x.a, { fast:true }); done2++; }
+    });
+    dlg.close();
+    toast(`${pieces} pieces put into ${done2} article${done2 === 1 ? '' : 's'}. `
+      + 'The photographs and settings are as they were.');
+    if(done) done();
+  };
+
+  if(!dlg.open) dlg.showModal();
+  setTimeout(() => box.focus(), 30);
 }
 
 function openPasteTranslation(a, lang, done){
