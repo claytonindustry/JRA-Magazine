@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Which markers survive a translator</title>
+<title>Putting the names back</title>
 <style>
   :root{
     --paper:#f4f2ed; --ink:#1d2328; --muted:#5d6a73; --line:#d9d4c9;
@@ -34,71 +34,69 @@
   .row{border-top:1px solid var(--line);padding:.9rem 0 .8rem}
   .tag{
     font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.76rem;
-    color:var(--muted);display:block;margin-bottom:.25rem;
+    color:var(--muted);display:block;margin-bottom:.3rem;
   }
   p.t{margin:0}
-  button{
-    font:600 .95rem/1 system-ui,sans-serif;padding:.65rem 1rem;
-    border:1px solid var(--good);border-radius:8px;cursor:pointer;
-    background:var(--good);color:#fff;
+  /* The watched names are tinted ONLY here, so you can see at a glance
+     which words are the ones under test. A real article would show
+     nothing at all. */
+  .keep{background:#fbf0cf;border-radius:3px;padding:0 .1em}
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]) .keep{background:#3a3320}
   }
-  pre{
-    background:var(--panel);border:1px solid var(--line);border-radius:8px;
-    padding:.8rem;overflow:auto;font-size:.82rem;line-height:1.5;
-    white-space:pre-wrap;word-break:break-word;
+  #count{
+    font-family:system-ui,sans-serif;font-size:.9rem;color:var(--muted);
+    margin:.6rem 0 0;
   }
-  .warn{color:var(--warn);font-weight:600}
 </style>
 </head>
 <body>
 
-<h1>Which markers survive a translator</h1>
-<p class="lede">The point of the whole thing is that a boat's name is not
-translated. The editor swaps each protected name for a marker before the words
-go to a translator, and swaps it back afterwards — which only works if the
-translator leaves the marker alone. Nobody has ever checked that it does. This
-checks it, in two different ways, in two languages.</p>
+<h1>Putting the names back</h1>
+<p class="lede">We know a browser will not honour <code>translate="no"</code> on a
+phrase inside a paragraph. But a browser does not rebuild the paragraph when it
+translates it — it keeps the elements and swaps the words inside them. So the
+name's own little box should still be there afterwards, holding French. If it is,
+a few lines of script can simply put the English back, and nothing needs
+translating by hand at all.</p>
 
 <div class="how">
   <b>How to run it</b>
   <ol>
-    <li><b>In Chrome:</b> right-click this page, Translate to <b>French</b>. Read
-      the list below. Then do it again in <b>Chinese</b> — that one matters most.</li>
-    <li>Every line should still contain its marker, unchanged. Line 1 is the
-      control and <b>should</b> turn into <i>Miroir</i> or <i>镜子</i> — if it does
-      not, the page never translated and nothing else here means anything.</li>
-    <li><b>Then the other way:</b> press the button further down, paste into
-      <a href="https://translate.google.com" target="_blank" rel="noopener">translate.google.com</a>,
-      and check the same thing. The two routes are different engines and may not
-      agree.</li>
-    <li>Tell me which numbers kept their marker, for each language and each route.</li>
+    <li>Right-click the page, Translate to <b>French</b>. Then do it again in
+      <b>Chinese</b>.</li>
+    <li>Every paragraph should turn French. Look at the three yacht names in
+      each: <b>Mirror</b>, <b>Shining Moon</b> and <b>Great Auk</b>.</li>
+    <li>Tell me, for each numbered paragraph, whether those three names are
+      still in English — and whether anything flickers, jumps or repeats.</li>
+    <li>The counter at the bottom says how many times the script put a name
+      back. If it climbs for ever, the script and the translator are fighting
+      and that matters as much as the result.</li>
   </ol>
 </div>
 
-<h2>The markers</h2>
+<h2>Five paragraphs, same words</h2>
 <div id="rows"></div>
 
-<h2>The other route — the translator's own box</h2>
-<p class="lede">The same sentences as plain text. Press the button, paste them
-into Google Translate, and compare.</p>
-<p><button id="copy" type="button">Copy the sentences</button></p>
-<pre id="raw"></pre>
-
-<h2>What the answer tells us</h2>
+<h2>What each answer would mean</h2>
 <div class="how">
-  <p style="margin:.2rem 0"><b>If the digit markers survive in French but not in
-  Chinese</b> — likely, since a translator may well write <i>1</i> as <i>一</i> —
-  then the marker must use a letter rather than a number, and the ones with
-  letters below will say which.</p>
-  <p style="margin:.6rem 0 .2rem"><b>If the fancy brackets ⟦ ⟧ are stripped but
-  the plain ones survive</b>, we change the brackets and lose nothing.</p>
-  <p style="margin:.6rem 0 .2rem"><b>If nothing survives in Chinese</b>, then
-  names cannot be protected in Chinese by this route at all, and we would want to
-  know that before building anything else on it.</p>
-  <p style="margin:.6rem 0 .2rem"><b>If the two routes disagree</b>, the sheet and
-  the paste box are not interchangeable and the editor should push you towards
-  whichever one works.</p>
+  <p style="margin:.2rem 0"><b>If 3 or 4 keeps its names</b> — this is the
+  answer. Readers translate the page themselves, boat names stay as written, and
+  there is no manual translation of anything, ever. I would put it in the
+  published page and we would be done.</p>
+  <p style="margin:.6rem 0 .2rem"><b>If they keep them but the counter climbs
+  without stopping</b> — it works but fights the translator. Fixable, probably by
+  giving up after a few goes, but I would want to see how bad it is.</p>
+  <p style="margin:.6rem 0 .2rem"><b>If 3 and 4 fail the same way 2 does</b> —
+  the browser is rebuilding the paragraph rather than filling it in, there is
+  nothing left to put back, and manual translation stays the only way to keep a
+  name.</p>
+  <p style="margin:.6rem 0 .2rem"><b>5 is the control</b> and should stay wholly
+  English in both languages. <b>1</b> should translate completely, names and
+  all.</p>
 </div>
+
+<p id="count">The script has put a name back 0 times.</p>
 
 <footer style="margin-top:3rem;border-top:1px solid var(--line);padding-top:1rem;
   font-family:system-ui,sans-serif;font-size:.85rem;color:var(--muted)">
@@ -107,51 +105,86 @@ links to it; it comes out once we have the answer.
 </footer>
 
 <script>
-/* One sentence, one marker each. The sentence is ordinary prose so the
-   translator treats it as prose; only the marker differs down the list. */
-const MARKS = [
-  ['nothing — the control, this one MUST change', 'Mirror'],
-  ['⟦1⟧  white square brackets, a number — what the editor uses today', '⟦1⟧'],
-  ['⟦A⟧  white square brackets, a letter', '⟦A⟧'],
-  ['[[1]]  plain brackets, a number', '[[1]]'],
-  ['[[A]]  plain brackets, a letter', '[[A]]'],
-  ['{{1}}  braces, a number', '{{1}}'],
-  ['__1__  underscores, a number', '__1__'],
-  ['XQ1QX  letters round a number, no punctuation at all', 'XQ1QX'],
-  ['XQAQX  letters only', 'XQAQX']
+/* Three names in a paragraph of ordinary prose — the shape that defeated
+   every opt-out we tried. */
+const NAMES = ['Mirror', 'Shining Moon', 'Great Auk'];
+const PARA = (wrap) =>
+  'She had sailed ' + wrap(0) + ' out of the loch for eleven seasons and knew every '
+  + 'rock in it. That spring ' + wrap(1) + ' came up from the south with a new suit of '
+  + 'sails and anchored just inside the point. By June the two of them were racing '
+  + 'every Saturday, and by August ' + wrap(2) + ' had joined them from Oban. '
+  + 'Nobody finished a season without a story about one of the three.';
+
+const plain = (i) => NAMES[i];
+const noTr   = (i) => '<span class="keep notranslate" translate="no">' + NAMES[i] + '</span>';
+const watch  = (i) => '<span class="keep" data-keep="' + NAMES[i] + '">' + NAMES[i] + '</span>';
+const tick   = (i) => '<span class="keep" data-tick="' + NAMES[i] + '">' + NAMES[i] + '</span>';
+
+const ROWS = [
+  ['1 · nothing at all — the control, the names should turn French', PARA(plain), false],
+  ['2 · translate="no" on each name — known to fail, here for comparison', PARA(noTr), false],
+  ['3 · watched, and put back the moment the browser changes it', PARA(watch), false],
+  ['4 · put back by a repeating check rather than by watching', PARA(tick), false],
+  ['5 · the whole paragraph held back — the control that should stay English',
+   PARA(plain), true]
 ];
-const SENTENCE = (mark) =>
-  'The yacht ' + mark + ' left the harbour long before dawn and was not seen again that week.';
 
 const rows = document.getElementById('rows');
-MARKS.forEach(([label, mark], i) => {
+ROWS.forEach(([label, html, whole], i) => {
   const row = document.createElement('div');
   row.className = 'row';
   const tag = document.createElement('span');
-  tag.className = 'tag';
+  tag.className = 'tag notranslate';
   tag.setAttribute('translate', 'no');
-  tag.classList.add('notranslate');
-  tag.textContent = (i + 1) + ' · ' + label;
+  tag.textContent = label;
   const p = document.createElement('p');
   p.className = 't';
-  p.textContent = (i + 1) + '. ' + SENTENCE(mark);
+  if(whole){ p.setAttribute('translate', 'no'); p.classList.add('notranslate'); }
+  p.innerHTML = (i + 1) + '. ' + html;
   row.append(tag, p);
   rows.append(row);
 });
 
-const raw = MARKS.map(([, mark], i) => (i + 1) + '. ' + SENTENCE(mark)).join('\n\n');
-document.getElementById('raw').textContent = raw;
-document.getElementById('copy').onclick = async (e) => {
-  try{
-    await navigator.clipboard.writeText(raw);
-    e.target.textContent = 'Copied — paste it into Google Translate';
-  }catch(err){
-    const r = document.createRange();
-    r.selectNodeContents(document.getElementById('raw'));
-    const s = getSelection(); s.removeAllRanges(); s.addRange(r);
-    e.target.textContent = 'Press Ctrl+C — the sentences are selected';
-  }
+/* ---- putting them back ---------------------------------------------
+   Two ways of noticing that the browser has changed a name. Both only
+   ever write the original English back, and both give up after a while
+   so that a translator which insists cannot spin this for ever. */
+let puts = 0;
+const say = () => {
+  document.getElementById('count').textContent =
+    'The script has put a name back ' + puts + ' times.';
 };
+const TRIES = 40;
+const restore = (el, attr) => {
+  const want = el.getAttribute(attr);
+  if(el.textContent === want) return false;
+  el.textContent = want;
+  puts++; say();
+  return true;
+};
+
+/* 3 — watched. The browser's own rewriting is a DOM change like any
+   other, so it can simply be noticed. */
+const watched = [...document.querySelectorAll('[data-keep]')];
+let watchedGoes = 0;
+const obs = new MutationObserver(() => {
+  if(watchedGoes++ > TRIES){ obs.disconnect(); return; }
+  obs.disconnect();
+  watched.forEach(el => restore(el, 'data-keep'));
+  watched.forEach(el => obs.observe(el, { childList:true, characterData:true, subtree:true }));
+});
+watched.forEach(el => obs.observe(el, { childList:true, characterData:true, subtree:true }));
+
+/* 4 — looked at every so often instead, which cannot be outraced by a
+   rewrite that happens between one observation and the next. */
+const ticked = [...document.querySelectorAll('[data-tick]')];
+let goes = 0;
+const timer = setInterval(() => {
+  ticked.forEach(el => restore(el, 'data-tick'));
+  if(++goes > TRIES) clearInterval(timer);
+}, 400);
+
+say();
 </script>
 </body>
 </html>
