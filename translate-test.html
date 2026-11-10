@@ -3,26 +3,26 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>One word in a real paragraph</title>
+<title>Which markers survive a translator</title>
 <style>
   :root{
     --paper:#f4f2ed; --ink:#1d2328; --muted:#5d6a73; --line:#d9d4c9;
-    --good:#1f5f7a; --panel:#fffdf9;
+    --good:#1f5f7a; --panel:#fffdf9; --warn:#a4561b;
   }
   @media (prefers-color-scheme: dark){
     :root:not([data-theme="light"]){
       --paper:#15191c; --ink:#e8e6e0; --muted:#9aa5ac; --line:#2e3539;
-      --good:#6fb3cf; --panel:#1b2024;
+      --good:#6fb3cf; --panel:#1b2024; --warn:#d9a05b;
     }
   }
   html{background:var(--paper)}
   body{
-    margin:0 auto;padding:2rem 16px 5rem;max-width:44rem;
+    margin:0 auto;padding:2rem 16px 5rem;max-width:46rem;
     background:var(--paper);color:var(--ink);
     font:17px/1.65 Georgia,"Times New Roman",serif;
   }
-  h1{font-size:1.6rem;line-height:1.25;margin:0 0 .4rem}
-  h2{font-size:1.1rem;margin:2.4rem 0 1rem;font-family:system-ui,sans-serif}
+  h1{font-size:1.55rem;line-height:1.25;margin:0 0 .4rem}
+  h2{font-size:1.05rem;margin:2.4rem 0 .8rem;font-family:system-ui,sans-serif}
   .lede{color:var(--muted);margin:0 0 1.4rem;font-size:.95rem}
   .how{
     border:1px solid var(--line);border-radius:10px;padding:.9rem 1.1rem;
@@ -30,126 +30,128 @@
     font-family:system-ui,sans-serif;font-size:.92rem;line-height:1.55;
   }
   .how ol{margin:.5rem 0 0;padding-inline-start:1.3rem}
-  .how li{margin-bottom:.3rem}
-  .row{border-top:1px solid var(--line);padding:1rem 0 .9rem}
+  .how li{margin-bottom:.35rem}
+  .row{border-top:1px solid var(--line);padding:.9rem 0 .8rem}
   .tag{
     font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.76rem;
-    color:var(--muted);display:block;margin-bottom:.35rem;
-  }
-  .n{
-    font-family:system-ui,sans-serif;font-weight:700;color:var(--good);
-    margin-inline-end:.3rem;
+    color:var(--muted);display:block;margin-bottom:.25rem;
   }
   p.t{margin:0}
-  as-is{display:inline}
-  /* Row 4: the word is not in the page at all. It is carried on the
-     element as a value and drawn by the stylesheet, where nothing that
-     reads the page's words can find it. */
-  .drawn::before{content:var(--w)}
+  button{
+    font:600 .95rem/1 system-ui,sans-serif;padding:.65rem 1rem;
+    border:1px solid var(--good);border-radius:8px;cursor:pointer;
+    background:var(--good);color:#fff;
+  }
+  pre{
+    background:var(--panel);border:1px solid var(--line);border-radius:8px;
+    padding:.8rem;overflow:auto;font-size:.82rem;line-height:1.5;
+    white-space:pre-wrap;word-break:break-word;
+  }
+  .warn{color:var(--warn);font-weight:600}
 </style>
 </head>
 <body>
 
-<h1>One word in a real paragraph</h1>
-<p class="lede">We know now that nothing marked <i>inside</i> a paragraph of real
-prose survives: a word, a clause, a sentence, two sentences — all translated. Only
-wrapping the whole paragraph works. This asks whether there is any way at all to
-keep one word, using methods that do not rely on Chrome honouring a mark.</p>
+<h1>Which markers survive a translator</h1>
+<p class="lede">The point of the whole thing is that a boat's name is not
+translated. The editor swaps each protected name for a marker before the words
+go to a translator, and swaps it back afterwards — which only works if the
+translator leaves the marker alone. Nobody has ever checked that it does. This
+checks it, in two different ways, in two languages.</p>
 
 <div class="how">
   <b>How to run it</b>
   <ol>
-    <li>Right-click the page, choose <b>Translate to…</b>, French.</li>
-    <li>Each paragraph below should contain the English word <b>lighthouse</b>
-      where the French would be <i>phare</i>.</li>
-    <li>Tell me which numbers still say <b>lighthouse</b>.</li>
+    <li><b>In Chrome:</b> right-click this page, Translate to <b>French</b>. Read
+      the list below. Then do it again in <b>Chinese</b> — that one matters most.</li>
+    <li>Every line should still contain its marker, unchanged. Line 1 is the
+      control and <b>should</b> turn into <i>Miroir</i> or <i>镜子</i> — if it does
+      not, the page never translated and nothing else here means anything.</li>
+    <li><b>Then the other way:</b> press the button further down, paste into
+      <a href="https://translate.google.com" target="_blank" rel="noopener">translate.google.com</a>,
+      and check the same thing. The two routes are different engines and may not
+      agree.</li>
+    <li>Tell me which numbers kept their marker, for each language and each route.</li>
   </ol>
-  <p style="margin:.7rem 0 0">Ignore the small grey captions — they are outside
-  everything and are meant to turn French. That is how you know it worked.</p>
 </div>
 
-<h2>Five ways to keep one word</h2>
+<h2>The markers</h2>
+<div id="rows"></div>
 
-<div class="row">
-  <span class="tag">1 &middot; nothing &mdash; the control, must turn French</span>
-  <p class="t"><span class="n">1.</span>He accused other sailors of being lazy. He
-  declared that rowing past the lighthouse was a sign of weakness. He insisted that
-  anyone who wasn't pulling every rope as tightly as possible had no business being
-  on the water. His crew grew increasingly exhausted.</p>
-</div>
+<h2>The other route — the translator's own box</h2>
+<p class="lede">The same sentences as plain text. Press the button, paste them
+into Google Translate, and compare.</p>
+<p><button id="copy" type="button">Copy the sentences</button></p>
+<pre id="raw"></pre>
 
-<div class="row">
-  <span class="tag">2 &middot; a span with both opt-outs &mdash; known to fail, here for comparison</span>
-  <p class="t"><span class="n">2.</span>He accused other sailors of being lazy. He
-  declared that rowing past the
-  <span class="notranslate" translate="no">lighthouse</span>
-  was a sign of weakness. He insisted that anyone who wasn't pulling every rope as
-  tightly as possible had no business being on the water. His crew grew
-  increasingly exhausted.</p>
-</div>
-
-<div class="row">
-  <span class="tag">3 &middot; the word in an open shadow root &mdash; not in the page's own tree</span>
-  <p class="t"><span class="n">3.</span>He accused other sailors of being lazy. He
-  declared that rowing past the <as-is>lighthouse</as-is>
-  was a sign of weakness. He insisted that anyone who wasn't pulling every rope as
-  tightly as possible had no business being on the water. His crew grew
-  increasingly exhausted.</p>
-</div>
-
-<div class="row">
-  <span class="tag">4 &middot; the word drawn by the stylesheet, not written in the page</span>
-  <p class="t"><span class="n">4.</span>He accused other sailors of being lazy. He
-  declared that rowing past the <span class="drawn" style="--w:'lighthouse'"></span>
-  was a sign of weakness. He insisted that anyone who wasn't pulling every rope as
-  tightly as possible had no business being on the water. His crew grew
-  increasingly exhausted.</p>
-</div>
-
-<div class="row">
-  <span class="tag">5 &middot; the whole paragraph marked &mdash; the one we know works</span>
-  <p class="t notranslate" translate="no"><span class="n">5.</span>He accused other
-  sailors of being lazy. He declared that rowing past the lighthouse was a sign of
-  weakness. He insisted that anyone who wasn't pulling every rope as tightly as
-  possible had no business being on the water. His crew grew increasingly
-  exhausted.</p>
-</div>
-
-<h2>What the answer would mean</h2>
+<h2>What the answer tells us</h2>
 <div class="how">
-  <p style="margin:.2rem 0"><b>3 keeps its word</b> &mdash; a boat's name can be
-  protected mid-sentence after all. The word stays real text you can select, copy
-  and search; it simply lives one step to the side, where the translator does not
-  look. This is the answer you asked for and I would build it.</p>
-  <p style="margin:.6rem 0 .2rem"><b>Only 4 keeps its word</b> &mdash; possible, but
-  I would not recommend it. The word would not be selectable, not findable with
-  Ctrl+F, and awkward for anyone reading with their ears. A last resort.</p>
-  <p style="margin:.6rem 0 .2rem"><b>Only 5</b> &mdash; then it is settled: whole
-  paragraphs are the only thing Chrome will leave alone, the mark becomes a
-  block-level control, and protecting a boat's name mid-sentence needs the
-  magazine to own its own translation.</p>
+  <p style="margin:.2rem 0"><b>If the digit markers survive in French but not in
+  Chinese</b> — likely, since a translator may well write <i>1</i> as <i>一</i> —
+  then the marker must use a letter rather than a number, and the ones with
+  letters below will say which.</p>
+  <p style="margin:.6rem 0 .2rem"><b>If the fancy brackets ⟦ ⟧ are stripped but
+  the plain ones survive</b>, we change the brackets and lose nothing.</p>
+  <p style="margin:.6rem 0 .2rem"><b>If nothing survives in Chinese</b>, then
+  names cannot be protected in Chinese by this route at all, and we would want to
+  know that before building anything else on it.</p>
+  <p style="margin:.6rem 0 .2rem"><b>If the two routes disagree</b>, the sheet and
+  the paste box are not interchangeable and the editor should push you towards
+  whichever one works.</p>
 </div>
 
 <footer style="margin-top:3rem;border-top:1px solid var(--line);padding-top:1rem;
   font-family:system-ui,sans-serif;font-size:.85rem;color:var(--muted)">
-A scratch page for one question. It is not part of the magazine and nothing links
-to it; it comes out once we have the answer.
+A scratch page for one question. It is not part of the magazine and nothing
+links to it; it comes out once we have the answer.
 </footer>
 
 <script>
-/* The word is lifted out of the page's own tree into a shadow root
-   hanging off the element — still drawn, still selectable, still real
-   text, but not among the words the page is made of. */
-class AsIs extends HTMLElement {
-  connectedCallback(){
-    if(this.dataset.done) return;
-    this.dataset.done = '1';
-    const words = this.textContent;
-    this.textContent = '';
-    this.attachShadow({ mode: 'open' }).textContent = words;
+/* One sentence, one marker each. The sentence is ordinary prose so the
+   translator treats it as prose; only the marker differs down the list. */
+const MARKS = [
+  ['nothing — the control, this one MUST change', 'Mirror'],
+  ['⟦1⟧  white square brackets, a number — what the editor uses today', '⟦1⟧'],
+  ['⟦A⟧  white square brackets, a letter', '⟦A⟧'],
+  ['[[1]]  plain brackets, a number', '[[1]]'],
+  ['[[A]]  plain brackets, a letter', '[[A]]'],
+  ['{{1}}  braces, a number', '{{1}}'],
+  ['__1__  underscores, a number', '__1__'],
+  ['XQ1QX  letters round a number, no punctuation at all', 'XQ1QX'],
+  ['XQAQX  letters only', 'XQAQX']
+];
+const SENTENCE = (mark) =>
+  'The yacht ' + mark + ' left the harbour long before dawn and was not seen again that week.';
+
+const rows = document.getElementById('rows');
+MARKS.forEach(([label, mark], i) => {
+  const row = document.createElement('div');
+  row.className = 'row';
+  const tag = document.createElement('span');
+  tag.className = 'tag';
+  tag.setAttribute('translate', 'no');
+  tag.classList.add('notranslate');
+  tag.textContent = (i + 1) + ' · ' + label;
+  const p = document.createElement('p');
+  p.className = 't';
+  p.textContent = (i + 1) + '. ' + SENTENCE(mark);
+  row.append(tag, p);
+  rows.append(row);
+});
+
+const raw = MARKS.map(([, mark], i) => (i + 1) + '. ' + SENTENCE(mark)).join('\n\n');
+document.getElementById('raw').textContent = raw;
+document.getElementById('copy').onclick = async (e) => {
+  try{
+    await navigator.clipboard.writeText(raw);
+    e.target.textContent = 'Copied — paste it into Google Translate';
+  }catch(err){
+    const r = document.createRange();
+    r.selectNodeContents(document.getElementById('raw'));
+    const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+    e.target.textContent = 'Press Ctrl+C — the sentences are selected';
   }
-}
-customElements.define('as-is', AsIs);
+};
 </script>
 </body>
 </html>
