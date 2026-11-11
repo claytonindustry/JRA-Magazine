@@ -516,7 +516,7 @@ body{background:var(--paper)}
    boat in the issue. */
 #editor .ed .notranslate,dialog .ed .notranslate{
   background:#fbf0cf;box-shadow:0 0 0 1px rgba(150,120,30,.3);
-  border-radius:3px;
+  border-radius:3px;font-style:italic;
 }
 /* The few marks worth having wherever a caption is written away from
    the writing bar — inside a dialog, which stands in front of that bar,
@@ -1081,11 +1081,7 @@ body.sheet-mode > *:not(#sheet):not(dialog){display:none!important}
 #dlgPaste .pasteen{color:var(--e-muted)}
 #dlgPaste .pasterow.none .pastefr{color:var(--e-warn);font-style:italic}
 @media (max-width:640px){ #dlgPaste .pastepair{grid-template-columns:minmax(0,1fr)} }
-/* the reader, told when an issue is not in the language it chose */
-#reader .notlang{
-  margin:.6rem 0 0;padding:.4rem .7rem;border-inline-start:3px solid var(--rule);
-  font-family:var(--sans);font-size:.86rem;color:var(--brine);
-}
+
 #editor .fig-row{display:flex;gap:.4rem;align-items:center;margin-bottom:.35rem;flex-wrap:wrap}
 #editor .fig-row select{width:auto;margin:0}
 #editor .fig-meta{font-size:.78rem;color:var(--e-muted)}
@@ -2127,7 +2123,7 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
    when the file changes. It is unrelated to the database's own VERSION,
    which governs schema upgrades and must not be moved for a cosmetic
    change. */
-const APP_VERSION = '1.35';
+const APP_VERSION = '1.36';
 
 /* Nothing is imported at the top any more. The Firebase libraries are
    several hundred kilobytes and, loaded this way, the browser must fetch
@@ -2327,7 +2323,13 @@ const faceFromEl = (n) => FACE_KEYS.find(k => n.classList.contains('ff-' + k)) |
    translates.
    --------------------------------------------------------------------- */
 const ASIS = 'notranslate';
-const ASIS_OPEN = `<span class="${ASIS}" translate="no">`;
+/* An em rather than a bare span, because the magazine has set vessel
+   names in italics for thirty years and the old site marks exactly this
+   way — <em class="notranslate">Ilvy</em>. One press now gives both
+   halves of the house style: the italic a reader sees, and the class
+   the translator reads. */
+const ASIS_OPEN = `<em class="${ASIS}" translate="no">`;
+const ASIS_SHUT = '</em>';
 
 const esc = s => String(s == null ? '' : s)
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -2342,7 +2344,7 @@ function sanitizeInline(html){
   const box = document.createElement('div');
   box.innerHTML = String(html || '');
   const out = [];
-  (function walk(node){
+  (function walk(node, inAsIs){
     node.childNodes.forEach(n => {
       if(n.nodeType === 3){ out.push(escapeHtml(n.nodeValue)); return; }
       if(n.nodeType !== 1) return;
@@ -2368,23 +2370,27 @@ function sanitizeInline(html){
       if(tag === 'script' || tag === 'style') return;
       const href = tag === 'a' ? safeHref(n.getAttribute('href')) : '';
       if(href) out.push(`<a href="${escapeHtml(href)}">`);
-      if(asis) out.push(ASIS_OPEN);
-      if(italic) out.push('<em>');
+      /* the mark is itself an em, so neither the node that carries it
+         nor anything inside it wants a second one */
+      const mark = asis && !inAsIs;
+      const em = italic && !mark && !inAsIs;
+      if(mark) out.push(ASIS_OPEN);
+      if(em) out.push('<em>');
       if(upright) out.push('<span class="upright">');
       if(bold) out.push('<strong>');
       if(under) out.push('<u>');
-      walk(n);
+      walk(n, inAsIs || asis);
       if(under) out.push('</u>');
       if(bold) out.push('</strong>');
       if(upright) out.push('</span>');
-      if(italic) out.push('</em>');
-      if(asis) out.push('</span>');
+      if(em) out.push('</em>');
+      if(mark) out.push(ASIS_SHUT);
       if(href) out.push('</a>');
     });
-  })(box);
+  })(box, false);
   return out.join('').replace(/\u00a0/g, ' ').replace(/[ \t\r\n]+/g, ' ')
     .replace(/<em><\/em>|<strong><\/strong>|<span class="upright"><\/span>|<a [^>]*><\/a>/g, '')
-    .split(ASIS_OPEN + '</span>').join('').trim();
+    .split(ASIS_OPEN + ASIS_SHUT).join('').trim();
 }
 
 /* The web, an email, or a place in the reader. Anything else is dropped. */
@@ -3789,6 +3795,25 @@ function registerTongues(list){
   });
   return added;
 }
+/* And every language the widget can manage, which is every language
+   the reader can be offered whether or not anybody has translated a
+   word by hand. A language with issues written in it keeps the name
+   those were given; the rest are named in their own tongue. */
+function registerWidgetLangs(){
+  let added = 0;
+  Object.keys(GT_LANGS).forEach(code => {
+    if(LANGS[code]) return;
+    LANGS[code] = {
+      name: GT_LANGS[code],
+      dir: RTL_LANGS.includes(code) ? 'rtl' : 'ltr',
+      measure: LANGS.en.measure,
+      tag: code,
+      s: LANGS.en.s
+    };
+    added++;
+  });
+  return added;
+}
 
 async function loadLibrary(force){
   if(Reader.library && !force) return Reader.library;
@@ -3806,7 +3831,8 @@ async function loadLibrary(force){
      not mean a reader choosing it would be given anything. */
   const out = new Set();
   arr(node).forEach(c => arr(c && c.langs).forEach(x => out.add(x)));
-  if(registerTongues(arr(langs).filter(t => t && out.has(t.code)))){
+  registerWidgetLangs();
+  if(registerTongues(arr(langs).filter(t => t && out.has(t.code))) || true){
     buildLangControl();
     /* a language chosen on an earlier visit, which could not be
        restored at the start because nothing yet knew of it */
@@ -4553,8 +4579,12 @@ function renderArticle(num, id, query, mode){
   /* A reader who has chosen a language and opened an issue that does not
      have it is reading the English, and is told so once rather than left
      to wonder why the words did not change. */
+  /* Whether this issue is already written in the language being read.
+     If it is, the piece is the magazine's own translation and must be
+     held back from the widget rather than translated a second time;
+     if it is not, the widget answers for it and nothing need be said,
+     exactly as on the old site. */
   const inLang = LANG !== 'en' && arr(issueMeta(num) && issueMeta(num).langs).includes(LANG);
-  const notInLang = LANG !== 'en' && !inLang;
   /* A loose proof is not in an issue, so there is no contents to send
      anyone back to; it still says which piece this is. */
   setNowBar(where, a.title || '', bare ? '' : num);
@@ -4573,10 +4603,7 @@ function renderArticle(num, id, query, mode){
             ${bare ? '' : `<button class="crumb" id="back">← ${esc(query ? S().backToResults : S().backToContents)}</button>`}
             <h1${headAttr(a.titleSize, a.titleFace)}>${a.titleHtml || esc(a.title)}</h1>
             ${a.author ? `<p class="by${headCls(a.bylineSize, a.bylineFace)}">${a.authorHtml || esc(a.author)}</p>` : ''}
-            ${notInLang ? `<p class="notlang">${esc(
-              (LANGS[LANG] || {}).name || LANG)}: ${esc(S().issueN(num))} ${
-              esc('has not been translated \u2014 this is the English.')}</p>` : ''}
-            <p class="meta">${esc(bare
+            <p class="meta notranslate" translate="no">${esc(bare
               ? (a.words ? `${a.words.toLocaleString()} words, about ${longSpan(mins(a.words))}. ${where}.`
                          : `${S().picturePage}. ${where}.`)
               : a.words
@@ -4831,6 +4858,24 @@ function renderTabs(current){
     `<a href="#/${t.id}"${t.id === current ? ' aria-current="page"' : ''}>${esc(t.label)}</a>`).join('');
 }
 
+/* Everything the page needs after it has been drawn in whatever
+   language is being read.
+
+   The magazine writes its pages with JavaScript, so the widget cannot
+   translate once at the start and be done: each time a piece is drawn
+   there are new words on the page and it has to be asked again. An
+   article the magazine has itself translated is held back first, so
+   that the widget passes over the checked prose and renders only the
+   furniture around it. */
+function afterDraw(num, id){
+  if(LANG === 'en') return;
+  const meta = num ? issueMeta(num) : null;
+  const mine = !!(meta && arr(meta.langs).includes(LANG));
+  holdFromWidget($('#reader .art'), mine);
+  holdFromWidget($('#reader .rail'), mine);
+  gtGo(LANG);
+}
+
 let routeToken = 0;
 
 async function routeReader(hash, opts){
@@ -4875,7 +4920,7 @@ async function routeReader(hash, opts){
   }
 
   renderTabs('');
-  if(!parts.length){ renderShelf(params); settle(); return; }
+  if(!parts.length){ renderShelf(params); settle(); afterDraw(null, null); return; }
 
   const [num, id] = parts;
   const meta = issueMeta(num);
@@ -4904,6 +4949,7 @@ async function routeReader(hash, opts){
   if(id) renderArticle(num, id, params.q, params.qm);
   else renderIssue(num, params.q, params.qm);
   settle();
+  afterDraw(num, id);
 }
 
 /* ---------- reader controls ---------- */
@@ -4949,6 +4995,11 @@ function buildLangControl(){
        loaded for the last one is not an answer for this one */
     Reader.issues = {};
     routeReader(readerHash());
+    /* …and the page itself is put into that language, which is what
+       answers for everything nobody has translated by hand. The one
+       exception is handled where the article is drawn: a piece already
+       in this language is held back so it is not translated twice. */
+    gtGo(LANG);
   };
 }
 
@@ -5487,6 +5538,73 @@ const RATIO  = { auto:0, free:0, wide:16/9, four:4/3, square:1, tall:3/4 };
 const KINDS = { p:'¶ Text', h2:'H Head', h3:'h Sub', quote:'“” Quote' };
 
 /* =====================================================================
+   Translating the page where it stands
+
+   The old site has done this for years and we spent a week proving it
+   impossible, because we were asking the wrong thing. A browser's own
+   translator will not spare a phrase inside a paragraph — four tests
+   said so. But the widget the old site uses is not the browser's
+   translator: it is a script on the page, walking the page's own tree,
+   and it honours class="notranslate" on a single word in the middle of
+   a sentence. Which is exactly what the As written button writes.
+
+   None of its switcher is wanted — the reader already has a language
+   control. What is wanted is the one call its switcher makes, so the
+   library is fetched the first time somebody asks for another language
+   and never otherwise.
+   ===================================================================== */
+const GT_LIB = 'https://cdn.gtranslate.net/widgets/latest/lib.min.js';
+/* What it can do, and what each is called in its own language, since
+   that is what somebody looking for their own language reads. */
+const GT_LANGS = {
+  ar:'\u0627\u0644\u0639\u0631\u0628\u064A\u0629', 'zh-CN':'\u4E2D\u6587', nl:'Nederlands',
+  fr:'Fran\u00e7ais', de:'Deutsch', it:'Italiano', pt:'Portugu\u00eas',
+  ru:'\u0420\u0443\u0441\u0441\u043A\u0438\u0439', es:'Espa\u00f1ol'
+};
+let gtLibP = null, gtFailed = false, gtLast = 0;
+function gtLib(){
+  if(gtLibP) return gtLibP;
+  gtLibP = new Promise((ok, no) => {
+    const el = document.createElement('script');
+    el.src = GT_LIB;
+    el.onload = () => ok(true);
+    el.onerror = () => { gtFailed = true; no(new Error('the translator could not be reached')); };
+    document.body.appendChild(el);
+  });
+  return gtLibP;
+}
+/* Put the page into a language, or back into the one it is written in.
+   Asking for English is how the widget is told to undo itself. */
+async function gtGo(code){
+  const to = (code && code !== 'en') ? code : 'en';
+  /* Choosing a language both redraws the page and asks for the
+     translation, and the redraw asks again when it is done. Asking
+     twice in the same breath is wasted work; asking again later is
+     not, because by then there are new words on the page. */
+  const now = Date.now();
+  if(now - gtLast < 400) return false;
+  gtLast = now;
+  try{
+    await gtLib();
+    if(window.__GT && __GT.translator && typeof __GT.translator.translate === 'function'){
+      __GT.translator.translate('en', to);
+      return true;
+    }
+    gtFailed = true;
+  }catch(e){ gtFailed = true; }
+  return false;
+}
+/* An article already in the language being asked for must not be
+   translated into it a second time. The widget leaves a whole element
+   alone when told to — the one thing every translator honours — so the
+   piece is held back and the magazine's own words around it are not. */
+function holdFromWidget(el, hold){
+  if(!el) return;
+  if(hold){ el.setAttribute('translate', 'no'); el.classList.add('notranslate'); }
+  else { el.removeAttribute('translate'); el.classList.remove('notranslate'); }
+}
+
+/* =====================================================================
    The same piece in another language
 
    A translation is a whole article of its own, kept inside the English
@@ -5608,7 +5726,7 @@ function detokenise(text, kept){
   return escapeHtml(String(text || '')).replace(
     new RegExp(TOK_OPEN + '\\s*(\\d+)\\s*' + TOK_SHUT, 'g'),
     (whole, n) => kept[+n - 1] !== undefined
-      ? ASIS_OPEN + kept[+n - 1] + '</span>' : whole);
+      ? ASIS_OPEN + kept[+n - 1] + ASIS_SHUT : whole);
 }
 
 /* Which languages this article can actually be read in. */
@@ -7206,7 +7324,7 @@ function toolbars(){
    --------------------------------------------------------------------- */
 const ASIS_SEL = '.' + ASIS;
 function newAsIs(){
-  const n = document.createElement('span');
+  const n = document.createElement('em');
   n.className = ASIS;
   n.setAttribute('translate', 'no');
   return n;
@@ -12278,6 +12396,9 @@ function wire(){
 /* ---------- start ---------- */
 setLang(store('jra-lang') || 'en');
 buildLangControl();
+/* A language chosen on an earlier visit is applied as soon as anything
+   is on screen; the library is only fetched if one actually was. */
+if(LANG !== 'en') later('gtboot', () => gtGo(LANG), 400);
 setSize(Number(store('jra-size')) || 1);
 const savedTheme = store('jra-theme');
 setTheme(savedTheme ? savedTheme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches);
