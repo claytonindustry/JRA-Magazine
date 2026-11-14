@@ -514,9 +514,11 @@ body{background:var(--paper)}
    and above all not the printed pages, where the PDF writer paints
    every background it finds and would set a coloured box behind every
    boat in the issue. */
+/* Highlighted while you write, and nothing more: the words are shown
+   as they are written, which is the whole point of the mark. */
 #editor .ed .notranslate,dialog .ed .notranslate{
   background:#fbf0cf;box-shadow:0 0 0 1px rgba(150,120,30,.3);
-  border-radius:3px;font-style:italic;
+  border-radius:3px;
 }
 /* The few marks worth having wherever a caption is written away from
    the writing bar — inside a dialog, which stands in front of that bar,
@@ -818,7 +820,6 @@ body{background:var(--paper)}
 #editor .alist.arts li.cur .rowtools,
 #editor .alist.arts .rowtools:focus-within{opacity:1}
 
-
 #editor details.sub{margin-top:.6rem;border-top:1px solid var(--e-line);padding-top:.5rem}
 #editor .subhead{
   margin:.9rem 0 .2rem;font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;
@@ -1014,13 +1015,53 @@ dialog .ed-cap{font-size:.95rem;min-height:2.2em}
 #editor .fig .ed-cap{font-size:.95rem;min-height:2.2em}
 /* ---------- writing a translation ----------
    The same screen as English, with the English itself a press away. */
-#editor .tonguesel{width:auto;margin:0;font-size:.85rem;padding:.25rem .4rem}
 #editor .trbar{
   display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;
   background:var(--e-panel);border:1px solid var(--e-line);border-radius:8px;
   padding:.6rem .7rem;margin:.6rem 0 .4rem;
 }
 #editor .trbar .hint{margin:0;flex:1 1 16rem;min-width:0}
+/* ---------- the translations tab ---------- */
+#editor .trlangs{display:flex;flex-direction:column;gap:.3rem;margin:.2rem 0 .6rem}
+#editor .trlang{
+  display:flex;gap:.5rem;align-items:center;padding:.35rem .5rem;
+  background:#fff;border:1px solid var(--e-line);border-radius:6px;
+}
+#editor .trlang code{font-size:.75rem;color:var(--e-muted)}
+#editor .trwhole{display:flex;gap:.6rem;flex-wrap:wrap;margin-top:.6rem}
+#editor .trwcol{
+  display:flex;flex-direction:column;gap:.2rem;padding:.4rem .6rem;
+  border:1px solid var(--e-line);border-radius:8px;background:var(--e-bg);
+}
+#editor .trwcol .hint{margin:0;font-size:.75rem}
+#editor .trgrid{
+  margin-top:.9rem;border:1px solid var(--e-line);border-radius:8px;overflow:hidden;
+  background:#fff;
+}
+#editor .trgrid .trrow{display:flex;border-bottom:1px solid var(--e-line)}
+#editor .trgrid .trrow:last-child{border-bottom:0}
+#editor .trgrid .trhead{background:var(--e-panel);font-family:var(--ui);font-size:.78rem;
+  font-weight:600;color:var(--e-muted)}
+#editor .trcell{
+  flex:1 1 0;min-width:0;padding:.45rem .6rem;border-inline-start:1px solid var(--e-line);
+  font-family:var(--ui);font-size:.8rem;text-align:center;
+}
+#editor .trcell.trname{
+  flex:2 1 0;text-align:start;border-inline-start:0;
+  display:flex;flex-direction:column;gap:.1rem;
+}
+#editor .trcell.trname .hint{margin:0;font-size:.72rem}
+#editor .trbtn{
+  background:none;cursor:pointer;color:var(--e-ink);
+  display:flex;flex-direction:column;align-items:center;gap:.1rem;
+}
+#editor .trbtn:hover{background:var(--e-bg)}
+#editor .trtick{font-size:1rem;line-height:1}
+#editor .trsaid{font-size:.68rem;color:var(--e-muted)}
+#editor .trbtn.tr-empty .trtick{color:var(--e-line)}
+#editor .trbtn.tr-written .trtick{color:var(--e-warn)}
+#editor .trbtn.tr-live .trtick{color:var(--e-accent)}
+#editor .trbtn.behind .trsaid{color:var(--e-warn);font-weight:600}
 #editor .trwhich{margin:0 0 .5rem}
 #editor .trwhich b{color:var(--e-ink)}
 #editor .trwhich.tr-live b{color:var(--e-accent)}
@@ -1151,7 +1192,6 @@ dialog .figctl .btn[aria-pressed="true"],
 #editor .blk{scroll-margin-top:7rem;scroll-margin-bottom:1rem}
 #editor .work.drag{outline:3px dashed var(--e-accent);outline-offset:-10px}
 
-
 #editor .canvas{display:flex;flex-direction:column;min-width:0;min-height:0;position:relative}
 #editor .curate{grid-area:main;display:none;flex-direction:column;min-width:0;min-height:0}
 #editor .preview{min-width:0;min-height:0;overflow:auto;background:var(--paper)}
@@ -1168,6 +1208,7 @@ body.pv-web #editor .canvas{display:none}
 #editor .split{display:none}
 body.etab-write #editor .split,
 body.etab-issue #editor .split,
+body.etab-translate #editor .split,
 body.etab-settings #editor .split{display:flex}
 body.etab-settings.spane-gallery #editor .split,
 body.etab-settings.spane-icons #editor .split{display:none}
@@ -1177,8 +1218,12 @@ body.etab-settings.spane-icons #editor .curate{display:flex}
    so the editor takes the pane. */
 body.etab-settings #editor .sp-bar,
 body.etab-settings #editor .sp-grip,
-body.etab-settings #editor .pv{display:none}
-body.etab-settings #editor .sp-panes{grid-template-columns:minmax(0,1fr)}
+body.etab-settings #editor .pv,
+body.etab-translate #editor .sp-bar,
+body.etab-translate #editor .sp-grip,
+body.etab-translate #editor .pv{display:none}
+body.etab-settings #editor .sp-panes,
+body.etab-translate #editor .sp-panes{grid-template-columns:minmax(0,1fr)}
 /* …and so does a tab whose preview is put away, which is how both of
    them start. */
 body.pv-off #editor .sp-grip,
@@ -1770,6 +1815,12 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
     <nav class="tabs" role="tablist" aria-label="Editor view">
       <button role="tab" id="tabWrite" aria-selected="true">Article Pool</button>
     </nav>
+    <!-- Translating is its own job, done to a whole issue rather than
+         to the piece in front of you, so it has its own place to be
+         rather than hanging off the article you happen to be writing. -->
+    <nav class="tabs" role="tablist" aria-label="Translations">
+      <button role="tab" id="tabTr" aria-selected="false">Translations</button>
+    </nav>
     <!-- One control, three positions: the magazine as you build it, and
          the two ways of seeing it whole. -->
     <nav class="tabs mviews" role="tablist" aria-label="The magazine">
@@ -1792,7 +1843,6 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
   </header>
 
   <div class="menu" id="brandMenu" role="menu" hidden></div>
-
 
   <aside class="side" id="side"></aside>
 
@@ -2123,7 +2173,7 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
    when the file changes. It is unrelated to the database's own VERSION,
    which governs schema upgrades and must not be moved for a cosmetic
    change. */
-const APP_VERSION = '1.36';
+const APP_VERSION = '1.37';
 
 /* Nothing is imported at the top any more. The Firebase libraries are
    several hundred kilobytes and, loaded this way, the browser must fetch
@@ -2323,13 +2373,14 @@ const faceFromEl = (n) => FACE_KEYS.find(k => n.classList.contains('ff-' + k)) |
    translates.
    --------------------------------------------------------------------- */
 const ASIS = 'notranslate';
-/* An em rather than a bare span, because the magazine has set vessel
-   names in italics for thirty years and the old site marks exactly this
-   way — <em class="notranslate">Ilvy</em>. One press now gives both
-   halves of the house style: the italic a reader sees, and the class
-   the translator reads. */
-const ASIS_OPEN = `<em class="${ASIS}" translate="no">`;
-const ASIS_SHUT = '</em>';
+/* A wrapper that changes nothing about how the words look. The
+   protection is the class, not the element — GTranslate's own switcher
+   is a plain div carrying it, to keep itself from being translated —
+   so a marked phrase is displayed exactly as it was written, upright
+   or italic as the writing says, and italics stay an independent
+   choice on their own button. */
+const ASIS_OPEN = `<span class="${ASIS}" translate="no">`;
+const ASIS_SHUT = '</span>';
 
 const esc = s => String(s == null ? '' : s)
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -2370,12 +2421,12 @@ function sanitizeInline(html){
       if(tag === 'script' || tag === 'style') return;
       const href = tag === 'a' ? safeHref(n.getAttribute('href')) : '';
       if(href) out.push(`<a href="${escapeHtml(href)}">`);
-      /* the mark is itself an em, so neither the node that carries it
-         nor anything inside it wants a second one */
+      /* The two are independent again: an imported <em class="notranslate">
+         comes through as an italic inside a mark, each keeping its own
+         job, rather than one of them quietly deciding the other. */
       const mark = asis && !inAsIs;
-      const em = italic && !mark && !inAsIs;
       if(mark) out.push(ASIS_OPEN);
-      if(em) out.push('<em>');
+      if(italic) out.push('<em>');
       if(upright) out.push('<span class="upright">');
       if(bold) out.push('<strong>');
       if(under) out.push('<u>');
@@ -2383,7 +2434,7 @@ function sanitizeInline(html){
       if(under) out.push('</u>');
       if(bold) out.push('</strong>');
       if(upright) out.push('</span>');
-      if(em) out.push('</em>');
+      if(italic) out.push('</em>');
       if(mark) out.push(ASIS_SHUT);
       if(href) out.push('</a>');
     });
@@ -3328,7 +3379,6 @@ function previewMag(){
 function pubId(a){ return a.pubId || a.id; }
 const magByNum = (n) => Object.values(State.magazines)
   .find(m => m && String(m.num) === String(n));
-
 
 /* ---------- loading and saving ---------- */
 async function loadEditorData(){
@@ -5053,7 +5103,7 @@ function setPreviewing(on){
    strict: the pool holds what is not in a magazine, the magazine holds
    what is. An address for the wrong one is not an error — it is sent to
    the tab the article actually lives in. */
-const ETABS = ['write','issue','settings'];
+const ETABS = ['write','issue','settings','translate'];
 const SPANES = ['gallery','icons','about','links','account'];
 const MVIEWS = ['edit','web','pdf'];
 /* the two whole-screen views are addresses of their own, which is what
@@ -5137,6 +5187,7 @@ function routeEditor(raw){
     tab === 'issue' && State.mview === v));
   SPANES.forEach(s => document.body.classList.toggle('spane-' + s, tab === 'settings' && State.spane === s));
   $('#tabWrite').setAttribute('aria-selected', String(tab === 'write'));
+  $('#tabTr').setAttribute('aria-selected', String(tab === 'translate'));
   $$('#editor .mviews button').forEach(b =>
     b.setAttribute('aria-selected', String(tab === 'issue' && b.dataset.mv === State.mview)));
 
@@ -6054,7 +6105,6 @@ function activeMags(){
     .sort((x, y) => (Number(y.num || 0) - Number(x.num || 0)) || (y.publishedAt || 0) - (x.publishedAt || 0));
 }
 
-
 /* ---------------------------------------------------------------------
    The magazine panel
 
@@ -6095,30 +6145,6 @@ function sideIssue(side){
     h('button', { class:'btn small', onclick: () => openMagSettings(null) }, '+ New magazine')));
   side.append(card);
 
-  /* Translating a whole issue at once: out to a sheet, and back from
-     one. Only worth showing once there is a language to translate into. */
-  if(m && tongues().length){
-    const tr = h('section', { class:'card' }, h('h2', { text:'Translating' }));
-    tr.append(h('p', { class:'hint', text:
-      'Open the sheet, translate that page in your browser, select it all, copy, '
-      + 'and paste it back here. One pass for the whole issue.' }));
-    tr.append(h('div', { class:'fp-row' },
-      h('button', { class:'btn small primary',
-        title:'Opens the whole issue as plain words, in a new tab',
-        onclick: () => window.open(location.pathname + location.search
-          + '#editor/sheet/' + (m.num || ''), '_blank', 'noopener') }, 'Translation sheet…')));
-    const langRow = h('div', { class:'fp-row' });
-    tongues().forEach(t => {
-      const c = magTongueCount(m, t.code);
-      langRow.append(h('button', { class:'btn small',
-        title:'Paste the ' + t.name + ' sheet back into this issue',
-        onclick: () => openPasteIssue(m, t.code, () => { renderSide(); renderWork();
-          renderEditorChrome(); }) },
-        'Paste ' + t.name + ' \u00b7 ' + c.done + '/' + c.all));
-    });
-    tr.append(langRow);
-    side.append(tr);
-  }
 }
 
 /* ---------------------------------------------------------------------
@@ -6758,11 +6784,150 @@ function renderWork(){
   work.style.setProperty('--mag-body', faceCss(D.bodyFace));
   work.style.setProperty('--mag-head', faceCss(D.headFace));
   if(ARTICLE_TAB(State.etab)) workArticle(work);
+  else if(State.etab === 'translate') workTranslations(work);
   else if(State.etab === 'settings'){
     if(State.spane === 'about' || State.spane === 'links') workPage(work);
     else if(State.spane === 'account') workAccount(work);
   }
 }
+
+/* =====================================================================
+   Translations, all in one place
+
+   Translating belongs to an issue rather than to the piece in front of
+   you, and it was scattered across both: a dropdown at the head of
+   every article, a card in the magazine's panel, buttons in between.
+   It is one job and it is done here.
+
+   The grid is the whole of it — every article of the open issue down
+   the side, every language across the top, and in each cell how far
+   that one has got. Pressing a cell opens that piece in that language,
+   written with every tool the English has.
+   ===================================================================== */
+const TR_MARK = { empty:'\u2013', written:'\u25CF', live:'\u2713' };
+
+function workTranslations(work){
+  const s = sheet();
+  const m = curMag();
+
+  s.append(h('h2', { style:'margin:0 0 .2rem', text:'Translations' }));
+  s.append(h('p', { class:'hint', text:
+    'A reader who chooses a language gets the page translated where it stands, '
+    + 'with anything marked As written left alone. What is written here is the '
+    + 'magazine\u2019s own translation, which is used in place of that wherever it '
+    + 'exists \u2014 so these are the issues worth doing properly.' }));
+
+  /* ---- the languages this magazine is published in ---- */
+  const langs = h('section', { class:'card' }, h('h2', { text:'Languages' }));
+  if(!tongues().length)
+    langs.append(h('p', { class:'hint', text:
+      'None yet. A language added here can be written by hand, issue by issue.' }));
+  const list = h('div', { class:'trlangs' });
+  tongues().forEach(t => {
+    const row = h('div', { class:'trlang' });
+    row.append(h('b', { text: t.name }), h('code', { text: t.code }));
+    row.append(h('span', { class:'spacer' }));
+    row.append(h('button', { class:'btn small ghost', title:'Change what readers see it called',
+      onclick: () => {
+        const was = t.name;
+        const name = (prompt('What should readers see it called?', was) || '').trim();
+        if(!name || name === was) return;
+        State.tongues = tongues().map(x => x.code === t.code ? { ...x, name } : x);
+        saveTongues(); renderWork();
+      } }, 'Rename'));
+    row.append(h('button', { class:'btn small danger', title:'Take this language off the list',
+      onclick: () => {
+        const used = Object.values(State.articles).filter(a => trHas(a, t.code)).length;
+        if(!confirm(used
+          ? `Take ${t.name} off the list?\n\n${used} article${used === 1 ? ' has' : 's have'} `
+            + 'been written in it. The words are kept and come back if the language is '
+            + 'added again, but readers will be served the page translation instead.'
+          : `Take ${t.name} off the list?`)) return;
+        State.tongues = tongues().filter(x => x.code !== t.code);
+        saveTongues();
+        if(State.tongue === t.code) State.tongue = 'en';
+        renderWork();
+      } }, 'Remove'));
+    list.append(row);
+  });
+  langs.append(list);
+  langs.append(h('div', { class:'fp-row' },
+    h('button', { class:'btn small primary', onclick: () => addTongue(true) },
+      '+ Add a language')));
+  s.append(langs);
+
+  /* ---- the issue, article by article, language by language ---- */
+  if(!m){
+    s.append(h('p', { class:'hint', text:
+      'No magazine is open. Choose one on the Magazines tab and it appears here.' }));
+    work.append(s);
+    return;
+  }
+  const arts = magArticles(m);
+  const card = h('section', { class:'card' },
+    h('h2', { text: 'Issue ' + (m.num || '\u2014') }));
+  if(!tongues().length || !arts.length){
+    card.append(h('p', { class:'hint', text: !arts.length
+      ? 'This issue has no articles in it yet.'
+      : 'Add a language above and this issue appears here, article by article.' }));
+    s.append(card);
+    work.append(s);
+    return;
+  }
+
+  /* what each language can do with this issue, whole */
+  const bar = h('div', { class:'trwhole' });
+  tongues().forEach(t => {
+    const c = magTongueCount(m, t.code);
+    const whole = c.done === c.all;
+    bar.append(h('div', { class:'trwcol' },
+      h('b', { text: t.name }),
+      h('span', { class:'hint', text: c.done + ' of ' + c.all + (whole ? ' \u2014 ready' : '') }),
+      h('button', { class:'btn small', title:'Paste a translated sheet back into this issue',
+        onclick: () => openPasteIssue(m, t.code, () => renderWork()) }, 'Paste\u2026')));
+  });
+  card.append(h('div', { class:'fp-row' },
+    h('button', { class:'btn small primary',
+      title:'Opens the whole issue as plain words, in a new tab',
+      onclick: () => window.open(location.pathname + location.search
+        + '#editor/sheet/' + (m.num || ''), '_blank', 'noopener') }, 'Translation sheet\u2026'),
+    h('span', { class:'hint', text:
+      'Translate that page in your browser, select it all, copy, and paste it back.' })));
+  card.append(bar);
+  s.append(card);
+
+  const grid = h('div', { class:'trgrid' });
+  const head = h('div', { class:'trrow trhead' });
+  head.append(h('div', { class:'trcell trname', text:'Article' }));
+  tongues().forEach(t => head.append(h('div', { class:'trcell', text: t.name })));
+  grid.append(head);
+  arts.forEach(a => {
+    const row = h('div', { class:'trrow' });
+    row.append(h('div', { class:'trcell trname' },
+      h('b', { text: a.title || 'Untitled' }),
+      h('span', { class:'hint', text: trPieceCount(a) + ' pieces' })));
+    tongues().forEach(t => {
+      const st = trState(a, t.code);
+      const behind = trBehind(a, t.code);
+      const cell = h('button', { class:'trcell trbtn tr-' + st + (behind ? ' behind' : ''),
+        type:'button',
+        title: a.title + ' \u00b7 ' + t.name + ' \u2014 ' + TR_SAID[st]
+          + (behind ? ', and the English has changed since' : ''),
+        onclick: () => {
+          State.curArticle = a.id;
+          State.tongue = t.code;
+          goEditor('editor/' + tabOf(a) + '/' + a.id);
+        } },
+        h('span', { class:'trtick', text: TR_MARK[st] }),
+        h('span', { class:'trsaid', text: behind ? 'behind' : TR_SAID[st].split(',')[0] }));
+      row.append(cell);
+    });
+    grid.append(row);
+  });
+  s.append(grid);
+  work.append(s);
+}
+const trPieceCount = (a) => englishPieces(a).length;
 
 /* Who is signed in, what the archive holds, and the jobs that belong to
    the magazine as a whole rather than to any one issue. */
@@ -6935,27 +7100,6 @@ function readSheet(text){
   return out;
 }
 
-/* ---------------------------------------------------------------------
-   Putting a translation in
-
-   The French document is a copy of the English, so its blocks stand in
-   the same order; the Nth piece of words in one is the Nth in the
-   other. Pairing them is therefore a matter of counting, and counting
-   is a thing that can be shown before it is done — which is the whole
-   point of the screen below. Nothing is changed until it is approved,
-   and a translator that merged two paragraphs shows up as a short
-   column rather than as half an article quietly in the wrong place.
-   --------------------------------------------------------------------- */
-function trTargets(a, d){
-  const out = [];
-  const src = arr(a.blocks), dst = arr(d.blocks);
-  englishPieces(a).forEach(piece => {
-    const i = src.indexOf(piece.b);
-    out.push(Object.assign({}, piece, { to: i > -1 ? dst[i] : null }));
-  });
-  return out;
-}
-
 /* A whole issue at once: the sheet comes back as one lump of words, is
    cut up at its signposts, and each article's share is shown against
    the English it would replace. Nothing is written until it is
@@ -7057,80 +7201,32 @@ function openPasteIssue(m, lang, done){
   setTimeout(() => box.focus(), 30);
 }
 
-function openPasteTranslation(a, lang, done){
-  const dlg = $('#dlgPaste');
-  const box = $('#pasteBox');
-  const where = $('#pasteMatch');
-  const go = $('#pasteGo');
-  const d = trDoc(a, lang);
-  const targets = trTargets(a, d);
+/* ---------------------------------------------------------------------
+   Putting a translation in
 
-  box.value = '';
-  where.textContent = '';
-  go.disabled = true;
-  $('#pasteNote').textContent =
-    `The English has ${targets.length} piece${targets.length === 1 ? '' : 's'} of words. `
-    + `Paste the ${tongueName(lang)} here and it will show you what goes where before changing anything.`;
-
-  let pairs = [];
-  const draw = () => {
-    const lines = pastedPieces(box.value);
-    pairs = targets.map((t, i) => ({ t, line: lines[i] }));
-    const spare = lines.slice(targets.length);
-    where.textContent = '';
-
-    if(!lines.length){ go.disabled = true; return; }
-
-    const sum = h('p', { class: 'hint pastesum' + (lines.length === targets.length ? ' ok' : ' off') });
-    sum.textContent = lines.length === targets.length
-      ? `${lines.length} pieces pasted, ${targets.length} wanted — they line up.`
-      : `${lines.length} pieces pasted, ${targets.length} wanted. `
-        + (lines.length < targets.length
-            ? 'The ones with nothing beside them will be left in English.'
-            : 'The last ' + spare.length + ' will be ignored.');
-    where.append(sum);
-
-    const list = h('div', { class:'pastelist' });
-    pairs.forEach(({ t, line }) => {
-      list.append(h('div', { class:'pasterow' + (line ? '' : ' none') },
-        h('div', { class:'kind', text: t.kind }),
-        h('div', { class:'pastepair' },
-          h('div', { class:'pasteen', text: t.tokened }),
-          h('div', { class:'pastefr', text: line || '— nothing pasted, stays English' }))));
-    });
-    where.append(list);
-    go.disabled = !pairs.some(x => x.line);
-  };
-
-  box.oninput = () => later('pastematch', draw, 150);
-  box.onpaste = () => setTimeout(draw, 0);
-
-  go.onclick = () => {
-    let n = 0;
-    pairs.forEach(({ t, line }) => {
-      if(!line || !t.to) return;
-      const words = detokenise(line, t.kept);
-      if(t.field === 'caption') t.to.caption = words;
-      else t.to.html = (t.to.t === 'h2' || t.to.t === 'h3')
-        ? escapeHtml(plainText(words)) : words;
-      n++;
-    });
-    d.fresh = undefined;
-    syncHead(d);
-    dlg.close();
-    toast(n + ' piece' + (n === 1 ? '' : 's') + ' put in. The photographs and settings are as they were.');
-    if(done) done();
-  };
-
-  if(!dlg.open) dlg.showModal();
-  setTimeout(() => box.focus(), 30);
+   The French document is a copy of the English, so its blocks stand in
+   the same order; the Nth piece of words in one is the Nth in the
+   other. Pairing them is therefore a matter of counting, and counting
+   is a thing that can be shown before it is done — which is the whole
+   point of the screen below. Nothing is changed until it is approved,
+   and a translator that merged two paragraphs shows up as a short
+   column rather than as half an article quietly in the wrong place.
+   --------------------------------------------------------------------- */
+function trTargets(a, d){
+  const out = [];
+  const src = arr(a.blocks), dst = arr(d.blocks);
+  englishPieces(a).forEach(piece => {
+    const i = src.indexOf(piece.b);
+    out.push(Object.assign({}, piece, { to: i > -1 ? dst[i] : null }));
+  });
+  return out;
 }
 
 /* Adding a language. A code, because that is what a browser and a
    search engine are told, and a name, because that is what a reader
    picks from. Any language at all: the list is the magazine's, not
    this file's. */
-function addTongue(){
+function addTongue(stay){
   const code = (prompt('A two-letter code for the language — fr, de, es, zh…') || '')
     .trim().toLowerCase();
   if(!code) return;
@@ -7146,9 +7242,9 @@ function addTongue(){
   if(!name) return;
   State.tongues = tongues().concat([{ code, name, rtl: RTL_LANGS.includes(code) || undefined }]);
   saveTongues();
-  State.tongue = code;
+  if(!stay) State.tongue = code;
   renderWork();
-  toast(name + ' added. Copy the English, translate it, and paste it in.');
+  toast(name + ' added.');
 }
 
 function workArticle(work){
@@ -7179,93 +7275,44 @@ function workArticle(work){
     saveArticle(a, { fast:true });
     renderSide(); relayout();
   };
-  /* Which language this half is writing. English is the article; every
-     other choice is that language's own version of it, written with the
-     same tools and holding its own photographs. */
-  const tongue = h('select', { class:'tonguesel', 'aria-label':'Language' });
-  const fillTongues = () => {
-    tongue.textContent = '';
-    tongue.append(h('option', { value:'en', text:'English — the article' }));
-    tongues().forEach(t => tongue.append(h('option', { value:t.code,
-      text: t.name + ' · ' + TR_SAID[trState(a, t.code)] })));
-    tongue.append(h('option', { value:'+', text:'Add a language…' }));
-    tongue.value = State.tongue;
-  };
-  fillTongues();
-  tongue.onchange = () => {
-    if(tongue.value === '+'){ tongue.value = State.tongue; addTongue(); return; }
-    State.tongue = tongue.value;
-    renderWork();
-  };
-
   head.append(h('div', { class:'row' },
     h('label', { class:'check' }, newPage, ' Start on a new page'),
     h('label', { class:'check', title:'Read on the web, left out of the printed issue' },
-      webOnly, ' Online only'),
-    h('span', { class:'spacer' }), tongue));
+      webOnly, ' Online only')));
   s.append(head);
 
-  /* Writing a translation. The one thing this screen needs that the
-     English one does not is the English itself, on the clipboard. */
+  /* Writing a translation rather than the article itself. Everything
+     about translating lives on its own tab now; what is left here is a
+     line saying which language this is, and the way back — because
+     from here it looks exactly like writing an article, which is the
+     point, and that is precisely when you want telling. */
   if(State.tongue !== 'en'){
     const lang = State.tongue;
+    const d = trDoc(a, lang);
+    ensureHead(d);
     const bar = h('div', { class:'trbar' });
-    const copy = h('button', { class:'btn primary', type:'button',
-      text:'Copy the English' });
+    bar.append(h('b', { text: tongueName(lang) }));
+    bar.append(h('span', { class:'hint', text:
+      'You are writing this piece in ' + tongueName(lang) + '. The English is untouched, '
+      + 'and so are the photographs — only the words want changing.' }));
+    bar.append(h('span', { class:'spacer' }));
+    const copy = h('button', { class:'btn small', type:'button', text:'Copy the English' });
     copy.onclick = async () => {
       const words = englishText(a);
       if(!words){ toast('There is nothing written in this article yet.'); return; }
       try{
         await navigator.clipboard.writeText(words);
-        copy.textContent = 'Copied — now translate it';
-        setTimeout(() => { copy.textContent = 'Copy the English'; }, 2000);
-      }catch(e){
-        toast('This browser would not hand over the clipboard. Open the English and copy it by hand.');
-      }
+        copy.textContent = 'Copied';
+        setTimeout(() => { copy.textContent = 'Copy the English'; }, 1600);
+      }catch(e){ toast('This browser would not hand over the clipboard.'); }
     };
     bar.append(copy);
-    const paste = h('button', { class:'btn', type:'button',
-      text:'Paste the translation…' });
-    paste.onclick = () => openPasteTranslation(a, lang, () => {
-      saveArticle(a, { fast:true });
-      renderWork();
-    });
-    bar.append(paste);
-    bar.append(h('span', { class:'hint', text:
-      'This is the English article with its photographs, crops and settings already in '
-      + 'place — only the words want changing. Copy them, translate them anywhere, and '
-      + 'paste the whole thing back.' }));
+    bar.append(h('button', { class:'btn small', type:'button',
+      onclick: () => { State.tongue = 'en'; renderWork(); } }, 'Back to the English'));
+    bar.append(h('button', { class:'btn small primary', type:'button',
+      onclick: () => goEditor('editor/translate') }, 'Translations'));
     s.append(bar);
-    const d = trDoc(a, lang);
-    ensureHead(d);
-    /* Where this language has got to, said without euphemism. Written
-       is not published: an issue already on the shelf has to be sent
-       again before anybody can read the French of it. */
-    const state = trState(a, lang);
-    const mag = a.magazine && State.magazines[a.magazine];
-    /* An issue goes out in a language whole or not at all, so what
-       stands between this piece and a reader is usually the other
-       pieces beside it. Say which, and how many. */
-    const tally = mag ? magTongueCount(mag, lang) : null;
-    const said = state === 'empty'
-      ? 'Readers see this piece in English. It still reads as the English copy it was made from.'
-      : state === 'live'
-        ? 'Readers who choose ' + tongueName(lang) + ' get this.'
-        : !mag
-          ? 'This piece is in the pool; it goes out when its issue does.'
-          : tally.done < tally.all
-            ? `Issue ${mag.num || '—'} needs all ${tally.all} of its articles in `
-              + `${tongueName(lang)} before it can go out in it — ${tally.done} done, `
-              + `${tally.all - tally.done} to go: ` + tally.missing.map(x => '“' +
-                (x.title || 'Untitled') + '”').join(', ') + '.'
-            : !mag.published
-              ? 'Every article is written. Publish issue ' + (mag.num || '—') + ' and it goes out.'
-              : 'Every article is written. Issue ' + (mag.num || '—')
-                + ' is on the shelf: press Publish correction to send it.';
-    const behind = trBehind(a, lang);
-    s.append(h('p', { class:'hint trwhich tr-' + state },
-      h('b', { text: tongueName(lang) + ' · ' + TR_SAID[state] + '. ' }), said));
-    if(behind) s.append(h('p', { class:'hint trbehind' },
+    if(trBehind(a, lang)) s.append(h('p', { class:'hint trbehind' },
       h('b', { text:'The English has changed since this was copied. ' }),
       'Something has been written, moved or added to it that is not here.'));
   }
@@ -7324,7 +7371,7 @@ function toolbars(){
    --------------------------------------------------------------------- */
 const ASIS_SEL = '.' + ASIS;
 function newAsIs(){
-  const n = document.createElement('em');
+  const n = document.createElement('span');
   n.className = ASIS;
   n.setAttribute('translate', 'no');
   return n;
@@ -9240,7 +9287,6 @@ function openPlaceSheet(cands, after){
     body.append(row);
   });
 
-
   /* one width and alignment for everything on the sheet */
   const ctl = $('#placeCtl');
   ctl.textContent = '';
@@ -10654,7 +10700,6 @@ function coverBox(m, G, which){
            width: Math.round(p.w * G.pageW) };
 }
 const boxStyle = (b) => `left:${b.left}px;top:${b.top}px;width:${b.width}px`;
-
 
 /* There was a second cover once — a framed one, with the photograph
    inset and the masthead in a ruled box above it. It is gone, and with
@@ -12191,6 +12236,7 @@ function wire(){
   /* Each tab keeps its own article, so the buttons need carry nothing:
      the bare address is read as "whatever that tab had open". */
   $('#tabWrite').onclick = () => { goEditor('editor/write'); };
+  $('#tabTr').onclick = () => { goEditor('editor/translate'); };
   /* …and the magazine's three positions are three addresses, so a
      reload comes back to the one you were looking at. */
   $('#tabIssue').onclick = () => { goEditor('editor/issue'); };
@@ -12416,10 +12462,6 @@ if(FIREBASE.apiKey === 'PASTE'){
   route();
   if(location.hash.replace(/^#/, '').startsWith('editor') || store(KNOWN_EDITOR)) startAuth();
 }
-
-
-
-
 
 </script>
 </body>
