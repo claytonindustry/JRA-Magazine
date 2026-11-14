@@ -1021,60 +1021,52 @@ dialog .ed-cap{font-size:.95rem;min-height:2.2em}
   padding:.6rem .7rem;margin:.6rem 0 .4rem;
 }
 #editor .trbar .hint{margin:0;flex:1 1 16rem;min-width:0}
-/* ---------- the translations tab ---------- */
-#editor .trlangs{display:flex;flex-direction:column;gap:.3rem;margin:.2rem 0 .6rem}
-#editor .trlang{
+/* ---------- translating, inside a magazine's settings ---------- */
+dialog#dlgTr{max-width:min(52rem,96vw)}
+#editor .trlangs,dialog .trlangs{display:flex;flex-direction:column;gap:.3rem;margin:.2rem 0 .6rem}
+#editor .trlang,dialog .trlang{
   display:flex;gap:.5rem;align-items:center;padding:.35rem .5rem;
   background:#fff;border:1px solid var(--e-line);border-radius:6px;
 }
-#editor .trlang code{font-size:.75rem;color:var(--e-muted)}
-#editor .trwhole{display:flex;gap:.6rem;flex-wrap:wrap;margin-top:.6rem}
-#editor .trwcol{
+#editor .trlang code,dialog .trlang code{font-size:.75rem;color:var(--e-muted)}
+#editor .trwhole,dialog .trwhole{display:flex;gap:.6rem;flex-wrap:wrap;margin-top:.6rem}
+#editor .trwcol,dialog .trwcol{
   display:flex;flex-direction:column;gap:.2rem;padding:.4rem .6rem;
   border:1px solid var(--e-line);border-radius:8px;background:var(--e-bg);
 }
-#editor .trwcol .hint{margin:0;font-size:.75rem}
-#editor .trgrid{
+#editor .trwcol .hint,dialog .trwcol .hint{margin:0;font-size:.75rem}
+#editor .trgrid,dialog .trgrid{
   margin-top:.9rem;border:1px solid var(--e-line);border-radius:8px;overflow:hidden;
   background:#fff;
 }
-#editor .trgrid .trrow{display:flex;border-bottom:1px solid var(--e-line)}
-#editor .trgrid .trrow:last-child{border-bottom:0}
-#editor .trgrid .trhead{background:var(--e-panel);font-family:var(--ui);font-size:.78rem;
+#editor .trgrid .trrow,dialog .trgrid .trrow{display:flex;border-bottom:1px solid var(--e-line)}
+#editor .trgrid .trrow:last-child,dialog .trgrid .trrow:last-child{border-bottom:0}
+#editor .trgrid .trhead,dialog .trgrid .trhead{background:var(--e-panel);font-family:var(--ui);font-size:.78rem;
   font-weight:600;color:var(--e-muted)}
-#editor .trcell{
+#editor .trcell,dialog .trcell{
   flex:1 1 0;min-width:0;padding:.45rem .6rem;border-inline-start:1px solid var(--e-line);
   font-family:var(--ui);font-size:.8rem;text-align:center;
 }
-#editor .trcell.trname{
+#editor .trcell.trname,dialog .trcell.trname{
   flex:2 1 0;text-align:start;border-inline-start:0;
   display:flex;flex-direction:column;gap:.1rem;
 }
-#editor .trcell.trname .hint{margin:0;font-size:.72rem}
-#editor .trbtn{
+#editor .trcell.trname .hint,dialog .trcell.trname .hint{margin:0;font-size:.72rem}
+#editor .trbtn,dialog .trbtn{
   background:none;cursor:pointer;color:var(--e-ink);
   display:flex;flex-direction:column;align-items:center;gap:.1rem;
 }
-#editor .trbtn:hover{background:var(--e-bg)}
-#editor .trtick{font-size:1rem;line-height:1}
-#editor .trsaid{font-size:.68rem;color:var(--e-muted)}
-#editor .trbtn.tr-empty .trtick{color:var(--e-line)}
-#editor .trbtn.tr-written .trtick{color:var(--e-warn)}
-#editor .trbtn.tr-live .trtick{color:var(--e-accent)}
-#editor .trbtn.behind .trsaid{color:var(--e-warn);font-weight:600}
+#editor .trbtn:hover,dialog .trbtn:hover{background:var(--e-bg)}
+#editor .trtick,dialog .trtick{font-size:1rem;line-height:1}
+#editor .trsaid,dialog .trsaid{font-size:.68rem;color:var(--e-muted)}
+#editor .trbtn.tr-empty .trtick,dialog .trbtn.tr-empty .trtick{color:var(--e-line)}
+#editor .trbtn.tr-written .trtick,dialog .trbtn.tr-written .trtick{color:var(--e-warn)}
+#editor .trbtn.tr-live .trtick,dialog .trbtn.tr-live .trtick{color:var(--e-accent)}
+#editor .trbtn.behind .trsaid,dialog .trbtn.behind .trsaid{color:var(--e-warn);font-weight:600}
 #editor .trwhich{margin:0 0 .5rem}
 #editor .trwhich b{color:var(--e-ink)}
 #editor .trwhich.tr-live b{color:var(--e-accent)}
 #editor .trwhich.tr-written b{color:var(--e-warn)}
-/* which languages this issue holds, beside the publish buttons */
-#editor .tonguesay{display:flex;gap:.3rem;align-items:center;flex-wrap:wrap}
-#editor .tongue-chip{
-  font-family:var(--ui);font-size:.72rem;padding:.1rem .4rem;border-radius:999px;
-  border:1px solid var(--e-line);color:var(--e-warn);background:var(--e-panel);
-  white-space:nowrap;
-}
-#editor .tongue-chip.on{color:var(--e-accent);border-color:var(--e-accent)}
-#editor .tongue-chip.ready{color:var(--e-ink);border-color:var(--e-ink)}
 #editor .trbehind{margin:-.3rem 0 .6rem;color:var(--e-warn)}
 /* pasting a whole translation, shown against the English first */
 dialog#dlgPaste{max-width:min(46rem,96vw)}
@@ -1208,7 +1200,6 @@ body.pv-web #editor .canvas{display:none}
 #editor .split{display:none}
 body.etab-write #editor .split,
 body.etab-issue #editor .split,
-body.etab-translate #editor .split,
 body.etab-settings #editor .split{display:flex}
 body.etab-settings.spane-gallery #editor .split,
 body.etab-settings.spane-icons #editor .split{display:none}
@@ -1218,12 +1209,8 @@ body.etab-settings.spane-icons #editor .curate{display:flex}
    so the editor takes the pane. */
 body.etab-settings #editor .sp-bar,
 body.etab-settings #editor .sp-grip,
-body.etab-settings #editor .pv,
-body.etab-translate #editor .sp-bar,
-body.etab-translate #editor .sp-grip,
-body.etab-translate #editor .pv{display:none}
-body.etab-settings #editor .sp-panes,
-body.etab-translate #editor .sp-panes{grid-template-columns:minmax(0,1fr)}
+body.etab-settings #editor .pv{display:none}
+body.etab-settings #editor .sp-panes{grid-template-columns:minmax(0,1fr)}
 /* …and so does a tab whose preview is put away, which is how both of
    them start. */
 body.pv-off #editor .sp-grip,
@@ -1815,12 +1802,6 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
     <nav class="tabs" role="tablist" aria-label="Editor view">
       <button role="tab" id="tabWrite" aria-selected="true">Article Pool</button>
     </nav>
-    <!-- Translating is its own job, done to a whole issue rather than
-         to the piece in front of you, so it has its own place to be
-         rather than hanging off the article you happen to be writing. -->
-    <nav class="tabs" role="tablist" aria-label="Translations">
-      <button role="tab" id="tabTr" aria-selected="false">Translations</button>
-    </nav>
     <!-- One control, three positions: the magazine as you build it, and
          the two ways of seeing it whole. -->
     <nav class="tabs mviews" role="tablist" aria-label="The magazine">
@@ -1829,9 +1810,6 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
       <button role="tab" id="tabPdf" data-mv="pdf" aria-selected="false">PDF</button>
     </nav>
     <div class="where" id="whereLabel"></div>
-    <!-- Which languages this issue holds, and whether they have been
-         sent. Beside the publish buttons, where the question arises. -->
-    <div class="tonguesay" id="tongueSay" hidden></div>
     <div class="spacer"></div>
     <span class="status" id="status" aria-live="polite"></span>
     <button class="btn primary" id="btnPublish" hidden>Publish…</button>
@@ -2025,6 +2003,16 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
   </form>
 </dialog>
 
+<!-- Translating an issue: its languages, its sheet, and how far each
+     language has got through its articles. -->
+<dialog id="dlgTr">
+  <form method="dialog">
+    <h3 id="trTitle">Translating</h3>
+    <div id="trBody"></div>
+    <div class="fp-row"><button class="btn primary" value="ok">Done</button></div>
+  </form>
+</dialog>
+
 <!-- A whole translation, pasted in one go, shown against the English
      it would replace before anything is changed. -->
 <dialog id="dlgPaste">
@@ -2173,7 +2161,7 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
    when the file changes. It is unrelated to the database's own VERSION,
    which governs schema upgrades and must not be moved for a cosmetic
    change. */
-const APP_VERSION = '1.37';
+const APP_VERSION = '1.38';
 
 /* Nothing is imported at the top any more. The Firebase libraries are
    several hundred kilobytes and, loaded this way, the browser must fetch
@@ -5103,7 +5091,7 @@ function setPreviewing(on){
    strict: the pool holds what is not in a magazine, the magazine holds
    what is. An address for the wrong one is not an error — it is sent to
    the tab the article actually lives in. */
-const ETABS = ['write','issue','settings','translate'];
+const ETABS = ['write','issue','settings'];
 const SPANES = ['gallery','icons','about','links','account'];
 const MVIEWS = ['edit','web','pdf'];
 /* the two whole-screen views are addresses of their own, which is what
@@ -5187,7 +5175,6 @@ function routeEditor(raw){
     tab === 'issue' && State.mview === v));
   SPANES.forEach(s => document.body.classList.toggle('spane-' + s, tab === 'settings' && State.spane === s));
   $('#tabWrite').setAttribute('aria-selected', String(tab === 'write'));
-  $('#tabTr').setAttribute('aria-selected', String(tab === 'translate'));
   $$('#editor .mviews button').forEach(b =>
     b.setAttribute('aria-selected', String(tab === 'issue' && b.dataset.mv === State.mview)));
 
@@ -6000,37 +5987,7 @@ function renderEditorChrome(){
       ? 'Sends this issue again as it reads here, in place of the one on the shelf'
       : 'Nothing has changed since this issue was published';
   }
-  sayTongues(m, onIssue);
   document.title = (where ? where + ' — ' : '') + 'JRA Magazine';
-}
-
-/* What languages this issue holds, and which of them are on the shelf.
-   It sits beside the publish buttons because that is where the question
-   is asked: a language written but not sent reads to nobody, and there
-   was nothing anywhere that said so. */
-function sayTongues(m, onIssue){
-  const bar = $('#tongueSay');
-  if(!bar) return;
-  /* Every language anybody has started on, whether or not the issue is
-     ready to go out in it — the point is to see how far each has got. */
-  const started = (onIssue && m && tongues().length)
-    ? tongues().map(t => t.code).filter(c => magTongueCount(m, c).done) : [];
-  if(!started.length){ bar.hidden = true; return; }
-  const live = arr(m.publishedLangs), stale = magIsStale(m);
-  bar.hidden = false;
-  bar.textContent = '';
-  bar.append(h('span', { class:'boxlab inline', text:'Languages' }));
-  started.forEach(c => {
-    const t = magTongueCount(m, c);
-    const whole = t.done === t.all;
-    const on = whole && m.published && live.includes(c) && !stale;
-    bar.append(h('span', { class:'tongue-chip' + (on ? ' on' : whole ? ' ready' : ''),
-      title: on ? tongueName(c) + ' is on the shelf'
-        : !whole ? t.missing.map(x => x.title || 'Untitled').join(', ') + ' still to translate'
-        : m.published ? tongueName(c) + ' is written but not yet sent — press Publish correction'
-                      : tongueName(c) + ' goes out when this issue is published' },
-      tongueName(c) + (on ? ' ✓' : whole ? ' · not sent' : ` · ${t.done} of ${t.all}`)));
-  });
 }
 
 /* ---------- the sidebar ----------
@@ -6315,6 +6272,25 @@ function openMagSettings(existing){
   $('#magSetGo').onclick = () => {};
 
   /* ---- the cover ---- */
+  /* Translating belongs to the magazine, so it is one of its settings —
+     a press rather than a panel, because the grid wants more width than
+     this window has and nobody opens settings to translate by accident. */
+  body.append(h('h3', { class:'subhead', text:'Translating' }));
+  if(making){
+    body.append(h('p', { class:'hint', text:
+      'Once this magazine exists and has articles in it, this is where they are translated.' }));
+  }else{
+    const tally = tongues().map(t => {
+      const c = magTongueCount(m, t.code);
+      return t.name + ' ' + c.done + '/' + c.all;
+    }).join(' \u00b7 ');
+    body.append(h('div', { class:'fp-row' },
+      h('button', { class:'btn', type:'button',
+        onclick: () => openMagTranslations(m) }, 'Translations\u2026'),
+      h('span', { class:'hint', text: tally ||
+        'No languages yet \u2014 readers get the page translated as it stands.' })));
+  }
+
   body.append(h('h3', { class:'subhead', text:'Cover' }));
   const thumb = h('div', { class:'cover-thumb' });
   const cover = m.cover && State.images[m.cover];
@@ -6784,7 +6760,6 @@ function renderWork(){
   work.style.setProperty('--mag-body', faceCss(D.bodyFace));
   work.style.setProperty('--mag-head', faceCss(D.headFace));
   if(ARTICLE_TAB(State.etab)) workArticle(work);
-  else if(State.etab === 'translate') workTranslations(work);
   else if(State.etab === 'settings'){
     if(State.spane === 'about' || State.spane === 'links') workPage(work);
     else if(State.spane === 'account') workAccount(work);
@@ -6792,109 +6767,102 @@ function renderWork(){
 }
 
 /* =====================================================================
-   Translations, all in one place
+   Translating an issue
 
-   Translating belongs to an issue rather than to the piece in front of
-   you, and it was scattered across both: a dropdown at the head of
-   every article, a card in the magazine's panel, buttons in between.
-   It is one job and it is done here.
+   Translating belongs to the magazine, not to the piece in front of
+   you, so it is one of the magazine's own settings \u2014 opened with the
+   issue, showing that issue's articles and how far each language has
+   got through them.
 
-   The grid is the whole of it — every article of the open issue down
-   the side, every language across the top, and in each cell how far
-   that one has got. Pressing a cell opens that piece in that language,
-   written with every tool the English has.
+   The grid is the whole of it: every article down the side, every
+   language across the top. Pressing a cell opens that piece in that
+   language, written with every tool the English has.
    ===================================================================== */
 const TR_MARK = { empty:'\u2013', written:'\u25CF', live:'\u2713' };
 
-function workTranslations(work){
-  const s = sheet();
-  const m = curMag();
+function openMagTranslations(m){
+  const dlg = $('#dlgTr');
+  const body = $('#trBody');
+  body.textContent = '';
+  $('#trTitle').textContent = 'Translating issue ' + (m.num || '\u2014');
+  body.append(h('p', { class:'hint', text:
+    'A reader who chooses a language gets the page translated where it stands, with '
+    + 'anything marked As written left alone. What is written here is the magazine\u2019s '
+    + 'own translation, used in place of that wherever it exists \u2014 so these are the '
+    + 'issues worth doing properly.' }));
 
-  s.append(h('h2', { style:'margin:0 0 .2rem', text:'Translations' }));
-  s.append(h('p', { class:'hint', text:
-    'A reader who chooses a language gets the page translated where it stands, '
-    + 'with anything marked As written left alone. What is written here is the '
-    + 'magazine\u2019s own translation, which is used in place of that wherever it '
-    + 'exists \u2014 so these are the issues worth doing properly.' }));
+  /* ---- the languages the magazine is published in ---- */
+  const langs = h('div', { class:'trlangs' });
+  const draw = () => {
+    langs.textContent = '';
+    if(!tongues().length)
+      langs.append(h('p', { class:'hint', text:
+        'No languages yet. One added here can be written by hand, issue by issue.' }));
+    tongues().forEach(t => {
+      const row = h('div', { class:'trlang' });
+      row.append(h('b', { text: t.name }), h('code', { text: t.code }));
+      row.append(h('span', { class:'spacer' }));
+      row.append(h('button', { class:'btn small ghost', type:'button',
+        title:'Change what readers see it called',
+        onclick: () => {
+          const name = (prompt('What should readers see it called?', t.name) || '').trim();
+          if(!name || name === t.name) return;
+          State.tongues = tongues().map(x => x.code === t.code ? { ...x, name } : x);
+          saveTongues(); again();
+        } }, 'Rename'));
+      row.append(h('button', { class:'btn small danger', type:'button',
+        title:'Take this language off the list',
+        onclick: () => {
+          const used = Object.values(State.articles).filter(a => trHas(a, t.code)).length;
+          if(!confirm(used
+            ? `Take ${t.name} off the list?\n\n${used} article${used === 1 ? ' has' : 's have'} `
+              + 'been written in it. The words are kept and come back if the language is '
+              + 'added again, but readers will be served the page translation instead.'
+            : `Take ${t.name} off the list?`)) return;
+          State.tongues = tongues().filter(x => x.code !== t.code);
+          saveTongues();
+          if(State.tongue === t.code) State.tongue = 'en';
+          again();
+        } }, 'Remove'));
+      langs.append(row);
+    });
+    langs.append(h('div', { class:'fp-row' },
+      h('button', { class:'btn small primary', type:'button',
+        onclick: () => { addTongue(true); again(); } }, '+ Add a language')));
+  };
+  /* rebuilt rather than patched, since adding a language changes every
+     row of the grid below it */
+  const again = () => openMagTranslations(m);
+  draw();
+  body.append(langs);
 
-  /* ---- the languages this magazine is published in ---- */
-  const langs = h('section', { class:'card' }, h('h2', { text:'Languages' }));
-  if(!tongues().length)
-    langs.append(h('p', { class:'hint', text:
-      'None yet. A language added here can be written by hand, issue by issue.' }));
-  const list = h('div', { class:'trlangs' });
-  tongues().forEach(t => {
-    const row = h('div', { class:'trlang' });
-    row.append(h('b', { text: t.name }), h('code', { text: t.code }));
-    row.append(h('span', { class:'spacer' }));
-    row.append(h('button', { class:'btn small ghost', title:'Change what readers see it called',
-      onclick: () => {
-        const was = t.name;
-        const name = (prompt('What should readers see it called?', was) || '').trim();
-        if(!name || name === was) return;
-        State.tongues = tongues().map(x => x.code === t.code ? { ...x, name } : x);
-        saveTongues(); renderWork();
-      } }, 'Rename'));
-    row.append(h('button', { class:'btn small danger', title:'Take this language off the list',
-      onclick: () => {
-        const used = Object.values(State.articles).filter(a => trHas(a, t.code)).length;
-        if(!confirm(used
-          ? `Take ${t.name} off the list?\n\n${used} article${used === 1 ? ' has' : 's have'} `
-            + 'been written in it. The words are kept and come back if the language is '
-            + 'added again, but readers will be served the page translation instead.'
-          : `Take ${t.name} off the list?`)) return;
-        State.tongues = tongues().filter(x => x.code !== t.code);
-        saveTongues();
-        if(State.tongue === t.code) State.tongue = 'en';
-        renderWork();
-      } }, 'Remove'));
-    list.append(row);
-  });
-  langs.append(list);
-  langs.append(h('div', { class:'fp-row' },
-    h('button', { class:'btn small primary', onclick: () => addTongue(true) },
-      '+ Add a language')));
-  s.append(langs);
-
-  /* ---- the issue, article by article, language by language ---- */
-  if(!m){
-    s.append(h('p', { class:'hint', text:
-      'No magazine is open. Choose one on the Magazines tab and it appears here.' }));
-    work.append(s);
-    return;
-  }
   const arts = magArticles(m);
-  const card = h('section', { class:'card' },
-    h('h2', { text: 'Issue ' + (m.num || '\u2014') }));
-  if(!tongues().length || !arts.length){
-    card.append(h('p', { class:'hint', text: !arts.length
-      ? 'This issue has no articles in it yet.'
-      : 'Add a language above and this issue appears here, article by article.' }));
-    s.append(card);
-    work.append(s);
+  if(!tongues().length) return;
+  if(!arts.length){
+    body.append(h('p', { class:'hint', text:'This issue has no articles in it yet.' }));
     return;
   }
 
-  /* what each language can do with this issue, whole */
+  body.append(h('div', { class:'fp-row' },
+    h('button', { class:'btn small primary', type:'button',
+      title:'Opens the whole issue as plain words, in a new tab',
+      onclick: () => window.open(location.pathname + location.search
+        + '#editor/sheet/' + (m.num || ''), '_blank', 'noopener') }, 'Translation sheet\u2026')));
+  body.append(h('p', { class:'hint', text:
+    'Translate that page in your browser, select it all, copy, and paste it back below.' }));
+
   const bar = h('div', { class:'trwhole' });
   tongues().forEach(t => {
     const c = magTongueCount(m, t.code);
-    const whole = c.done === c.all;
     bar.append(h('div', { class:'trwcol' },
       h('b', { text: t.name }),
-      h('span', { class:'hint', text: c.done + ' of ' + c.all + (whole ? ' \u2014 ready' : '') }),
-      h('button', { class:'btn small', title:'Paste a translated sheet back into this issue',
-        onclick: () => openPasteIssue(m, t.code, () => renderWork()) }, 'Paste\u2026')));
+      h('span', { class:'hint', text: c.done + ' of ' + c.all
+        + (c.done === c.all ? ' \u2014 ready' : '') }),
+      h('button', { class:'btn small', type:'button',
+        title:'Paste a translated sheet back into this issue',
+        onclick: () => openPasteIssue(m, t.code, again) }, 'Paste\u2026')));
   });
-  card.append(h('div', { class:'fp-row' },
-    h('button', { class:'btn small primary',
-      title:'Opens the whole issue as plain words, in a new tab',
-      onclick: () => window.open(location.pathname + location.search
-        + '#editor/sheet/' + (m.num || ''), '_blank', 'noopener') }, 'Translation sheet\u2026'),
-    h('span', { class:'hint', text:
-      'Translate that page in your browser, select it all, copy, and paste it back.' })));
-  card.append(bar);
-  s.append(card);
+  body.append(bar);
 
   const grid = h('div', { class:'trgrid' });
   const head = h('div', { class:'trrow trhead' });
@@ -6905,29 +6873,30 @@ function workTranslations(work){
     const row = h('div', { class:'trrow' });
     row.append(h('div', { class:'trcell trname' },
       h('b', { text: a.title || 'Untitled' }),
-      h('span', { class:'hint', text: trPieceCount(a) + ' pieces' })));
+      h('span', { class:'hint', text: englishPieces(a).length + ' pieces' })));
     tongues().forEach(t => {
       const st = trState(a, t.code);
       const behind = trBehind(a, t.code);
-      const cell = h('button', { class:'trcell trbtn tr-' + st + (behind ? ' behind' : ''),
+      row.append(h('button', { class:'trcell trbtn tr-' + st + (behind ? ' behind' : ''),
         type:'button',
-        title: a.title + ' \u00b7 ' + t.name + ' \u2014 ' + TR_SAID[st]
+        title: (a.title || 'Untitled') + ' \u00b7 ' + t.name + ' \u2014 ' + TR_SAID[st]
           + (behind ? ', and the English has changed since' : ''),
         onclick: () => {
+          dlg.close();
+          $('#dlgMagSet').close();
           State.curArticle = a.id;
           State.tongue = t.code;
           goEditor('editor/' + tabOf(a) + '/' + a.id);
         } },
         h('span', { class:'trtick', text: TR_MARK[st] }),
-        h('span', { class:'trsaid', text: behind ? 'behind' : TR_SAID[st].split(',')[0] }));
-      row.append(cell);
+        h('span', { class:'trsaid', text: behind ? 'behind' : TR_SAID[st].split(',')[0] })));
     });
     grid.append(row);
   });
-  s.append(grid);
-  work.append(s);
+  body.append(grid);
+
+  if(!dlg.open) dlg.showModal();
 }
-const trPieceCount = (a) => englishPieces(a).length;
 
 /* Who is signed in, what the archive holds, and the jobs that belong to
    the magazine as a whole rather than to any one issue. */
@@ -12236,7 +12205,6 @@ function wire(){
   /* Each tab keeps its own article, so the buttons need carry nothing:
      the bare address is read as "whatever that tab had open". */
   $('#tabWrite').onclick = () => { goEditor('editor/write'); };
-  $('#tabTr').onclick = () => { goEditor('editor/translate'); };
   /* …and the magazine's three positions are three addresses, so a
      reload comes back to the one you were looking at. */
   $('#tabIssue').onclick = () => { goEditor('editor/issue'); };
