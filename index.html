@@ -2241,7 +2241,7 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
    when the file changes. It is unrelated to the database's own VERSION,
    which governs schema upgrades and must not be moved for a cosmetic
    change. */
-const APP_VERSION = '1.40';
+const APP_VERSION = '1.41';
 
 /* Nothing is imported at the top any more. The Firebase libraries are
    several hundred kilobytes and, loaded this way, the browser must fetch
@@ -2329,19 +2329,44 @@ async function restGet(path){
    Loaded once, the first time somebody signs in or writes something.
    Everything the editor needs hangs off this one promise. */
 let sdkP = null;
+/* How long the sign-in library is given to arrive before the editor
+   stops waiting and says so. Generous: a slow connection should be let
+   through, and only a fetch that is never coming should be called off. */
+const SDK_WAIT = 20000;
+
 function firebase(){
   if(sdkP) return sdkP;
   sdkP = (async () => {
-    const [appM, authM, dbM] = await Promise.all([
-      import(SDK + 'firebase-app.js'),
-      import(SDK + 'firebase-auth.js'),
-      import(SDK + 'firebase-database.js')
-    ]);
-    const app = appM.initializeApp(FIREBASE);
-    return Object.assign({}, authM, dbM, {
-      app, auth: authM.getAuth(app), db: dbM.getDatabase(app)
+    /* A fetch that hangs is worse than one that fails. A failure is
+       caught and said out loud; a hang leaves the sign-in box disabled,
+       waiting on something that is never coming, with nothing written
+       anywhere to say what went wrong. So it is given a limit. */
+    let bell;
+    const tooLong = new Promise((_, no) => {
+      bell = setTimeout(() => no(new Error(
+        'it did not arrive within ' + Math.round(SDK_WAIT / 1000)
+        + ' seconds. Check the connection and try again.')), SDK_WAIT);
     });
+    try{
+      const [appM, authM, dbM] = await Promise.race([
+        Promise.all([
+          import(SDK + 'firebase-app.js'),
+          import(SDK + 'firebase-auth.js'),
+          import(SDK + 'firebase-database.js')
+        ]),
+        tooLong
+      ]);
+      const app = appM.initializeApp(FIREBASE);
+      return Object.assign({}, authM, dbM, {
+        app, auth: authM.getAuth(app), db: dbM.getDatabase(app)
+      });
+    }finally{ clearTimeout(bell); }
   })();
+  /* and a failure is not remembered. This promise was kept for the life
+     of the page, so one bad moment on the network meant every later try
+     failed the same way without touching the network at all, and only a
+     reload could clear it. The next press is a fresh attempt. */
+  sdkP.catch(() => { sdkP = null; });
   return sdkP;
 }
 
@@ -5672,8 +5697,11 @@ async function startAuth(){
     f.onAuthStateChanged(f.auth, onUser);
   }catch(e){
     authStarted = false;
+    /* back to a box that can be typed into, with the reason in it —
+       pressing the button again is a fresh attempt */
     showGate(true, false);
-    $('#gateErr').textContent = 'Could not fetch the sign-in library: ' + (e.message || e);
+    $('#gateErr').textContent = 'Could not fetch the sign-in library \u2014 '
+      + (e.message || e);
   }
 }
 
