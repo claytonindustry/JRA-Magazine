@@ -854,6 +854,20 @@ dialog .libcell small{color:var(--e-muted);font-size:.68rem;overflow:hidden;text
 }
 .libwrap:hover .libx,.libx:focus-visible{opacity:1}
 .libx:hover{background:#b3261e;border-color:#b3261e;color:#fff}
+/* ordering the icon set, and taking one out of it */
+.libwrap .iconops{
+  position:absolute;top:.25rem;inset-inline-end:.25rem;display:flex;gap:.15rem;
+  opacity:.5;transition:opacity .12s;
+}
+.libwrap:hover .iconops,.libwrap:focus-within .iconops{opacity:1}
+.iconop{
+  width:1.35rem;height:1.35rem;padding:0;line-height:1;cursor:pointer;
+  border:1px solid var(--e-line);border-radius:4px;background:#fff;color:var(--e-ink);
+  font-size:.82rem;
+}
+.iconop[disabled]{opacity:.35;cursor:default}
+.iconop:hover:not([disabled]){border-color:var(--e-accent);color:var(--e-accent)}
+.iconop.x:hover{background:#b3261e;border-color:#b3261e;color:#fff}
 dialog .libcell .pend{
   position:absolute;top:.4rem;inset-inline-end:.4rem;font-size:.6rem;
   background:var(--e-warn,#8a5a00);color:#fff;border-radius:3px;padding:0 .25rem;
@@ -1012,7 +1026,17 @@ dialog .ed-cap{font-size:.95rem;min-height:2.2em}
   width:auto;height:auto;max-width:150px;max-height:150px;
   background:#eee;border-radius:4px;
 }
-#editor .fig .ed-cap{font-size:.95rem;min-height:2.2em}
+/* A box has to look like one. Everything written in the editor sits in
+   a .ed with a see-through border, which is right for a paragraph of
+   prose on the page's own background and wrong here: a white box on a
+   white card with no edge is a caption field nobody can see until they
+   click where it ought to be. It is a field, like the credit beside it,
+   so it is drawn like one. */
+#editor .fig .ed-cap{font-size:.95rem;min-height:2.2em;border-color:var(--e-line)}
+/* and it still says when it has the cursor: the rule above is as
+   specific as the one that tints a focused box and comes after it, so
+   without this the edge never changes and the box stops answering */
+#editor .fig .ed-cap:focus{border-color:var(--e-accent)}
 /* ---------- writing a translation ----------
    The same screen as English, with the English itself a press away. */
 #editor .trbar{
@@ -1350,6 +1374,16 @@ body.pdf-building #editor .work,body.pdf-building #editor .sp-grip{display:none!
 }
 #editor #cuMag:disabled{opacity:.45}
 #editor .cu-bar{display:flex;gap:.6rem;align-items:center;padding:.45rem .8rem;background:var(--e-panel);border-bottom:1px solid var(--e-line);flex-wrap:wrap}
+/* The three things this screen does: look at all of it, look at the
+   part readers are shown, put something new in. Buttons rather than
+   chips, because two of them are where you are and the third is
+   something you do — and because a row of five small words was a
+   filter bar for distinctions that are not the library's to make. */
+#editor .cu-views{display:flex;gap:.4rem}
+#editor .cu-views .btn{font-size:.95rem;font-weight:600;padding:.35rem 1rem}
+#editor .cu-views .btn[aria-pressed="true"]{
+  background:var(--e-accent);color:#fff;border-color:var(--e-accent);
+}
 #editor .cu-scroll{flex:1;overflow:auto;padding:1rem 1.2rem 3rem}
 #editor .cu-h{font-size:.78rem;text-transform:uppercase;letter-spacing:.08em;color:var(--e-muted);margin:0}
 #editor .cu-head-row{display:flex;align-items:center;gap:.6rem;margin:1rem 0 .7rem}
@@ -1914,24 +1948,26 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
          on the right, and the library itself underneath. -->
     <div class="cu-bar">
       <b id="cuTitle">Media library</b>
+      <!-- What this screen is, and the one thing it does: first, and
+           large enough to be the answer to what am I looking at. The
+           filters and the search narrow whichever is showing and come
+           after, because they are nobody's first question. -->
+      <div class="cu-views" id="cuKind">
+        <button class="btn" type="button" data-kind="all">All</button>
+        <button class="btn" type="button" data-kind="gallery">Gallery</button>
+        <button class="btn" type="button" id="cuUp"
+                title="Adds to the library without putting it into an article">Upload</button>
+      </div>
+      <div class="spacer"></div>
       <select id="cuMag" aria-label="Filter by magazine"></select>
       <select id="cuArt" aria-label="Filter by article"></select>
       <input id="cuFind" type="search" autocomplete="off"
              placeholder="Search" aria-label="Search the media library">
-      <div class="spacer"></div>
-      <div class="chips" id="cuKind">
-        <button class="btn small" data-kind="all">All</button>
-        <button class="btn small" data-kind="gallery">Gallery</button>
-        <button class="btn small" data-kind="icons">Icons</button>
-        <button class="btn small" data-kind="covers">Covers</button>
-        <button class="btn small" data-kind="uploads">Uploads</button>
-      </div>
       <span class="hint" id="cuCount"></span>
     </div>
     <div class="cu-scroll">
       <div class="cu-head-row">
         <h3 class="cu-h" id="cuHead"></h3>
-        <button class="btn small ghost" id="cuUpload" hidden>Upload…</button>
         <button class="btn small ghost danger" id="cuClear" hidden>Empty the gallery</button>
         <button class="btn small primary" id="cuPublish" hidden>Publish the gallery</button>
       </div>
@@ -2205,7 +2241,7 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
    when the file changes. It is unrelated to the database's own VERSION,
    which governs schema upgrades and must not be moved for a cosmetic
    change. */
-const APP_VERSION = '1.39';
+const APP_VERSION = '1.40';
 
 /* Nothing is imported at the top any more. The Firebase libraries are
    several hundred kilobytes and, loaded this way, the browser must fetch
@@ -5272,7 +5308,9 @@ function routeEditor(raw){
   State.lastEditHash = raw;
   /* Icons used to be a screen of their own; it is one list now, so the
      old address lands on the gallery with the icons showing. */
-  if(tab === 'settings' && id === 'icons'){ State.spane = 'gallery'; State.galKind = 'icons'; }
+  /* the icon set used to be a view of the library and is now kept in
+     the picker; an old link to it lands on the library itself */
+  if(tab === 'settings' && id === 'icons'){ State.spane = 'gallery'; State.galKind = 'all'; }
   else if(tab === 'settings') State.spane = SPANES.includes(id) ? id : 'gallery';
   if(tab === 'settings' && (State.spane === 'about' || State.spane === 'links')) State.curPage = State.spane;
 
@@ -9492,23 +9530,52 @@ function paneHere(pane, dlg, after){
   setTimeout(() => find.focus(), 30);
 }
 
+/* The icon set, and the only place it is kept.
+
+   An icon is a burgee ending a column, not a photograph to look at, to
+   put in the gallery or to find among the issues — so it is no longer
+   a view of the media library. This is where one is placed, so this is
+   where the set is ordered and weeded too. */
 function paneIcons(pane, dlg, after){
-  const set = iconSet();
-  pane.append(h('p', { class:'hint', text: set.length
-    ? 'Click one to place it. An icon keeps its own size rather than filling the column.'
-    : 'No icons yet. Upload one here and it joins the set, ready for every issue after this.' }));
+  const note = h('p', { class:'hint' });
   const grid = h('div', { class:'libgrid' });
-  set.forEach(e => {
-    const f = iconFig(e);
-    if(!f) return;
-    const cell = h('button', { class:'libcell', type:'button', title: e.name || '' });
-    cell.append(h('img', { src: figUrl(f, 240), alt:'', loading:'lazy' }));
-    cell.append(h('small', { text: `${e.name || 'untitled'} · ${iconWidth(e)}px` }));
-    if(f.local) cell.append(h('span', { class:'pend', text:'not sent yet' }));
-    cell.onclick = () => { dlg.close(); openPlaceSheet([candidateOfIcon(e)], after); };
-    grid.append(cell);
-  });
-  pane.append(grid);
+  const draw = () => {
+    const set = iconSet();
+    note.textContent = set.length
+      ? 'Click one to place it. An icon keeps its own size rather than filling the column.'
+      : 'No icons yet. Upload one here and it joins the set, ready for every issue after this.';
+    grid.textContent = '';
+    set.forEach((e, i) => {
+      const f = iconFig(e);
+      if(!f) return;
+      const cell = h('button', { class:'libcell', type:'button', title: e.name || '' });
+      cell.append(h('img', { src: figUrl(f, 240), alt:'', loading:'lazy' }));
+      cell.append(h('small', { text: `${e.name || 'untitled'} \u00b7 ${iconWidth(e)}px` }));
+      if(f.local) cell.append(h('span', { class:'pend', text:'not sent yet' }));
+      cell.onclick = () => { dlg.close(); openPlaceSheet([candidateOfIcon(e)], after); };
+      /* the order they are offered in, and taking one out — kept in the
+         corner, out of the way of the press that places one */
+      const ops = h('span', { class:'iconops' },
+        h('button', { class:'iconop', type:'button', title:'Earlier in the set',
+          disabled: i === 0 || null,
+          onclick: ev => { ev.stopPropagation(); moveIcon(e.key, -1); draw(); } }, '\u2039'),
+        h('button', { class:'iconop', type:'button', title:'Later in the set',
+          disabled: i === set.length - 1 || null,
+          onclick: ev => { ev.stopPropagation(); moveIcon(e.key, 1); draw(); } }, '\u203A'),
+        h('button', { class:'iconop x', type:'button', title:'Take it out of the icon set',
+          onclick: ev => {
+            ev.stopPropagation();
+            if(!confirm(`Take ${e.name || 'this icon'} out of the set?\n\n`
+              + 'The file stays in the media library. It stops being offered here, and '
+              + 'anywhere it has already been placed is left as it is.')) return;
+            markIcon(e.key, false);
+            draw();
+          } }, '\u00d7'));
+      grid.append(h('span', { class:'libwrap' }, cell, ops));
+    });
+  };
+  pane.append(note, grid);
+  draw();
   pane.append(h('div', { class:'fp-row' },
     h('button', { class:'btn', type:'button',
       onclick: () => { dlg.close(); pickPhotos(after, { icon:true }); } },
@@ -10097,12 +10164,11 @@ const shownShots = () => shownList.map(p => ({
 
 function photoCard(p, n){
   const on = n != null;
-  const icon = inIconSet(p.key);
   /* Which of them are in the gallery has to be plain at a glance. It was
      only ever said on each card's own button, in a word that reads the
      same whichever way round it is, so a library entirely inside the
      gallery looked exactly like one entirely outside it. */
-  const inGal = State.galKind !== 'icons' && photoIsFeatured(p);
+  const inGal = photoIsFeatured(p);
   const card = h('li', { class:'cu-card' + (on ? ' on' : '') + (inGal ? ' ingal' : '') });
 
   const pic = h('div', { class:'cu-pic' }, h('img', { src: figUrl(p.f, 480), alt:'', loading:'lazy' }));
@@ -10126,31 +10192,12 @@ function photoCard(p, n){
     row.append(h('button', { class:'btn small', title:'Later in the gallery',
       onclick: () => moveFeatured(p.key, 1) }, '↓'));
   }
-  if(State.galKind === 'icons' && icon){
-    row.append(h('button', { class:'btn small', title:'Earlier in the set',
-      onclick: () => moveIcon(p.key, -1) }, '↑'));
-    row.append(h('button', { class:'btn small', title:'Later in the set',
-      onclick: () => moveIcon(p.key, 1) }, '↓'));
-  }
-
-  /* Any photograph can be in the gallery now — one in an issue, one in a
-     piece still in the pool, or a file that has only been uploaded.
-     Inside the icon set this is not offered: `on` there means in the
-     set, and an icon is a burgee rather than a photograph to look at. */
-  if(State.galKind !== 'icons'){
-    const inGal = photoIsFeatured(p);
-    row.append(h('button', { class:'btn small grow' + (inGal ? ' ghost' : ''),
-      onclick: () => featurePhoto(p, !inGal) },
-      inGal ? 'Remove from gallery' : 'Add to gallery'));
-  }
-
-  /* No star on every card: most photographs are not icons and never
-     will be, and a press that turned one into a burgee was mostly a way
-     to do it by accident. Icons are uploaded as icons, and the only
-     place one can be taken out of the set is inside the set. */
-  if(State.galKind === 'icons' && icon)
-    row.append(h('button', { class:'btn small ghost grow', title:'Take this out of the icon set',
-      onclick: () => { markIcon(p.f, false); renderCurate(); } }, 'Not an icon'));
+  /* Any photograph can be in the gallery — one in an issue, one in a
+     piece still in the pool, a cover, or a file that has only been
+     uploaded. */
+  row.append(h('button', { class:'btn small grow' + (inGal ? ' ghost' : ''),
+    onclick: () => featurePhoto(p, !inGal) },
+    inGal ? 'Remove from gallery' : 'Add to gallery'));
 
   /* What a photograph says — its caption, its credit, the line the
      gallery shows — edited here rather than by being thrown into the
@@ -10209,15 +10256,21 @@ function featurePhoto(p, on){
    above a list of everything else is a view of the one library, chosen
    with the rest.
 
-   The chips do not hold different things — they are ways of looking at
-   the same library: all of it, the part in the gallery, the icon set,
-   the covers, and whatever belongs to no magazine. The two filters and
-   the search narrow whichever is showing, so a cover can be found by
-   its issue and an upload by its name.
+   There are two ways of looking at it and no more: all of it, and the
+   part in the gallery. A cover is a photograph and sits among the rest
+   on its merits; a file nothing has used yet is a photograph too, and
+   sits at the top of All because it is the one you have just added and
+   came here to find. The two filters and the search narrow whichever is
+   showing, so a cover can still be found by its issue and an upload by
+   its name.
+
+   Icons are not here. An icon is a burgee ending a column, not a
+   photograph to look at or to put in the gallery, and the only place it
+   is any use is the + Icon… button while writing — which is where the
+   set is now kept, ordered and weeded.
    --------------------------------------------------------------------- */
-const CU_KINDS = ['all','gallery','icons','covers','uploads'];
-const CU_HEAD = { all:'Everything', gallery:'In the gallery', icons:'The icon set',
-                  covers:'Covers', uploads:'In no magazine' };
+const CU_KINDS = ['all','gallery'];
+const CU_HEAD = { all:'Everything', gallery:'In the gallery' };
 
 /* Every article that has a photograph in it, for the second filter. */
 function articlesWithPhotos(m){
@@ -10274,41 +10327,32 @@ function renderCurate(){
     p.f.local ? 'not sent' : ''
   ].join(' ').toLowerCase();
 
-  /* The covers are gathered here rather than taken from the archive,
-     which only lists a cover that is not also printed inside the issue —
-     true of most of them, and a reason for one to be missing from the
-     one view that is entirely about covers. */
-  const coverList = () => magsByNumber().map(m => {
-    if(!m.cover || !State.images[m.cover]) return null;
-    const f = resolveFig({ img: m.cover });
-    return f ? { key:'img:' + m.cover, m:null, b:null, a:null, f, uses:1,
-                 rec: State.images[m.cover], coverOf: m } : null;
-  }).filter(Boolean);
-
-  const everything = archivePhotos();
+  const everything = archivePhotos().filter(p => !inIconSet(p.key));
   let list;
-  if(kind === 'covers') list = coverList();
-  else if(kind === 'icons'){
-    /* An icon is one thing however many issues use it, so this is the
-       one view where an entry per issue would be wrong. */
-    const once = new Map();
-    everything.forEach(p => { if(inIconSet(p.key) && !once.has(p.key)) once.set(p.key, p); });
-    const order = iconSet().map(e => e.key);
-    list = [...once.values()].sort((x, y) => order.indexOf(x.key) - order.indexOf(y.key));
-  }
-  else if(kind === 'gallery'){
+  if(kind === 'gallery'){
     const order = gallerySet().map(e => e.key);
     const once = new Map();
     everything.forEach(p => { if(photoIsFeatured(p) && !once.has(p.key)) once.set(p.key, p); });
     list = [...once.values()].sort((x, y) => order.indexOf(x.key) - order.indexOf(y.key));
   }
-  else if(kind === 'uploads'){
-    /* Anything in no magazine: a file placed in nothing, and a
-       photograph in an article still waiting in the pool. The icons and
-       the covers have their own view and are not repeated here. */
-    list = everything.filter(p => !p.m && !p.coverOf && !inIconSet(p.key));
+  else{
+    /* Everything, newest work first: a file sent up and placed in
+       nothing, then a photograph in a piece still in the pool, then the
+       issues as they run. A cover takes its place among them like any
+       other picture. The sort is stable, so within each the order the
+       library was gathered in is kept. */
+    const rank = (p) => (p.m || p.coverOf) ? 2 : (p.b ? 1 : 0);
+    /* and within the issues, by issue — so a cover sits with the
+       photographs of the issue it is the cover of, rather than in a
+       heap of covers at the end */
+    const order = magsByNumber().map(m => m.id);
+    const byIssue = (p) => {
+      const m = p.m || p.coverOf;
+      const i = m ? order.indexOf(m.id) : -1;
+      return i < 0 ? order.length : i;
+    };
+    list = everything.slice().sort((x, y) => rank(x) - rank(y) || byIssue(x) - byIssue(y));
   }
-  else list = everything;
 
   /* ---- and then narrowed, whichever view it is ---- */
   const shown = list.filter(p => {
@@ -10323,7 +10367,7 @@ function renderCurate(){
   });
 
   shownList = shown;
-  const numbered = kind === 'gallery' || kind === 'icons';
+  const numbered = kind === 'gallery';
   shown.forEach((p, i) => grid.append(photoCard(p, numbered ? i + 1 : null)));
 
   /* ---- what it says about itself ---- */
@@ -10335,23 +10379,9 @@ function renderCurate(){
   $('#cuEmpty').hidden = n > 0;
   $('#cuEmpty').textContent = terms.length || State.galMag || State.galArt
     ? 'Nothing here matches that.'
-    : kind === 'icons'
-      ? 'No icons yet. Upload one here, or with + Icon… while writing an article.'
-      : kind === 'gallery'
-        ? 'Nothing is in the gallery yet. Add photographs to it from All.'
-        : kind === 'covers'
-          ? 'No magazine has a cover yet.'
-          : kind === 'uploads'
-            ? 'Nothing here. Upload a photograph and it waits in this pool until it is used.'
-            : 'No photographs yet.';
-
-  /* ---- and the one button each view has ---- */
-  const up = $('#cuUpload');
-  up.hidden = !(kind === 'icons' || kind === 'uploads');
-  up.textContent = kind === 'icons' ? 'Upload an icon…' : 'Upload…';
-  up.title = kind === 'icons'
-    ? 'Adds to the icon set without putting one into an article'
-    : 'Adds to the library without putting it into an article';
+    : kind === 'gallery'
+      ? 'Nothing is in the gallery yet. Add photographs to it from All.'
+      : 'No photographs yet. Upload one and it waits here until it is used.';
 
   /* Taking everything out again belongs where what is in it can be
      seen, rather than beside the filters, which is where the pair that
@@ -12658,10 +12688,9 @@ function wire(){
   $('#fpDown').onclick = () => { const b = blockById(selected); if(b){ moveBlock(b, 1); drawLayout().then(reselect); } };
   $('#fpEdit').onclick = () => { if(selected) goToBlock(selected); };
 
-  /* iconOnly and poolOnly alike add to the library without dropping
-     anything into whichever article happened to be open. */
-  $('#cuUpload').onclick = () => pickPhotos(null,
-    State.galKind === 'icons' ? { iconOnly:true } : { poolOnly:true });
+  /* poolOnly adds to the library without dropping anything into
+     whichever article happened to be open. */
+  $('#cuUp').onclick = () => pickPhotos(null, { poolOnly:true });
   $('#cuMag').onchange = () => {
     State.galMag = $('#cuMag').value;
     State.galArt = '';                 // the article list is the magazine's
