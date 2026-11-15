@@ -1021,6 +1021,31 @@ dialog .ed-cap{font-size:.95rem;min-height:2.2em}
   padding:.6rem .7rem;margin:.6rem 0 .4rem;
 }
 #editor .trbar .hint{margin:0;flex:1 1 16rem;min-width:0}
+/* ---------- the list of every language there is ---------- */
+dialog#dlgLang{max-width:min(30rem,94vw);width:30rem}
+#dlgLang h3{margin:0 0 .5rem}
+#dlgLang .langfind{
+  width:100%;font-family:var(--ui);font-size:.9rem;padding:.4rem .5rem;
+  border:1px solid var(--e-line);border-radius:6px;background:#fff;color:var(--e-ink);
+}
+#dlgLang .langlist{
+  max-height:min(55vh,22rem);overflow:auto;margin:.5rem 0;
+  border:1px solid var(--e-line);border-radius:6px;background:#fff;
+}
+#dlgLang .langrow{
+  display:flex;gap:.5rem;align-items:baseline;width:100%;text-align:left;
+  padding:.35rem .5rem;background:none;border:0;
+  border-bottom:1px solid var(--e-line);color:var(--e-ink);
+  font-family:var(--ui);font-size:.85rem;cursor:pointer;
+}
+#dlgLang .langrow:last-child{border-bottom:0}
+#dlgLang .langrow:hover:not([disabled]){background:var(--e-bg)}
+#dlgLang .langrow[disabled]{opacity:.5;cursor:default}
+#dlgLang .langrow b{font-size:.95rem}
+#dlgLang .langrow .eng{color:var(--e-muted)}
+#dlgLang .langrow code{margin-left:auto;font-size:.72rem;color:var(--e-muted)}
+#dlgLang .langlist .hint{margin:.6rem .5rem}
+
 /* ---------- translating, inside a magazine's settings ---------- */
 dialog#dlgTr{max-width:min(52rem,96vw)}
 #editor .trlangs,dialog .trlangs{display:flex;flex-direction:column;gap:.3rem;margin:.2rem 0 .6rem}
@@ -1029,6 +1054,9 @@ dialog#dlgTr{max-width:min(52rem,96vw)}
   background:#fff;border:1px solid var(--e-line);border-radius:6px;
 }
 #editor .trlang code,dialog .trlang code{font-size:.75rem;color:var(--e-muted)}
+#editor .trlang .eng,dialog .trlang .eng{font-size:.78rem;color:var(--e-muted)}
+#editor .trlang .wrong,dialog .trlang .wrong{font-size:.78rem;color:var(--e-warn)}
+#editor .trlang .btn,dialog .trlang .btn{white-space:nowrap}
 #editor .trwhole,dialog .trwhole{display:flex;gap:.6rem;flex-wrap:wrap;margin-top:.6rem}
 #editor .trwcol,dialog .trwcol{
   display:flex;flex-direction:column;gap:.2rem;padding:.4rem .6rem;
@@ -1769,7 +1797,11 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
     <div class="bar-in" id="barIn">
       <button class="flag" id="flag">JRA Magazine</button>
       <div class="bar-tools">
-        <select class="lang" id="langSel" hidden aria-label="Language"></select>
+        <!-- Marked, because the one control a reader needs in order to
+             leave a language they cannot read must not itself be
+             translated into it. -->
+        <select class="lang notranslate" id="langSel" hidden translate="no"
+                aria-label="Language"></select>
         <div class="sizes" role="group" id="sizeGroup" aria-label="Text size">
           <button data-size="0" aria-pressed="false">A</button>
           <button data-size="1" aria-pressed="true">A</button>
@@ -2005,6 +2037,18 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
 
 <!-- Translating an issue: its languages, its sheet, and how far each
      language has got through its articles. -->
+<!-- Every language the translator can manage, picked from a list rather
+     than typed. A code typed from memory is how Chinese became
+     Chamorro: ch is a real language, just not that one, and nothing
+     downstream could tell. -->
+<dialog id="dlgLang">
+  <h3>Add a language</h3>
+  <input class="langfind" id="langFind" type="search" autocomplete="off"
+         aria-label="Search languages">
+  <div class="langlist" id="langList"></div>
+  <div class="fp-row"><button class="btn" type="button" id="langShut">Cancel</button></div>
+</dialog>
+
 <dialog id="dlgTr">
   <form method="dialog">
     <h3 id="trTitle">Translating</h3>
@@ -2161,7 +2205,7 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
    when the file changes. It is unrelated to the database's own VERSION,
    which governs schema upgrades and must not be moved for a cosmetic
    change. */
-const APP_VERSION = '1.38';
+const APP_VERSION = '1.39';
 
 /* Nothing is imported at the top any more. The Firebase libraries are
    several hundred kilobytes and, loaded this way, the browser must fetch
@@ -3677,7 +3721,10 @@ function busy(msg){
    any route. The exception is Preview, which hands it a draft payload
    built in memory and says so at the top of the screen.
    ===================================================================== */
-const Reader = { library: null, issues: {}, gallery: null, pages: {}, searchIndex: null };
+const Reader = { library: null, issues: {}, gallery: null, pages: {}, searchIndex: null,
+  /* the languages whole issues have been written in by hand, which go
+     to the top of the picker ahead of everything the machine can do */
+  written: [] };
 
 const WPM = 220;
 const readerEl = $('#reader');
@@ -3822,11 +3869,20 @@ function registerTongues(list){
   let added = 0;
   arr(list).forEach(t => {
     if(!t || !t.code || LANGS[t.code]) return;
+    /* A code the translator has never heard of is nobody's language. It
+       was typed by hand, it means something else or nothing at all, and
+       a reader who chose it would be handed a page in a language
+       neither of you picked. It is offered to nobody; the editor is
+       told about it where the list is kept. */
+    const known = canonTongue(t.code);
+    if(!known) return;
     LANGS[t.code] = {
-      name: t.name || t.code,
-      dir: t.rtl ? 'rtl' : 'ltr',
+      /* its own name, always: an editor's label is in English and would
+         itself be translated, which is how a reader gets lost */
+      name: TONGUE_TABLE[known][0],
+      dir: RTL_LANGS.includes(known) ? 'rtl' : 'ltr',
       measure: LANGS.en.measure,
-      tag: t.code,
+      tag: known,
       s: LANGS.en.s
     };
     added++;
@@ -3839,10 +3895,10 @@ function registerTongues(list){
    those were given; the rest are named in their own tongue. */
 function registerWidgetLangs(){
   let added = 0;
-  Object.keys(GT_LANGS).forEach(code => {
+  Object.keys(TONGUE_TABLE).forEach(code => {
     if(LANGS[code]) return;
     LANGS[code] = {
-      name: GT_LANGS[code],
+      name: TONGUE_TABLE[code][0],
       dir: RTL_LANGS.includes(code) ? 'rtl' : 'ltr',
       measure: LANGS.en.measure,
       tag: code,
@@ -3857,6 +3913,7 @@ async function loadLibrary(force){
   if(Reader.library && !force) return Reader.library;
   if(State.previewing){
     registerTongues(State.tongues);
+    Reader.written = tongues().map(t => t.code).filter(c => LANGS[c]);
     Reader.library = previewLibrary();
     return Reader.library;
   }
@@ -3870,7 +3927,9 @@ async function loadLibrary(force){
   const out = new Set();
   arr(node).forEach(c => arr(c && c.langs).forEach(x => out.add(x)));
   registerWidgetLangs();
-  if(registerTongues(arr(langs).filter(t => t && out.has(t.code))) || true){
+  registerTongues(arr(langs).filter(t => t && out.has(t.code)));
+  Reader.written = [...out].filter(c => c !== 'en' && LANGS[c]);
+  {
     buildLangControl();
     /* a language chosen on an earlier visit, which could not be
        restored at the start because nothing yet knew of it */
@@ -5020,14 +5079,63 @@ function setLang(code){
   $('#themeBtn').textContent = html.dataset.theme === 'dark' ? L.s.light : L.s.dark;
   store('jra-lang', code);
 }
-function buildLangControl(){
-  const codes = Object.keys(LANGS);
+/* The picker's own names are the one thing on the page that must not be
+   translated. A reader who has put the page into Japanese and wants out
+   again needs to find English written in English, and a reader looking
+   for their own language is looking for its own name — not for an
+   English word that has itself been put through the machine.
+
+   So the control is marked, and then watched. Marking is honoured by the
+   translator this page uses; watching catches whatever is not, which is
+   how English came to read Anglais and Français came to read
+   Françaisfra.
+
+   The order is English, then the languages this archive has really been
+   written in, then every other language the translator can manage. */
+function langOptionList(){
+  const written = arr(Reader.written).filter(c => c !== 'en' && LANGS[c]);
+  const rest = Object.keys(LANGS)
+    .filter(c => c !== 'en' && !written.includes(c))
+    .sort((a, b) => String(LANGS[a].name).localeCompare(String(LANGS[b].name)));
+  const out = [{ value:'en', text: LANGS.en.name }];
+  written.forEach(c => out.push({ value:c, text: LANGS[c].name }));
+  /* a line, not a word, because a word here would be in some language */
+  if(written.length && rest.length)
+    out.push({ value:'', text:'\u2500'.repeat(10), off:true });
+  rest.forEach(c => out.push({ value:c, text: LANGS[c].name }));
+  return out;
+}
+/* Draws the list if it is not already exactly right, and says whether it
+   had to. Doing nothing when nothing is wrong is what keeps the watch
+   below from answering itself for ever. */
+function drawLangOptions(){
   const sel = $('#langSel');
-  if(codes.length < 2) return;
+  if(!sel) return false;
+  const want = langOptionList();
+  const key = (v, t) => v + '\u0000' + t;
+  const now = [...sel.options].map(o => key(o.value, o.textContent)).join('\u0001');
+  const pick = LANGS[LANG] ? LANG : 'en';
+  if(now === want.map(o => key(o.value, o.text)).join('\u0001')){
+    if(sel.value !== pick) sel.value = pick;
+    return false;
+  }
+  sel.textContent = '';
+  want.forEach(o => sel.append(h('option', {
+    value: o.value, disabled: o.off || null,
+    translate:'no', class:'notranslate'
+  }, o.text)));
+  sel.value = pick;
+  return true;
+}
+let langWatch = null;
+function buildLangControl(){
+  const sel = $('#langSel');
+  if(!sel || Object.keys(LANGS).length < 2) return;
   sel.hidden = false;
-  sel.innerHTML = codes.map(c =>
-    `<option value="${c}"${c === LANG ? ' selected' : ''}>${esc(LANGS[c].name)}</option>`).join('');
+  drawLangOptions();
   sel.onchange = () => {
+    /* the rule between the written languages and the rest */
+    if(!sel.value || !LANGS[sel.value]){ sel.value = LANGS[LANG] ? LANG : 'en'; return; }
     setLang(sel.value);
     /* the words are different in a different language, so what was
        loaded for the last one is not an answer for this one */
@@ -5039,6 +5147,13 @@ function buildLangControl(){
        in this language is held back so it is not translated twice. */
     gtGo(LANG);
   };
+  if(langWatch) return;
+  langWatch = new MutationObserver(() => {
+    langWatch.disconnect();
+    drawLangOptions();
+    langWatch.observe(sel, { subtree:true, childList:true, characterData:true });
+  });
+  langWatch.observe(sel, { subtree:true, childList:true, characterData:true });
 }
 
 /* =====================================================================
@@ -5592,13 +5707,6 @@ const KINDS = { p:'¶ Text', h2:'H Head', h3:'h Sub', quote:'“” Quote' };
    and never otherwise.
    ===================================================================== */
 const GT_LIB = 'https://cdn.gtranslate.net/widgets/latest/lib.min.js';
-/* What it can do, and what each is called in its own language, since
-   that is what somebody looking for their own language reads. */
-const GT_LANGS = {
-  ar:'\u0627\u0644\u0639\u0631\u0628\u064A\u0629', 'zh-CN':'\u4E2D\u6587', nl:'Nederlands',
-  fr:'Fran\u00e7ais', de:'Deutsch', it:'Italiano', pt:'Portugu\u00eas',
-  ru:'\u0420\u0443\u0441\u0441\u043A\u0438\u0439', es:'Espa\u00f1ol'
-};
 let gtLibP = null, gtFailed = false, gtLast = 0;
 function gtLib(){
   if(gtLibP) return gtLibP;
@@ -5614,7 +5722,9 @@ function gtLib(){
 /* Put the page into a language, or back into the one it is written in.
    Asking for English is how the widget is told to undo itself. */
 async function gtGo(code){
-  const to = (code && code !== 'en') ? code : 'en';
+  /* the code the translator knows this language by, which is not always
+     the code an issue happens to be published under */
+  const to = (code && code !== 'en') ? (canonTongue(code) || 'en') : 'en';
   /* Choosing a language both redraws the page and asks for the
      translation, and the redraw asks again when it is done. Asking
      twice in the same breath is wasted work; asking again later is
@@ -5664,13 +5774,190 @@ function holdFromWidget(el, hold){
 /* Languages are added as they are wanted rather than written into this
    file. These are only the names offered when adding one; any code and
    any name can be typed instead. */
-const LANG_NAMES = {
-  fr:'French', de:'German', es:'Spanish', it:'Italian', pt:'Portuguese',
-  nl:'Dutch', sv:'Swedish', no:'Norwegian', da:'Danish', fi:'Finnish',
-  pl:'Polish', ru:'Russian', zh:'Chinese', ja:'Japanese', ko:'Korean',
-  ar:'Arabic', he:'Hebrew', tr:'Turkish', el:'Greek', cs:'Czech'
+/* =====================================================================
+   The languages there are
+
+   Every language the translator can manage, each with the name it is
+   known by in its own tongue and the name an editor looking for it
+   would type. The first is what a reader reads: somebody who wants
+   Portuguese is looking for Português, not for a word in English
+   that has itself been translated into something else.
+
+   A language is chosen from this list, never typed. A code typed from
+   memory is how Chinese became Chamorro: ch is a language, just not
+   that one, and nothing downstream could tell.
+
+   Right-to-left names are written as escapes. They are no different to
+   the browser, but a line of source that reverses itself halfway is a
+   line nobody can safely edit.
+   ===================================================================== */
+const TONGUE_TABLE = {
+  af:['Afrikaans','Afrikaans'],
+  sq:['Shqip','Albanian'],
+  am:['አማርኛ','Amharic'],
+  ar:['العربية','Arabic'],
+  hy:['Հայերեն','Armenian'],
+  as:['অসমীয়া','Assamese'],
+  ay:['Aymar aru','Aymara'],
+  az:['Azərbaycan','Azerbaijani'],
+  bm:['Bamanankan','Bambara'],
+  eu:['Euskara','Basque'],
+  be:['Беларуская','Belarusian'],
+  bn:['বাংলা','Bengali'],
+  bho:['भोजपुरी','Bhojpuri'],
+  bs:['Bosanski','Bosnian'],
+  bg:['Български','Bulgarian'],
+  ca:['Català','Catalan'],
+  ceb:['Cebuano','Cebuano'],
+  ny:['Chichewa','Chichewa'],
+  'zh-CN':['中文（简体）','Chinese (Simplified)'],
+  'zh-TW':['中文（繁體）','Chinese (Traditional)'],
+  co:['Corsu','Corsican'],
+  hr:['Hrvatski','Croatian'],
+  cs:['Čeština','Czech'],
+  da:['Dansk','Danish'],
+  dv:['ބިވެހި','Dhivehi'],
+  doi:['डोगरी','Dogri'],
+  nl:['Nederlands','Dutch'],
+  eo:['Esperanto','Esperanto'],
+  et:['Eesti','Estonian'],
+  ee:['Eʋegbe','Ewe'],
+  tl:['Filipino','Filipino'],
+  fi:['Suomi','Finnish'],
+  fr:['Français','French'],
+  fy:['Frysk','Frisian'],
+  gl:['Galego','Galician'],
+  ka:['ქართული','Georgian'],
+  de:['Deutsch','German'],
+  el:['Ελληνικά','Greek'],
+  gn:['Avañe’ẽ','Guarani'],
+  gu:['ગુજરાતી','Gujarati'],
+  ht:['Kreyòl ayisyen','Haitian Creole'],
+  ha:['Hausa','Hausa'],
+  haw:['ʻŌlelo Hawaiʻi','Hawaiian'],
+  iw:['עברית','Hebrew'],
+  hi:['हिन्दी','Hindi'],
+  hmn:['Hmoob','Hmong'],
+  hu:['Magyar','Hungarian'],
+  is:['Íslenska','Icelandic'],
+  ig:['Igbo','Igbo'],
+  ilo:['Ilokano','Ilocano'],
+  id:['Bahasa Indonesia','Indonesian'],
+  ga:['Gaeilge','Irish'],
+  it:['Italiano','Italian'],
+  ja:['日本語','Japanese'],
+  jw:['Basa Jawa','Javanese'],
+  kn:['ಕನ್ನಡ','Kannada'],
+  kk:['Қазақ','Kazakh'],
+  km:['ខ្មែរ','Khmer'],
+  rw:['Kinyarwanda','Kinyarwanda'],
+  gom:['कोंकणी','Konkani'],
+  ko:['한국어','Korean'],
+  kri:['Krio','Krio'],
+  ku:['Kurdî','Kurdish (Kurmanji)'],
+  ckb:['کوردیی ناوەندی','Kurdish (Sorani)'],
+  ky:['Кыргызча','Kyrgyz'],
+  lo:['ລາວ','Lao'],
+  la:['Latina','Latin'],
+  lv:['Latviešu','Latvian'],
+  ln:['Lingála','Lingala'],
+  lt:['Lietuvių','Lithuanian'],
+  lg:['Luganda','Luganda'],
+  lb:['Lëtzebuergesch','Luxembourgish'],
+  mk:['Македонски','Macedonian'],
+  mai:['मैथिली','Maithili'],
+  mg:['Malagasy','Malagasy'],
+  ms:['Bahasa Melayu','Malay'],
+  ml:['മലയാളം','Malayalam'],
+  mt:['Malti','Maltese'],
+  mi:['Māori','Maori'],
+  mr:['मराठी','Marathi'],
+  'mni-Mtei':['ꯃꯤꯇꯩꯂꯣꯟ','Meiteilon (Manipuri)'],
+  lus:['Mizo','Mizo'],
+  mn:['Монгол','Mongolian'],
+  my:['မြန်မာ','Myanmar (Burmese)'],
+  ne:['नेपाली','Nepali'],
+  no:['Norsk','Norwegian'],
+  or:['ଓଡିଆ','Odia (Oriya)'],
+  om:['Oromoo','Oromo'],
+  ps:['پښتو','Pashto'],
+  fa:['فارسی','Persian'],
+  pl:['Polski','Polish'],
+  pt:['Português','Portuguese'],
+  pa:['ਪੰਜਾਬੀ','Punjabi'],
+  qu:['Runasimi','Quechua'],
+  ro:['Română','Romanian'],
+  ru:['Русский','Russian'],
+  sm:['Gagana Sāmoa','Samoan'],
+  sa:['संस्कृतम्','Sanskrit'],
+  gd:['Gàidhlig','Scots Gaelic'],
+  nso:['Sepedi','Sepedi'],
+  sr:['Српски','Serbian'],
+  st:['Sesotho','Sesotho'],
+  sn:['Shona','Shona'],
+  sd:['سنڌي','Sindhi'],
+  si:['සිංහල','Sinhala'],
+  sk:['Slovenčina','Slovak'],
+  sl:['Slovenščina','Slovenian'],
+  so:['Soomaali','Somali'],
+  es:['Español','Spanish'],
+  su:['Basa Sunda','Sundanese'],
+  sw:['Kiswahili','Swahili'],
+  sv:['Svenska','Swedish'],
+  tg:['Тоҷикӣ','Tajik'],
+  ta:['தமிழ்','Tamil'],
+  tt:['Татарча','Tatar'],
+  te:['తెలుగు','Telugu'],
+  th:['ไทย','Thai'],
+  ti:['ትግርስ','Tigrinya'],
+  ts:['Xitsonga','Tsonga'],
+  tr:['Türkçe','Turkish'],
+  tk:['Türkmen','Turkmen'],
+  ak:['Twi','Twi'],
+  uk:['Українська','Ukrainian'],
+  ur:['اردو','Urdu'],
+  ug:['ئۇيغۇرچە','Uyghur'],
+  uz:['Oʻzbek','Uzbek'],
+  vi:['Tiếng Việt','Vietnamese'],
+  cy:['Cymraeg','Welsh'],
+  xh:['isiXhosa','Xhosa'],
+  yi:['ייִדיש','Yiddish'],
+  yo:['Yorùbá','Yoruba'],
+  zu:['isiZulu','Zulu']
 };
-const RTL_LANGS = ['ar','he','fa','ur'];
+/* Codes that mean one of the above without being spelled like it: an
+   older form, a country where the language is the same, or a case the
+   translator writes differently. A stored language is matched through
+   here, so an issue published under one of them keeps working. */
+const TONGUE_ALIAS = {
+  zh:'zh-CN', 'zh-hans':'zh-CN', 'zh-hant':'zh-TW', 'zh-hk':'zh-TW',
+  he:'iw', jv:'jw', fil:'tl', 'in':'id', mni:'mni-Mtei',
+  'pt-br':'pt', 'pt-pt':'pt', nb:'no', nn:'no', 'fr-ca':'fr', 'es-mx':'es'
+};
+/* The language this code is, or nothing if the translator has never
+   heard of it. Case and the aliases above are both forgiven; anything
+   else is not a language and is offered to nobody. */
+function canonTongue(code){
+  const c = String(code == null ? '' : code).trim();
+  if(!c) return '';
+  if(TONGUE_TABLE[c]) return c;
+  const low = c.toLowerCase();
+  const hit = Object.keys(TONGUE_TABLE).find(k => k.toLowerCase() === low);
+  return hit || TONGUE_ALIAS[low] || '';
+}
+const tongueNative = (code) => {
+  const k = canonTongue(code);
+  return k ? TONGUE_TABLE[k][0] : '';
+};
+const tongueEnglish = (code) => {
+  const k = canonTongue(code);
+  return k ? TONGUE_TABLE[k][1] : '';
+};
+/* What each is called in English, for the places an editor reads. */
+const LANG_NAMES = Object.keys(TONGUE_TABLE).reduce((o, k) => {
+  o[k] = TONGUE_TABLE[k][1]; return o;
+}, {});
+const RTL_LANGS = ['ar','iw','he','fa','ur','ps','sd','ug','ckb','dv','yi'];
 const tongues = () => arr(State.tongues).filter(t => t && t.code);
 const tongueName = (code) => {
   const t = tongues().find(x => x.code === code);
@@ -6800,8 +7087,31 @@ function openMagTranslations(m){
         'No languages yet. One added here can be written by hand, issue by issue.' }));
     tongues().forEach(t => {
       const row = h('div', { class:'trlang' });
-      row.append(h('b', { text: t.name }), h('code', { text: t.code }));
+      const known = canonTongue(t.code);
+      const eng = known ? TONGUE_TABLE[known][1] : '';
+      row.append(h('b', { class:'notranslate', translate:'no',
+        text: known ? TONGUE_TABLE[known][0] : (t.name || t.code) }));
+      if(known){
+        row.append(h('span', { class:'eng', text:
+          (t.name && t.name !== eng && t.name !== TONGUE_TABLE[known][0])
+            ? t.name + ' \u00b7 ' + eng : eng }));
+        row.append(h('code', { text: t.code }));
+      }else{
+        row.append(h('code', { text: t.code }));
+        row.append(h('span', { class:'wrong', text:
+          '\u2014 not a language the translator knows, so no reader is offered it' }));
+      }
       row.append(h('span', { class:'spacer' }));
+      if(!known) row.append(h('button', { class:'btn small primary', type:'button',
+        title:'Choose the language this was meant to be',
+        onclick: () => pickTongue((code, pickedEng) => {
+          const moved = retongue(t.code, code, pickedEng);
+          toast(moved
+            ? pickedEng + ' \u2014 ' + moved
+              + (moved === 1 ? ' article moved across' : ' articles moved across')
+            : 'Now ' + pickedEng + '.');
+          again();
+        }) }, 'Put right\u2026'));
       row.append(h('button', { class:'btn small ghost', type:'button',
         title:'Change what readers see it called',
         onclick: () => {
@@ -6828,7 +7138,7 @@ function openMagTranslations(m){
     });
     langs.append(h('div', { class:'fp-row' },
       h('button', { class:'btn small primary', type:'button',
-        onclick: () => { addTongue(true); again(); } }, '+ Add a language')));
+        onclick: () => addTongue(true, again) }, '+ Add a language')));
   };
   /* rebuilt rather than patched, since adding a language changes every
      row of the grid below it */
@@ -7195,25 +7505,80 @@ function trTargets(a, d){
    search engine are told, and a name, because that is what a reader
    picks from. Any language at all: the list is the magazine's, not
    this file's. */
-function addTongue(stay){
-  const code = (prompt('A two-letter code for the language — fr, de, es, zh…') || '')
-    .trim().toLowerCase();
-  if(!code) return;
-  if(!/^[a-z]{2,3}(-[a-z0-9]{2,8})?$/.test(code)){
-    toast('That does not look like a language code. Two or three letters, such as fr or pt-br.');
-    return;
-  }
-  if(tongues().some(t => t.code === code)){
-    toast(tongueName(code) + ' is already on the list.');
-    return;
-  }
-  const name = (prompt('What should readers see it called?', LANG_NAMES[code] || '') || '').trim();
-  if(!name) return;
-  State.tongues = tongues().concat([{ code, name, rtl: RTL_LANGS.includes(code) || undefined }]);
+/* Picked from the list, never typed. Each language is shown in its own
+   tongue and in English, because an editor hunting for Portuguese types
+   "Portuguese" while the reader who wants it reads "Português", and
+   both have to find the same row. */
+function pickTongue(then){
+  const dlg = $('#dlgLang'), list = $('#langList'), find = $('#langFind');
+  const have = new Set(tongues().map(t => canonTongue(t.code)).filter(Boolean));
+  const draw = () => {
+    const q = find.value.trim().toLowerCase();
+    list.textContent = '';
+    const rows = Object.keys(TONGUE_TABLE)
+      .map(c => ({ c, native: TONGUE_TABLE[c][0], eng: TONGUE_TABLE[c][1] }))
+      .filter(r => !q || r.eng.toLowerCase().includes(q)
+        || r.native.toLowerCase().includes(q) || r.c.toLowerCase().startsWith(q))
+      .sort((a, b) => a.eng.localeCompare(b.eng));
+    if(!rows.length){
+      list.append(h('p', { class:'hint', text:'No language of that name.' }));
+      return;
+    }
+    rows.forEach(r => {
+      const on = have.has(r.c);
+      list.append(h('button', { class:'langrow' + (on ? ' on' : ''), type:'button',
+        disabled: on || null,
+        onclick: () => { dlg.close(); then(r.c, r.eng, r.native); } },
+        h('b', { class:'notranslate', translate:'no', text: r.native }),
+        h('span', { class:'eng', text: r.eng }),
+        h('code', { text: on ? 'on the list' : r.c })));
+    });
+  };
+  find.value = '';
+  find.placeholder = 'Search \u2014 Portuguese, Portugu\u00eas, pt\u2026';
+  find.oninput = draw;
+  find.onkeydown = (e) => {
+    if(e.key !== 'Enter') return;
+    e.preventDefault();
+    const b = list.querySelector('.langrow:not([disabled])');
+    if(b) b.click();
+  };
+  $('#langShut').onclick = () => dlg.close();
+  draw();
+  dlg.showModal();
+  find.focus();
+}
+
+function addTongue(stay, then){
+  pickTongue((code, eng) => {
+    State.tongues = tongues().concat([
+      { code, name: eng, rtl: RTL_LANGS.includes(code) || undefined }]);
+    saveTongues();
+    if(!stay) State.tongue = code;
+    renderWork();
+    toast(eng + ' added.');
+    if(then) then();
+  });
+}
+
+/* A language stored under a code that means something else, put right.
+   The words already written in it move with it, so correcting the label
+   never orphans a translation. */
+function retongue(from, to, name){
+  let moved = 0;
+  Object.values(State.articles).forEach(a => {
+    if(!a || !a.tr || !a.tr[from]) return;
+    a.tr[to] = a.tr[from];
+    delete a.tr[from];
+    moved++;
+    saveArticle(a);
+  });
+  State.tongues = tongues().map(t => t.code === from
+    ? { code: to, name: name || t.name, rtl: RTL_LANGS.includes(to) || undefined }
+    : t);
   saveTongues();
-  if(!stay) State.tongue = code;
-  renderWork();
-  toast(name + ' added.');
+  if(State.tongue === from) State.tongue = to;
+  return moved;
 }
 
 function workArticle(work){
