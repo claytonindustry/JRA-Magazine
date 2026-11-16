@@ -1045,6 +1045,21 @@ dialog .ed-cap{font-size:.95rem;min-height:2.2em}
   padding:.6rem .7rem;margin:.6rem 0 .4rem;
 }
 #editor .trbar .hint{margin:0;flex:1 1 16rem;min-width:0}
+/* ---------- who may edit ---------- */
+#editor .people{display:flex;flex-direction:column;gap:.3rem;margin:.2rem 0 .6rem}
+#editor .person{
+  display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;
+  padding:.4rem .5rem;background:#fff;border:1px solid var(--e-line);border-radius:6px;
+}
+#editor .person .tag{
+  font-size:.7rem;letter-spacing:.02em;padding:.05rem .4rem;border-radius:20px;
+  border:1px solid var(--e-line);color:var(--e-muted);
+}
+#editor .person .tag.own{border-color:var(--e-accent);color:var(--e-accent)}
+#editor .person .btn{white-space:nowrap}
+#editor .peopleadd{flex-wrap:wrap}
+#editor .peopleadd input{flex:1;min-width:9rem;margin:0}
+
 /* ---------- the list of every language there is ---------- */
 dialog#dlgLang{max-width:min(30rem,94vw);width:30rem}
 #dlgLang h3{margin:0 0 .5rem}
@@ -1470,9 +1485,11 @@ body.pdf-building #editor .work,body.pdf-building #editor .sp-grip{display:none!
 #gate form.waiting label,#gate form.waiting button[type="submit"]{display:none}
 /* the way through without a code — always there, never the main act */
 #gate .acts.alt{margin-top:.6rem;padding-top:.8rem;border-top:1px solid var(--e-line)}
-#gate input#gatePass{
-  font-size:1.05rem;letter-spacing:.12em;text-align:center;padding:.6rem .5rem;
+#gate input#gateMail,#gate input#gatePass{
+  font-size:1rem;text-align:center;padding:.6rem .5rem;margin-bottom:.4rem;
 }
+#gate input#gatePass{letter-spacing:.12em}
+#gate .said{color:var(--e-accent)}
 #gate .sr{display:block;font-size:0;margin-bottom:0}   /* label for readers only */
 /* signed in, but not an editor — the form is no use, the way out is */
 
@@ -2004,16 +2021,20 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
 <div id="gate" hidden>
   <form id="gateForm">
     <h2>JRA Magazine</h2>
-    <p>Enter the editor code</p>
-    <label class="sr">Editor code<input type="password" id="gatePass"
+    <p>Sign in to edit</p>
+    <label class="sr">Email<input type="email" id="gateMail" autocomplete="username"
+           autocapitalize="off" spellcheck="false" placeholder="Email" required></label>
+    <label class="sr">Password<input type="password" id="gatePass"
            autocomplete="current-password" autocapitalize="off" spellcheck="false"
-           required></label>
-    <p class="hint" id="gateWait" hidden>Fetching the sign-in library…</p>
+           placeholder="Password" required></label>
+    <p class="hint" id="gateWait" hidden>Checking…</p>
+    <p class="hint said" id="gateSaid" hidden></p>
     <p class="err" id="gateErr"></p>
     <div class="acts">
       <button class="btn" type="submit">Start editing</button>
     </div>
     <div class="acts alt">
+      <button class="btn ghost" type="button" id="gateForgot">Forgotten the password</button>
       <button class="btn ghost" type="button" id="gateCancel">Just read the magazine</button>
     </div>
   </form>
@@ -2241,14 +2262,13 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
    when the file changes. It is unrelated to the database's own VERSION,
    which governs schema upgrades and must not be moved for a cosmetic
    change. */
-const APP_VERSION = '1.41';
+const APP_VERSION = '1.42';
 
 /* Nothing is imported at the top any more. The Firebase libraries are
    several hundred kilobytes and, loaded this way, the browser must fetch
    and parse all of them before a line of this file runs — so every
    reader used to wait for the sign-in machinery before the magazine
    began to appear. They are now fetched only when somebody edits. */
-const SDK = 'https://www.gstatic.com/firebasejs/11.0.2/';
 
 const FIREBASE = {
   apiKey:            'AIzaSyCiCVCr_MeIYO4uq8vcsMQQu4B6BbrNqYA',
@@ -2261,27 +2281,64 @@ const FIREBASE = {
 };
 
 /* ---------- who may edit ----------
-   One code, typed into one box, the way the landing manager works. There is
-   no name to remember and no account for anyone to set up.
+   Everybody who edits this magazine has an account of their own. There
+   used to be one shared code, which meant the magazine could not tell
+   one person from another, could not take the keys back from one of
+   them without changing them for everybody, and had no idea who had
+   changed what.
 
-   The code is not checked in this file — a code checked here would be
-   readable by anyone who opened the page, and the database behind it would
-   have to be left open to the world for the editor to write at all. Instead
-   the code IS the password of the single shared editor account below. It
-   travels to Firebase, never appears in this file, and the database rules
-   keep refusing everyone who has not sent it.
+   Two things have to be true before somebody can edit:
 
-   Setting it up, once:
+     1. They have a login on this Firebase project.
+     2. Their address is listed under /people in the database.
+
+   The second is what this magazine controls, and it is the one that
+   matters. The database rules read that list themselves, so taking a
+   person out of it closes every door at once — the editor, the
+   published issues, and the photograph upload — immediately, even
+   while their login still exists and their token is still valid. That
+   is what the shared code could never do.
+
+   Setting it up, once, in the Firebase console:
      Authentication → Sign-in method → enable Email/Password.
-     Authentication → Users → Add user, with the address below and the code
-     as its password. Nothing is emailed and nothing needs verifying.
+     Authentication → Settings → User actions → UNCHECK "Enable create
+       (sign-up)". Without this, anybody could register an address you
+       have listed under /people and walk in. There is no reason to
+       leave it on: you make the accounts.
+     Realtime Database → Rules → paste database.rules.json from this
+       repository, and publish.
 
-   Changing the code: reset that user's password in the console. It takes
-   effect immediately and this file does not change.
+   Adding a person, each time:
+     Authentication → Users → Add user, with their address and a
+       password to hand them. The table then shows a User UID; copy it.
+     Then, in the editor: Account & settings → People → Add, with that
+       id, their name and their address.
+   Both are needed. The first is their login; the second is their
+   permission, and it is the one you take away again.
 
-   Six characters is Firebase's minimum for a password, so a code shorter
-   than that will be refused when you create the account. */
-const EDITOR_ACCOUNT = 'editors@jramag.org';
+   Six characters is Firebase's minimum for a password.
+
+   The first person is the exception, because an empty /people list
+   lets nobody write anything, including the list itself. Add that one
+   record by hand in Realtime Database → Data, before publishing the
+   rules:
+
+     people
+       <your User UID from Authentication → Users>
+         name  : "Your Name"
+         email : "you@example.com"
+         role  : "owner"
+         added : 0
+
+   After that the People panel does it. */
+
+/* A person is filed under the user id Firebase gives them, not under
+   their address. An address would read better, but an address contains
+   dots and a database key may not, so the rules would have to rewrite
+   one into the other — and a security rule that depends on a string
+   operation behaving exactly as expected is a lock whose key you have
+   not tried. auth.uid is handed to the rules as it is. The address is
+   kept inside the record, where it is only ever read by people. */
 
 /* Where an imported photograph lives when nothing says otherwise — the
    old WordPress uploads folder. Issues carry their own mediaBase, so
@@ -2325,56 +2382,175 @@ async function restGet(path){
   return r.json();
 }
 
-/* ---------- the full library, for editing ----------
-   Loaded once, the first time somebody signs in or writes something.
-   Everything the editor needs hangs off this one promise. */
-let sdkP = null;
-/* How long the sign-in library is given to arrive before the editor
-   stops waiting and says so. Generous: a slow connection should be let
-   through, and only a fetch that is never coming should be called off. */
-const SDK_WAIT = 20000;
+/* ---------- signing in, without the library ----------
+   Signing in used to fetch the Firebase SDK from gstatic: three bundled
+   modules, several hundred kilobytes, before the code box could even be
+   typed into. On a slow line that is the difference between editing the
+   magazine and not, and on a very slow one it never finished at all.
 
-function firebase(){
-  if(sdkP) return sdkP;
-  sdkP = (async () => {
-    /* A fetch that hangs is worse than one that fails. A failure is
-       caught and said out loud; a hang leaves the sign-in box disabled,
-       waiting on something that is never coming, with nothing written
-       anywhere to say what went wrong. So it is given a limit. */
-    let bell;
-    const tooLong = new Promise((_, no) => {
-      bell = setTimeout(() => no(new Error(
-        'it did not arrive within ' + Math.round(SDK_WAIT / 1000)
-        + ' seconds. Check the connection and try again.')), SDK_WAIT);
-    });
-    try{
-      const [appM, authM, dbM] = await Promise.race([
-        Promise.all([
-          import(SDK + 'firebase-app.js'),
-          import(SDK + 'firebase-auth.js'),
-          import(SDK + 'firebase-database.js')
-        ]),
-        tooLong
-      ]);
-      const app = appM.initializeApp(FIREBASE);
-      return Object.assign({}, authM, dbM, {
-        app, auth: authM.getAuth(app), db: dbM.getDatabase(app)
-      });
-    }finally{ clearTimeout(bell); }
-  })();
-  /* and a failure is not remembered. This promise was kept for the life
-     of the page, so one bad moment on the network meant every later try
-     failed the same way without touching the network at all, and only a
-     reload could clear it. The next press is a fresh attempt. */
-  sdkP.catch(() => { sdkP = null; });
-  return sdkP;
+   Everything this magazine asks of that library is four one-shot
+   database verbs and a sign-in. All of it answers plain HTTP, which is
+   how the reader has always worked. So the library is gone and these
+   are requests: a few hundred bytes instead of a few hundred kilobytes,
+   and nothing to wait for before typing.
+
+   What is given up with it: live listeners and an offline queue, which
+   this magazine never used. */
+const AUTH_API  = 'https://identitytoolkit.googleapis.com/v1/accounts:';
+const TOKEN_API = 'https://securetoken.googleapis.com/v1/token';
+const SESSION   = 'jra-session';
+
+/* The signed-in session: an hour-long token to send, and a refresh
+   token to get the next one with. The refresh token is what is kept
+   between visits, in this browser only — the same place and the same
+   exposure as the library's own store, which kept it in IndexedDB on
+   this origin. */
+let Session = null;
+let refreshing = null;
+
+async function authCall(method, body){
+  const r = await fetch(AUTH_API + method + '?key=' + encodeURIComponent(FIREBASE.apiKey), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  const out = await r.json().catch(() => ({}));
+  if(!r.ok){
+    const code = (out.error && out.error.message) || ('HTTP ' + r.status);
+    const e = new Error(code); e.code = code;
+    throw e;
+  }
+  return out;
 }
 
-/* ---------- the database, in four verbs ---------- */
-const dbGet = async (p) => { const f = await firebase(); return (await f.get(f.ref(f.db, p))).val(); };
-const dbSet = async (p, v) => { const f = await firebase(); return f.set(f.ref(f.db, p), clean(v)); };
-const dbUpd = async (p, v) => { const f = await firebase(); return f.update(f.ref(f.db, p), clean(v)); };
-const dbDel = async (p) => { const f = await firebase(); return f.remove(f.ref(f.db, p)); };
+function holdSession(d){
+  Session = {
+    idToken: d.idToken,
+    refreshToken: d.refreshToken,
+    /* a minute short of the hour, so a long save is never cut off
+       halfway by a token going stale mid-request */
+    until: Date.now() + (Number(d.expiresIn || 3600) - 60) * 1000,
+    uid: d.localId || (Session && Session.uid) || '',
+    email: (d.email || (Session && Session.email) || '').toLowerCase()
+  };
+  store(SESSION, Session.refreshToken);
+  return Session;
+}
+
+function dropSession(){
+  Session = null;
+  store(SESSION, '');
+}
+
+/* The token to send with the next request, fetched again when it is
+   old. Several requests asking at once share one refresh rather than
+   starting a stampede of them. */
+async function freshToken(force){
+  if(!Session) return null;
+  if(!force && Session.idToken && Date.now() < Session.until) return Session.idToken;
+  if(refreshing) return refreshing;
+  refreshing = (async () => {
+    try{
+      const r = await fetch(TOKEN_API + '?key=' + encodeURIComponent(FIREBASE.apiKey), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'grant_type=refresh_token&refresh_token='
+            + encodeURIComponent(Session.refreshToken)
+      });
+      const out = await r.json().catch(() => ({}));
+      if(!r.ok || !out.id_token) throw new Error('the sign-in has expired');
+      holdSession({ idToken: out.id_token, refreshToken: out.refresh_token,
+                    expiresIn: out.expires_in, localId: out.user_id });
+      return Session.idToken;
+    }catch(e){
+      /* the refresh token has been withdrawn or has rotted; this is a
+         signed-out browser now, and it should say so rather than
+         failing every write from here on */
+      dropSession();
+      onUser(null);
+      return null;
+    }finally{ refreshing = null; }
+  })();
+  return refreshing;
+}
+
+async function signInWithCode(email, password){
+  const d = await authCall('signInWithPassword',
+    { email, password, returnSecureToken: true });
+  holdSession(d);
+  await onUser(userShape());
+}
+
+async function signOutNow(){
+  dropSession();
+  await onUser(null);
+}
+
+async function sendResetEmail(email){
+  await authCall('sendOobCode', { requestType: 'PASSWORD_RESET', email });
+}
+
+/* What the rest of the file has always been handed: an object with an
+   address and a way to get a token. Keeping the shape means nothing
+   downstream — the menu, the account pane, the photograph upload —
+   had to learn anything new. */
+const userShape = () => !Session ? null : {
+  uid: Session.uid,
+  email: Session.email,
+  getIdToken: (force) => freshToken(force)
+};
+
+/* A browser that signed in before comes back signed in: the stored
+   refresh token is spent for a fresh one, which also proves it is still
+   good. Nothing is fetched for a reader. */
+async function restoreSession(){
+  const keep = store(SESSION);
+  if(!keep) return null;
+  Session = { idToken:'', refreshToken: keep, until: 0, uid:'', email:'' };
+  const t = await freshToken(true);
+  if(!t) return null;
+  /* the refresh gives back a user id but not an address, and the
+     address is the name every other part of this works by */
+  if(!Session.email){
+    try{
+      const who = await authCall('lookup', { idToken: t });
+      const u = who && who.users && who.users[0];
+      if(u) Session.email = String(u.email || '').toLowerCase();
+    }catch(e){ /* the address can wait; the token is what matters */ }
+  }
+  return userShape();
+}
+
+/* ---------- the database, in four verbs ----------
+   The same addresses the reader reads, with the signed-in token on the
+   end. A token that has gone stale between asking and sending is the
+   one error worth handling here: fetch a new one and try once more,
+   rather than handing a save failure to somebody who is signed in. */
+async function dbReq(method, path, value){
+  const send = async (token) => {
+    const url = `${DB_URL}/${path}.json` + (token ? '?auth=' + encodeURIComponent(token) : '');
+    const init = { method };
+    if(value !== undefined){
+      init.headers = { 'Content-Type': 'application/json' };
+      init.body = JSON.stringify(clean(value));
+    }
+    return fetch(url, init);
+  };
+  let r = await send(await freshToken());
+  if((r.status === 401 || r.status === 403) && Session) r = await send(await freshToken(true));
+  if(!r.ok){
+    const text = await r.text().catch(() => '');
+    const why = /permission|denied/i.test(text)
+      ? 'permission denied' : ('HTTP ' + r.status + (text ? ' — ' + text.slice(0, 120) : ''));
+    throw new Error(why);
+  }
+  const out = await r.text();
+  return out ? JSON.parse(out) : null;
+}
+const dbGet = (p) => dbReq('GET', p);
+const dbSet = (p, v) => dbReq('PUT', p, v === undefined ? null : v);
+const dbUpd = (p, v) => dbReq('PATCH', p, v === undefined ? {} : v);
+const dbDel = (p) => dbReq('DELETE', p);
 
 /* The database refuses undefined and silently drops empty objects, so
    everything on its way in goes through here. */
@@ -3345,6 +3521,8 @@ const State = {
   legacyLoose: [],
   /* the gallery screen's own two filters: which issue, and which kind */
   galMag: '', galArt: '', galKind: 'all',
+  /* who may edit, read with everything else at sign-in */
+  people: {},
   /* the split: how much of the pane the editor takes, which preview the
      other half is showing, and — when the window is too narrow to halve —
      which of the two is on screen. The preview choice is shared by both
@@ -3475,11 +3653,13 @@ const magByNum = (n) => Object.values(State.magazines)
 
 /* ---------- loading and saving ---------- */
 async function loadEditorData(){
-  const [articles, magazines, images, pages, langs] = await Promise.all([
+  const [articles, magazines, images, pages, langs, people] = await Promise.all([
     dbGet('articles'), dbGet('magazines'), dbGet('images'), dbGet('pages'),
-    dbGet('site/langs').catch(() => null)
+    dbGet('site/langs').catch(() => null),
+    dbGet('people').catch(() => null)
   ]);
   State.tongues = arr(langs);
+  State.people = (people && typeof people === 'object') ? people : {};
   /* The icon set is a convenience, not the magazine. If its node is
      unreachable — most likely because the rules have not caught up with
      it — that costs the icon list and nothing else, rather than taking
@@ -5693,15 +5873,13 @@ async function startAuth(){
   if(authStarted) return;
   authStarted = true;
   try{
-    const f = await firebase();
-    f.onAuthStateChanged(f.auth, onUser);
+    await onUser(await restoreSession());
   }catch(e){
     authStarted = false;
     /* back to a box that can be typed into, with the reason in it —
        pressing the button again is a fresh attempt */
     showGate(true, false);
-    $('#gateErr').textContent = 'Could not fetch the sign-in library \u2014 '
-      + (e.message || e);
+    $('#gateErr').textContent = 'Could not check the sign-in \u2014 ' + (e.message || e);
   }
 }
 
@@ -5713,15 +5891,26 @@ async function onUser(user){
   State.user = user || null;
   State.admin = false;
   State.role = null;
-  /* Knowing the code is the whole of it for now. When this grows the tiers
-     [[racemaster]] has, /admins/{uid} is where each person's role will live;
-     it is read here already, and an absent one changes nothing today. */
-  State.admin = !!user;
+  /* Having a login and being allowed to edit are two different things,
+     and this is the second one. The database rules read the same list,
+     so a person who is not on it is refused whichever way they ask —
+     this only decides what the screen does about it. */
   if(user){
+    let why = '';
     try{
-      const rec = await dbGet('admins/' + user.uid);
+      const rec = await dbGet('people/' + user.uid);
       State.role = (rec && typeof rec === 'object') ? rec : null;
-    }catch(e){ State.role = null; }
+      /* a session restored from the stored token knows the id but not
+         the address, and the record is where the address is kept */
+      if(State.role && State.role.email && Session && !Session.email)
+        Session.email = String(State.role.email).toLowerCase();
+    }catch(e){ why = e.message || 'it could not be checked'; }
+    State.admin = !!State.role;
+    if(!State.admin)
+      toast(why
+        ? 'Signed in, but whether you may edit could not be checked \u2014 ' + why
+        : 'Signed in as ' + (user.email || 'that account') + ', but it is not on the '
+          + 'list of people who may edit this magazine.');
   }
   document.body.classList.toggle('signed-in', State.admin);
   if(!user) store(KNOWN_EDITOR, '');   // stop pre-loading it for a reader
@@ -6011,6 +6200,9 @@ function canonTongue(code){
   const hit = Object.keys(TONGUE_TABLE).find(k => k.toLowerCase() === low);
   return hit || TONGUE_ALIAS[low] || '';
 }
+/* An owner is the one who may add and remove people. Everybody else
+   edits the magazine and leaves the keys alone. */
+const isOwner = () => !!(State.role && State.role.role === 'owner');
 const tongueNative = (code) => {
   const k = canonTongue(code);
   return k ? TONGUE_TABLE[k][0] : '';
@@ -6291,7 +6483,7 @@ function toggleMenu(){
     'View the live site'));
   menu.append(h('hr'));
   menu.append(h('button', { role:'menuitem',
-    onclick: async () => { closeMenu(); const f = await firebase(); await f.signOut(f.auth); location.hash = '#/'; } }, 'Sign out'));
+    onclick: async () => { closeMenu(); await signOutNow(); location.hash = '#/'; } }, 'Sign out'));
   menu.append(h('hr'));
   menu.append(h('p', { class:'ver', text:'Version ' + APP_VERSION }));
   menu.hidden = false;
@@ -7276,17 +7468,147 @@ function openMagTranslations(m){
 
 /* Who is signed in, what the archive holds, and the jobs that belong to
    the magazine as a whole rather than to any one issue. */
+/* ---------------------------------------------------------------------
+   Who may edit
+
+   The list the database itself reads. A person needs two things: a
+   login on the Firebase project, which is made in the console, and a
+   line here, which is made by an owner. The second is the one that can
+   be taken back, and taking it back closes every door at once — this
+   editor, the published issues, and the photograph upload — because
+   all three ask this same list.
+   --------------------------------------------------------------------- */
+function peopleCard(){
+  const card = h('section', { class:'card' }, h('h2', { text:'People' }));
+  const list = h('div', { class:'people' });
+  const owners = () => Object.values(State.people || {})
+    .filter(x => x && x.role === 'owner').length;
+
+  const save = async (key, rec) => {
+    try{
+      if(rec) await dbSet('people/' + key, rec); else await dbDel('people/' + key);
+      if(rec) State.people[key] = rec; else delete State.people[key];
+      draw();
+    }catch(e){ toast('The list was not changed: ' + (e.message || e)); }
+  };
+
+  const draw = () => {
+    list.textContent = '';
+    const keys = Object.keys(State.people || {}).sort((a, b) =>
+      String((State.people[a] || {}).name || a)
+        .localeCompare(String((State.people[b] || {}).name || b)));
+    if(!keys.length)
+      list.append(h('p', { class:'hint', text:
+        'Nobody is listed, which means nobody can edit. Add the first line by hand in '
+        + 'Realtime Database \u2192 Data before publishing the rules.' }));
+    keys.forEach(k => {
+      const rec = State.people[k] || {};
+      const email = rec.email || '';
+      const self = State.user && k === State.user.uid;
+      const row = h('div', { class:'person' });
+      row.append(h('b', { text: rec.name || email || k }));
+      row.append(h('span', { class:'hint', text: email || k }));
+      row.append(h('span', { class:'tag' + (rec.role === 'owner' ? ' own' : ''),
+        text: rec.role === 'owner' ? 'owner' : 'editor' }));
+      if(self) row.append(h('span', { class:'hint', text:'\u2014 you' }));
+      row.append(h('span', { class:'spacer' }));
+      if(isOwner()){
+        /* The last owner cannot be demoted or removed: an owner is the
+           only one who can change this list, and a list with nobody
+           able to change it is a door that has to be opened with the
+           console again. */
+        const lastOwner = rec.role === 'owner' && owners() < 2;
+        row.append(h('button', { class:'btn small ghost', type:'button',
+          disabled: lastOwner || null,
+          title: lastOwner
+            ? 'The only owner stays an owner \u2014 make somebody else one first'
+            : (rec.role === 'owner' ? 'Can edit, but not change this list'
+                                    : 'Can add and remove people'),
+          onclick: () => save(k, Object.assign({}, rec,
+            { role: rec.role === 'owner' ? 'editor' : 'owner' })) },
+          rec.role === 'owner' ? 'Make an editor' : 'Make an owner'));
+        row.append(h('button', { class:'btn small danger', type:'button',
+          disabled: lastOwner || null,
+          title:'Takes away every kind of access, at once',
+          onclick: () => {
+            if(!confirm(`Take away ${rec.name || email}\u2019s access?\n\n`
+              + (self ? 'This is you. You will be signed out of editing.\n\n' : '')
+              + 'They keep their login but can no longer edit anything, publish '
+              + 'anything or upload a photograph. Their account in the Firebase '
+              + 'console is not touched \u2014 delete it there too if they are gone '
+              + 'for good.')) return;
+            save(k, null);
+          } }, 'Remove'));
+      }
+      list.append(row);
+    });
+  };
+  draw();
+  card.append(list);
+
+  if(!isOwner()){
+    card.append(h('p', { class:'hint', text:
+      'Only an owner can change this list.' }));
+    return card;
+  }
+
+  const name = h('input', { placeholder:'Name', 'aria-label':'Name' });
+  const mail = h('input', { type:'email', placeholder:'Email', 'aria-label':'Email',
+    autocapitalize:'off', spellcheck:'false' });
+  const uid = h('input', { placeholder:'User UID from the console',
+    'aria-label':'User UID', autocapitalize:'off', spellcheck:'false' });
+  const role = h('select', { 'aria-label':'What they may do' },
+    h('option', { value:'editor', text:'Editor \u2014 may write and publish' }),
+    h('option', { value:'owner', text:'Owner \u2014 may also change this list' }));
+  const add = h('button', { class:'btn small primary', type:'button',
+    onclick: () => {
+      const email = (mail.value || '').trim().toLowerCase();
+      const k = (uid.value || '').trim();
+      if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){ toast('That is not an email address.'); return; }
+      /* the id is what the database will be asked about, so a mistyped
+         one is a person who can sign in and do nothing, with nothing
+         to say why */
+      if(!/^[A-Za-z0-9_-]{20,128}$/.test(k)){
+        toast('That does not look like a User UID. Copy it from Authentication \u2192 Users.');
+        return;
+      }
+      if(State.people[k]){ toast('That id is already on the list.'); return; }
+      save(k, { name: (name.value || '').trim() || email, email, role: role.value,
+                added: Date.now(), addedBy: (State.user && State.user.email) || '' });
+      name.value = ''; mail.value = ''; uid.value = '';
+      toast(email + ' may edit.');
+    } }, 'Add');
+  card.append(h('div', { class:'fp-row peopleadd' }, name, mail, uid, role, add));
+  card.append(h('p', { class:'hint', text:
+    'Two things make an editor: a login, made in the Firebase console under '
+    + 'Authentication \u2192 Users, and a line on this list. Copy the User UID the '
+    + 'console shows beside their address \u2014 that is what the database is asked '
+    + 'about. Adding somebody here does not create their login, and removing them '
+    + 'here does not delete it, but it does take away everything they could do '
+    + 'with it.' }));
+  return card;
+}
+
 function workAccount(work){
   const s = sheet();
   s.append(h('h2', { style:'margin:0 0 .2rem', text:'Account & settings' }));
 
+  const me = (State.user && State.user.email) || 'nobody';
   const acc = h('section', { class:'card' }, h('h2', { text:'Signed in' }));
-  acc.append(h('p', { class:'hint', text: (State.user && State.user.email) || 'nobody' }));
-  acc.append(h('p', { class:'hint', text:'Everyone editing shares one code. Change it by resetting this account’s password in the Firebase console — it takes effect at once and this file does not change.' }));
+  acc.append(h('p', { class:'hint' },
+    h('b', { text: (State.role && State.role.name) || me }),
+    ' \u00b7 ' + me + ' \u00b7 ' + (isOwner() ? 'owner' : 'editor')));
   acc.append(h('div', { class:'fp-row' },
     h('button', { class:'btn small', onclick: () => window.open(location.pathname + location.search, '_blank', 'noopener') }, 'View the live site'),
-    h('button', { class:'btn small ghost', onclick: async () => { const f = await firebase(); await f.signOut(f.auth); location.hash = '#/'; } }, 'Sign out')));
+    h('button', { class:'btn small', title:'Sends a link to set a new one',
+      onclick: async () => {
+        try{ await sendResetEmail(me); toast('A link to set a new password is on its way to ' + me + '.'); }
+        catch(e){ toast('Could not send it: ' + (e.message || e)); }
+      } }, 'Change my password'),
+    h('button', { class:'btn small ghost',
+      onclick: async () => { await signOutNow(); location.hash = '#/'; } }, 'Sign out')));
   s.append(acc);
+  s.append(peopleCard());
 
   const pics0 = h('section', { class:'card' }, h('h2', { text:'Photographs' }));
   const waiting = pendingImages();
@@ -12749,28 +13071,61 @@ function wire(){
   $('#cuPublish').onclick = () => publishStaleGalleries();
 
   /* sign in */
+  const LAST_EMAIL = 'jra-who';
+  $('#gateMail').value = store(LAST_EMAIL) || '';
+  const gateSays = (words, good) => {
+    $('#gateErr').textContent = good ? '' : words;
+    $('#gateSaid').textContent = good ? words : '';
+    $('#gateSaid').hidden = !good;
+  };
+  /* What the sign-in service says, in words that mean something to the
+     person reading them. The first two are deliberately the same
+     sentence: which half was wrong is not the reader's business and
+     saying so would tell a stranger which addresses have accounts. */
+  const gateWhy = (code, fallback) =>
+    /INVALID_LOGIN_CREDENTIALS|INVALID_PASSWORD|EMAIL_NOT_FOUND/.test(code)
+      ? 'That address and password do not match an account.'
+    : /INVALID_EMAIL|MISSING_EMAIL/.test(code) ? 'That is not an email address.'
+    : /MISSING_PASSWORD/.test(code)            ? 'The password is missing.'
+    : /USER_DISABLED/.test(code)               ? 'That account has been switched off.'
+    : /TOO_MANY_ATTEMPTS|RESET_PASSWORD_EXCEED/.test(code)
+      ? 'Too many tries. Wait a minute and try again.'
+    : /OPERATION_NOT_ALLOWED/.test(code)
+      ? 'Email and password sign-in is not switched on for this Firebase project yet.'
+    : /Failed to fetch|NetworkError/i.test(code)
+      ? 'Could not reach the sign-in service. Check the connection and try again.'
+    : (fallback || code || 'Could not start editing.');
+
   $('#gateForm').addEventListener('submit', async e => {
     e.preventDefault();
-    $('#gateErr').textContent = '';
+    gateSays('', false);
+    const email = ($('#gateMail').value || '').trim();
     try{
-      const f = await firebase();
-      await f.signInWithEmailAndPassword(f.auth, EDITOR_ACCOUNT, $('#gatePass').value);
+      await signInWithCode(email, $('#gatePass').value);
       $('#gatePass').value = '';
-      store(KNOWN_EDITOR, '1');       // so this browser loads it next time
+      store(KNOWN_EDITOR, '1');       // so this browser checks it next time
+      store(LAST_EMAIL, email);       // and does not ask the address twice
     }catch(err){
-      const code = err.code || '';
-      $('#gateErr').textContent =
-        /auth\/(invalid-credential|wrong-password|user-not-found|invalid-email)/.test(code)
-          ? 'That is not the editor code.'
-        : /auth\/too-many-requests/.test(code)
-          ? 'Too many tries. Wait a minute and try again.'
-        : /auth\/operation-not-allowed/.test(code)
-          ? 'Email/Password sign-in is not switched on for this Firebase project yet.'
-        : /auth\/network-request-failed/.test(code)
-          ? 'Could not reach Firebase. Check the connection and try again.'
-        : (err.message || 'Could not start editing.');
+      gateSays(gateWhy(err.code || err.message || '', err.message), false);
     }
   });
+  /* A password nobody can remember is a locked door, and the person who
+     could once reset it for everybody was whoever held the console. */
+  $('#gateForgot').onclick = async () => {
+    const email = ($('#gateMail').value || '').trim();
+    if(!email){ gateSays('Type the address first and the link will go to it.', false); return; }
+    try{ await sendResetEmail(email); }
+    catch(err){
+      const code = err.code || '';
+      /* an unknown address is answered the same as a known one: whether
+         somebody has an account here is nobody else's business */
+      if(!/EMAIL_NOT_FOUND/.test(code)){
+        gateSays(gateWhy(code, err.message), false);
+        return;
+      }
+    }
+    gateSays('If ' + email + ' has an account, a link to set a new password is on its way.', true);
+  };
   $('#gateCancel').onclick = () => { location.hash = '#/'; };
 
   /* reader controls */
