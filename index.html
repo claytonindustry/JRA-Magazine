@@ -654,8 +654,41 @@ body{background:var(--paper)}
 #reader .foot small{display:block;font-size:.72rem;color:var(--brine)}
 #reader .foot b{font-weight:500;font-size:.9rem}
 #reader .foot a:hover b{color:var(--tanbark)}
-#reader .foot .mid{flex:none;align-self:center;font-size:.76rem;color:var(--brine);text-align:center}
+#reader .foot .mid{
+  flex:none;max-width:40%;align-self:center;text-align:center;
+  overflow:hidden;
+}
+#reader .foot .mid small{font-size:.72rem}
+#reader .foot .mid b{
+  display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  color:var(--brine);
+}
 #reader .foot .off{opacity:.3;pointer-events:none}
+
+/* Where the rail cannot be shown, this is the only thing that says what
+   you are reading and where you can go from it, so it stays on screen
+   rather than waiting at the bottom of a long piece. It is sticky
+   rather than fixed: it rides at the foot of the window while the
+   article is passing and settles into its own place at the end, so a
+   short piece is not left with a bar floating over nothing. */
+@container reader (max-width:63.99rem){
+  #reader .foot{
+    position:sticky;bottom:0;z-index:5;
+    margin-top:2.5rem;padding:.5rem 0 calc(.5rem + env(safe-area-inset-bottom));
+    background:var(--paper);border-top:1px solid var(--rule);
+    box-shadow:0 -8px 16px -12px rgba(0,0,0,.35);
+    gap:.6rem;align-items:center;
+  }
+  #reader .foot a,#reader .foot button,#reader .foot .off{padding:.25rem 0}
+  #reader .foot small{font-size:.66rem}
+  #reader .foot b{font-size:.82rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block}
+  /* the ends are a direction, not a destination: on a narrow screen
+     there is no room to read the title of the piece beside this one */
+  #reader .foot a b,#reader .foot .off b{font-size:0}
+  #reader .foot a small,#reader .foot .off small{font-size:.8rem;color:var(--ink)}
+  #reader .foot .mid{max-width:56%}
+  #reader .foot .mid b{font-size:.82rem}
+}
 
 #reader .pdfonly{
   margin:1.5rem 0 0;padding:1.25rem;border:1px solid var(--rule);
@@ -2391,7 +2424,7 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
    when the file changes. It is unrelated to the database's own VERSION,
    which governs schema upgrades and must not be moved for a cosmetic
    change. */
-const APP_VERSION = '1.45';
+const APP_VERSION = '1.46';
 
 /* Nothing is imported at the top any more. The Firebase libraries are
    several hundred kilobytes and, loaded this way, the browser must fetch
@@ -4195,7 +4228,6 @@ const LANGS = {
       picturePage:'Picture page', pictures:'Pictures',
       draft:'Draft — not in an issue',
       previous:'Previous', next:'Next',
-      nextIssue:'Next issue', prevIssue:'Previous issue',
       opensOn:'Opens elsewhere', onSite:'Elsewhere',
       noneHere:q => `Nothing in this issue matches “${q}”. Try a boat name, a person, or a place.`,
       noneAnywhere:q => `Nothing in the library matches “${q}”. Try a boat name, a person, or a place.`,
@@ -5080,11 +5112,12 @@ function renderArticle(num, id, query, mode){
      on. The piece, on its own, as a reader would meet it. */
   const bare = !!issue.bare;
 
-  // At either end of an issue, step to the issue beside it on the shelf.
-  const all = arr(Reader.library.issues).map(x => String(x.num));
-  const here = all.indexOf(String(num));
-  const nextIssue = !bare && here > -1 && here < all.length - 1 ? all[here + 1] : null;
-  const prevIssue = !bare && here > 0 ? all[here - 1] : null;
+  /* The foot used to step to the issue beside this one on the shelf
+     once it ran out of articles. Reading to the end of one magazine is
+     not a reason to be put into the next: it is a different magazine,
+     and nothing said so until you were already in it. The end of an
+     issue is now the end of an issue, and the way to another is the
+     shelf. */
 
   const where = bare ? S().draft : S().issueN(num);
   /* A reader who has chosen a language and opened an issue that does not
@@ -5127,15 +5160,15 @@ function renderArticle(num, id, query, mode){
         ${bare ? '' : `<nav class="foot">
           ${prev
             ? `<a href="#/${esc(num)}/${esc(prev.id)}"><small>${esc(S().previous)}</small><b>${esc(prev.title)}</b></a>`
-            : prevIssue
-              ? `<a href="#/${esc(prevIssue)}"><small>${esc(S().prevIssue)}</small><b>${esc(S().issueN(prevIssue))}</b></a>`
-              : `<span class="off"><small>${esc(S().previous)}</small><b>—</b></span>`}
-          <button class="mid" id="toc">${esc(query ? S().results : S().contents)}</button>
+            : `<span class="off"><small>${esc(S().previous)}</small><b>\u2014</b></span>`}
+          <!-- Where you are, which on a narrow screen the rail is not
+               there to say. It is still the way back to the contents,
+               because it always was and taking that away would be a
+               feature lost to a change about something else. -->
+          <button class="mid" id="toc"><small>${esc(query ? S().results : S().contents)}</small><b>${esc(a.title || '')}</b></button>
           ${next
             ? `<a class="nxt" href="#/${esc(num)}/${esc(next.id)}"><small>${esc(S().next)}</small><b>${esc(next.title)}</b></a>`
-            : nextIssue
-              ? `<a class="nxt" href="#/${esc(nextIssue)}"><small>${esc(S().nextIssue)}</small><b>${esc(S().issueN(nextIssue))}</b></a>`
-              : `<span class="nxt off"><small>${esc(S().next)}</small><b>—</b></span>`}
+            : `<span class="nxt off"><small>${esc(S().next)}</small><b>\u2014</b></span>`}
         </nav>`}
       </div>
     </div>`;
