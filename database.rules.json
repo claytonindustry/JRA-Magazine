@@ -4,54 +4,58 @@
     ".write": false,
     "library": {
       ".read": true,
-      ".write": "auth != null && root.child('people').child(auth.uid).exists()"
+      ".write": "auth != null && root.child('people').child(auth.token.email.toLowerCase().replace('.', ',')).child('role').val() === 'owner'"
     },
     "issues": {
       ".read": true,
-      ".write": "auth != null && root.child('people').child(auth.uid).exists()"
+      ".write": "auth != null && root.child('people').child(auth.token.email.toLowerCase().replace('.', ',')).child('role').val() === 'owner'"
     },
     "searchindex": {
       ".read": true,
-      ".write": "auth != null && root.child('people').child(auth.uid).exists()"
+      ".write": "auth != null && root.child('people').child(auth.token.email.toLowerCase().replace('.', ',')).child('role').val() === 'owner'"
     },
     "site": {
       ".read": true,
-      ".write": "auth != null && root.child('people').child(auth.uid).exists()"
+      ".write": "auth != null && root.child('people').child(auth.token.email.toLowerCase().replace('.', ',')).child('role').val() === 'owner'"
     },
     "gallery": {
       ".read": true,
-      ".write": "auth != null && root.child('people').child(auth.uid).exists()"
+      ".write": "auth != null && root.child('people').child(auth.token.email.toLowerCase().replace('.', ',')).child('role').val() === 'owner'"
     },
     "articles": {
-      ".read": "auth != null && root.child('people').child(auth.uid).exists()",
-      ".write": "auth != null && root.child('people').child(auth.uid).exists()"
+      ".read": "auth != null && root.child('people').child(auth.token.email.toLowerCase().replace('.', ',')).exists()",
+      "$article": {
+        ".write": "auth != null && root.child('people').child(auth.token.email.toLowerCase().replace('.', ',')).child('role').val() === 'owner' || (auth != null && root.child('people').child(auth.token.email.toLowerCase().replace('.', ',')).exists() && newData.exists())"
+      }
     },
     "magazines": {
-      ".read": "auth != null && root.child('people').child(auth.uid).exists()",
-      ".write": "auth != null && root.child('people').child(auth.uid).exists()"
+      ".read": "auth != null && root.child('people').child(auth.token.email.toLowerCase().replace('.', ',')).exists()",
+      "$magazine": {
+        ".write": "auth != null && root.child('people').child(auth.token.email.toLowerCase().replace('.', ',')).child('role').val() === 'owner' || (auth != null && root.child('people').child(auth.token.email.toLowerCase().replace('.', ',')).exists() && data.exists() && newData.exists())"
+      }
     },
     "images": {
-      ".read": "auth != null && root.child('people').child(auth.uid).exists()",
-      ".write": "auth != null && root.child('people').child(auth.uid).exists()"
+      ".read": "auth != null && root.child('people').child(auth.token.email.toLowerCase().replace('.', ',')).exists()",
+      "$image": {
+        ".write": "auth != null && root.child('people').child(auth.token.email.toLowerCase().replace('.', ',')).child('role').val() === 'owner' || (auth != null && root.child('people').child(auth.token.email.toLowerCase().replace('.', ',')).exists() && newData.exists())"
+      }
     },
     "icons": {
-      ".read": "auth != null && root.child('people').child(auth.uid).exists()",
-      ".write": "auth != null && root.child('people').child(auth.uid).exists()"
+      ".read": "auth != null && root.child('people').child(auth.token.email.toLowerCase().replace('.', ',')).exists()",
+      ".write": "auth != null && root.child('people').child(auth.token.email.toLowerCase().replace('.', ',')).exists()"
     },
     "pages": {
-      ".read": "auth != null && root.child('people').child(auth.uid).exists()",
-      ".write": "auth != null && root.child('people').child(auth.uid).exists()"
+      ".read": "auth != null && root.child('people').child(auth.token.email.toLowerCase().replace('.', ',')).exists()",
+      ".write": "auth != null && root.child('people').child(auth.token.email.toLowerCase().replace('.', ',')).exists()"
     },
     "people": {
-      ".read": "auth != null",
+      ".read": "auth != null && root.child('people').child(auth.token.email.toLowerCase().replace('.', ',')).exists()",
       "$person": {
-        ".write": "auth != null && root.child('people').child(auth.uid).child('role').val() === 'owner'",
+        ".read": "auth != null && $person === auth.token.email.toLowerCase().replace('.', ',')",
+        ".write": "auth != null && root.child('people').child(auth.token.email.toLowerCase().replace('.', ',')).child('role').val() === 'owner'",
         ".validate": "newData.hasChildren(['name', 'role'])",
         "name": {
           ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length < 120"
-        },
-        "email": {
-          ".validate": "newData.isString() && newData.val().length < 200"
         },
         "role": {
           ".validate": "newData.isString() && (newData.val() === 'owner' || newData.val() === 'editor')"

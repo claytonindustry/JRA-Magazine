@@ -1492,14 +1492,9 @@ body.pdf-building #editor .work,body.pdf-building #editor .sp-grip{display:none!
 #gate input#gatePass{letter-spacing:.12em}
 #gate .said{color:var(--e-accent)}
 #gate .sr{display:block;font-size:0;margin-bottom:0}   /* label for readers only */
-/* signed in, but not an editor — the form is no use, the id is */
-#gate #gateNo p{margin-bottom:.6rem}
-#gate .uid{
-  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
-  font-size:.85rem;word-break:break-all;user-select:all;
-  background:var(--e-bg,#f3f1ec);border:1px solid var(--e-line,#d9d4c9);
-  border-radius:6px;padding:.5rem .6rem;margin:.3rem 0 .6rem;
-}
+/* signed in, but not an editor — one sentence and the way out */
+#gate #gateNo h2{margin-bottom:.5rem}
+#gate #gateNo p{margin-bottom:.2rem}
 
 #toast{
   position:fixed;left:50%;bottom:1.2rem;transform:translateX(-50%);
@@ -2046,22 +2041,15 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
       <button class="btn ghost" type="button" id="gateCancel">Just read the magazine</button>
     </div>
   </form>
-  <!-- Signed in, and not on the list. Asking for the password again is
-       no answer: the password was right. What is wanted is the id an
-       owner needs in order to add them. -->
+  <!-- Signed in, and not on the list. The password was right, so asking
+       for it again says nothing; and there is nothing here to work out,
+       because there is nothing this account may do. One sentence, and
+       the way back out for whoever signed in by mistake. -->
   <div id="gateNo" hidden>
-    <h2>JRA Magazine</h2>
-    <p id="gateWho"></p>
-    <p class="hint">This account may read the magazine but has not been given
-       permission to edit it. An owner adds it in Account &amp; settings →
-       People, using the id below.</p>
-    <p class="uid" id="gateUid"></p>
+    <h2>You are not an editor.</h2>
+    <p class="hint" id="gateWho"></p>
     <div class="acts">
-      <button class="btn" type="button" id="gateCopy">Copy the id</button>
-    </div>
-    <div class="acts alt">
       <button class="btn ghost" type="button" id="gateOut">Sign out</button>
-      <button class="btn ghost" type="button" id="gateRead">Just read the magazine</button>
     </div>
   </div>
 </div>
@@ -2288,7 +2276,7 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
    when the file changes. It is unrelated to the database's own VERSION,
    which governs schema upgrades and must not be moved for a cosmetic
    change. */
-const APP_VERSION = '1.43';
+const APP_VERSION = '1.44';
 
 /* Nothing is imported at the top any more. The Firebase libraries are
    several hundred kilobytes and, loaded this way, the browser must fetch
@@ -2358,13 +2346,20 @@ const FIREBASE = {
 
    After that the People panel does it. */
 
-/* A person is filed under the user id Firebase gives them, not under
-   their address. An address would read better, but an address contains
-   dots and a database key may not, so the rules would have to rewrite
-   one into the other — and a security rule that depends on a string
-   operation behaving exactly as expected is a lock whose key you have
-   not tried. auth.uid is handed to the rules as it is. The address is
-   kept inside the record, where it is only ever read by people. */
+/* A person is filed under their address, which is the only thing about
+   them anybody has to remember. A database key may not contain a dot,
+   so dots are written as commas; the rules derive the same key from the
+   signed-in address with replace(), which the Realtime Database rules
+   reference defines as replacing every instance, and the upload Worker
+   does the same. One address, three places, one spelling. */
+const peopleKey = (email) =>
+  String(email || '').trim().toLowerCase().replace(/\./g, ',');
+/* and back again, for reading */
+const keyEmail = (key) => String(key || '').replace(/,/g, '.');
+/* The five characters a key may not hold. A dot is dealt with above;
+   an address carrying one of these cannot be filed at all, and is
+   refused where it is typed rather than written and silently ignored. */
+const KEYABLE = (email) => !/[$#[\]/]/.test(String(email || ''));
 
 /* Where an imported photograph lives when nothing says otherwise — the
    old WordPress uploads folder. Issues carry their own mediaBase, so
@@ -2516,6 +2511,39 @@ async function sendResetEmail(email){
   await authCall('sendOobCode', { requestType: 'PASSWORD_RESET', email });
 }
 
+/* Making somebody a login, from the editor rather than the console.
+
+   The password here is thrown away: it is random, nobody reads it, and
+   the person is sent a link to set their own. An editor's password
+   should never have been through anybody else's hands, and inventing
+   one for them means it travels by whatever way you tell them, which
+   is usually worse than email.
+
+   Signing somebody up hands back a session for the account just made,
+   which would sign the owner doing it out of their own. Those tokens
+   are dropped on the floor: holdSession is not called, so the session
+   in hand is untouched.
+
+   Returns what happened, because an address that already has a login
+   is not a failure — it is somebody who has written for you before. */
+async function createLogin(email){
+  const bytes = new Uint8Array(24);
+  (self.crypto || window.crypto).getRandomValues(bytes);
+  const password = btoa(String.fromCharCode(...bytes)).replace(/[^A-Za-z0-9]/g, '') + 'aA1!';
+  try{
+    await authCall('signUp', { email, password, returnSecureToken: false });
+  }catch(e){
+    if(/EMAIL_EXISTS/.test(e.code || '')) return 'had one already';
+    if(/OPERATION_NOT_ALLOWED|ADMIN_ONLY_OPERATION/.test(e.code || ''))
+      throw new Error('this Firebase project will not let the editor make logins. '
+        + 'Authentication \u2192 Settings \u2192 User actions \u2192 tick "Enable create".');
+    throw e;
+  }
+  /* and now they set their own */
+  try{ await sendResetEmail(email); return 'made, and sent a link to set a password'; }
+  catch(e){ return 'made, but the password link would not send \u2014 ' + (e.message || e); }
+}
+
 /* What the rest of the file has always been handed: an object with an
    address and a way to get a token. Keeping the shape means nothing
    downstream — the menu, the account pane, the photograph upload —
@@ -2535,8 +2563,10 @@ async function restoreSession(){
   Session = { idToken:'', refreshToken: keep, until: 0, uid:'', email:'' };
   const t = await freshToken(true);
   if(!t) return null;
-  /* the refresh gives back a user id but not an address, and the
-     address is the name every other part of this works by */
+  /* The refresh gives back a user id but not an address, and the
+     address is now the name everything works by — who you are on the
+     list, and what the rules will ask about. So it is fetched before
+     anybody is looked up. */
   if(!Session.email){
     try{
       const who = await authCall('lookup', { idToken: t });
@@ -5890,8 +5920,9 @@ function showGate(on, waiting){
   $('#gateForm').hidden = notYet;
   $('#gateNo').hidden = !notYet;
   if(notYet){
+    /* which account, so that signing out and trying another one means
+       something to whoever is looking at it */
     $('#gateWho').textContent = 'Signed in as ' + (State.user.email || 'this account') + '.';
-    $('#gateUid').textContent = State.user.uid || '';
     return;
   }
   /* While the sign-in library is still on its way there is nothing
@@ -5935,12 +5966,8 @@ async function onUser(user){
   if(user){
     let why = '';
     try{
-      const rec = await dbGet('people/' + user.uid);
+      const rec = await dbGet('people/' + peopleKey(user.email));
       State.role = (rec && typeof rec === 'object') ? rec : null;
-      /* a session restored from the stored token knows the id but not
-         the address, and the record is where the address is kept */
-      if(State.role && State.role.email && Session && !Session.email)
-        Session.email = String(State.role.email).toLowerCase();
     }catch(e){ why = e.message || 'it could not be checked'; }
     State.admin = !!State.role;
     /* Not being listed is said on the screen itself, with the id to
@@ -6238,9 +6265,26 @@ function canonTongue(code){
   const hit = Object.keys(TONGUE_TABLE).find(k => k.toLowerCase() === low);
   return hit || TONGUE_ALIAS[low] || '';
 }
-/* An owner is the one who may add and remove people. Everybody else
-   edits the magazine and leaves the keys alone. */
+/* ---------------------------------------------------------------------
+   What each kind of person may do
+
+   An editor writes: a new article, any article's words, photographs,
+   layout and translations, the photographs themselves, the gallery,
+   and how a magazine is arranged.
+
+   An owner does all of that, and is alone in being able to make or
+   unmake things and to put them in front of readers: creating and
+   deleting a magazine, deleting an article, publishing and
+   unpublishing, the library's languages, deleting a photograph, and
+   who may edit at all.
+
+   The database is told the same thing, and it is the database that
+   decides. These are for hiding what cannot be pressed, so that
+   nobody presses it and is refused. A rule written here and nowhere
+   else would be no rule at all. */
 const isOwner = () => !!(State.role && State.role.role === 'owner');
+const mayPublish = isOwner;
+const mayDelete = isOwner;
 const tongueNative = (code) => {
   const k = canonTongue(code);
   return k ? TONGUE_TABLE[k][0] : '';
@@ -6557,10 +6601,10 @@ function renderEditorChrome(){
      sheet it opens explains what is missing, which a dead button cannot. */
   const onIssue = State.etab === 'issue';
   const out = !!m && !!m.published;
-  $('#btnPublish').hidden = !onIssue || out;
+  $('#btnPublish').hidden = !onIssue || out || !mayPublish();
   $('#btnPublish').disabled = !m;
-  $('#btnUnpublish').hidden = !onIssue || !out;
-  $('#btnCorrect').hidden = !onIssue || !out;
+  $('#btnUnpublish').hidden = !onIssue || !out || !mayPublish();
+  $('#btnCorrect').hidden = !onIssue || !out || !mayPublish();
   if(onIssue && out){
     const waiting = magIsStale(m);
     const c = $('#btnCorrect');
@@ -6605,8 +6649,10 @@ function sidePool(side){
      nothing holds — so it is marked as the different thing it is. */
   pool.forEach(a => list.append(artRow(a, {
     tools: () => h('span', { class:'rowtools' },
-      h('button', { class:'mini danger', title:'Delete this article',
-        onclick: () => deleteArticle(a) }, '\u2715'))
+      mayDelete()
+        ? h('button', { class:'mini danger', title:'Delete this article',
+            onclick: () => deleteArticle(a) }, '\u2715')
+        : null)
   })));
   card.append(list);
 
@@ -6682,7 +6728,9 @@ function sideIssue(side){
     'Magazine settings…');
   set.disabled = !m;
   card.append(h('div', { class:'fp-row' }, set,
-    h('button', { class:'btn small', onclick: () => openMagSettings(null) }, '+ New magazine')));
+    isOwner()
+      ? h('button', { class:'btn small', onclick: () => openMagSettings(null) }, '+ New magazine')
+      : null));
   side.append(card);
 
 }
@@ -6954,7 +7002,7 @@ function openMagSettings(existing){
 
   body.append(h('div', { class:'fp-row', style:'margin-top:1.4rem' },
     h('button', { class:'btn small danger', type:'button',
-      onclick: () => { dlg.close(); deleteMagazine(m); } },
+      onclick: () => { dlg.close(); deleteMagazine(m); }, hidden: !mayDelete() || undefined },
       m.published ? 'Unpublish and delete' : 'Delete this magazine')));
 
   /* Drawn again while it is already up — a cover arriving, or one being
@@ -7408,6 +7456,10 @@ function openMagTranslations(m){
             : 'Now ' + pickedEng + '.');
           again();
         }) }, 'Put right\u2026'));
+      if(!isOwner()){
+        langs.append(row);
+        return;
+      }
       row.append(h('button', { class:'btn small ghost', type:'button',
         title:'Change what readers see it called',
         onclick: () => {
@@ -7433,8 +7485,11 @@ function openMagTranslations(m){
       langs.append(row);
     });
     langs.append(h('div', { class:'fp-row' },
-      h('button', { class:'btn small primary', type:'button',
-        onclick: () => addTongue(true, again) }, '+ Add a language')));
+      isOwner()
+        ? h('button', { class:'btn small primary', type:'button',
+            onclick: () => addTongue(true, again) }, '+ Add a language')
+        : h('span', { class:'hint', text:
+            'An owner adds and removes the languages the magazine is offered in.' })));
   };
   /* rebuilt rather than patched, since adding a language changes every
      row of the grid below it */
@@ -7533,19 +7588,20 @@ function peopleCard(){
   const draw = () => {
     list.textContent = '';
     const keys = Object.keys(State.people || {}).sort((a, b) =>
-      String((State.people[a] || {}).name || a)
-        .localeCompare(String((State.people[b] || {}).name || b)));
+      String((State.people[a] || {}).name || keyEmail(a))
+        .localeCompare(String((State.people[b] || {}).name || keyEmail(b))));
     if(!keys.length)
       list.append(h('p', { class:'hint', text:
         'Nobody is listed, which means nobody can edit. Add the first line by hand in '
         + 'Realtime Database \u2192 Data before publishing the rules.' }));
     keys.forEach(k => {
       const rec = State.people[k] || {};
-      const email = rec.email || '';
-      const self = State.user && k === State.user.uid;
+      const email = keyEmail(k);
+      const self = State.user
+        && email === String(State.user.email || '').toLowerCase();
       const row = h('div', { class:'person' });
-      row.append(h('b', { text: rec.name || email || k }));
-      row.append(h('span', { class:'hint', text: email || k }));
+      row.append(h('b', { text: rec.name || email }));
+      row.append(h('span', { class:'hint', text: email }));
       row.append(h('span', { class:'tag' + (rec.role === 'owner' ? ' own' : ''),
         text: rec.role === 'owner' ? 'owner' : 'editor' }));
       if(self) row.append(h('span', { class:'hint', text:'\u2014 you' }));
@@ -7572,9 +7628,9 @@ function peopleCard(){
             if(!confirm(`Take away ${rec.name || email}\u2019s access?\n\n`
               + (self ? 'This is you. You will be signed out of editing.\n\n' : '')
               + 'They keep their login but can no longer edit anything, publish '
-              + 'anything or upload a photograph. Their account in the Firebase '
-              + 'console is not touched \u2014 delete it there too if they are gone '
-              + 'for good.')) return;
+              + 'anything or upload a photograph \u2014 the next thing they try is '
+              + 'refused. Their account in the Firebase console is not touched; '
+              + 'delete it there too if they are gone for good.')) return;
             save(k, null);
           } }, 'Remove'));
       }
@@ -7593,37 +7649,41 @@ function peopleCard(){
   const name = h('input', { placeholder:'Name', 'aria-label':'Name' });
   const mail = h('input', { type:'email', placeholder:'Email', 'aria-label':'Email',
     autocapitalize:'off', spellcheck:'false' });
-  const uid = h('input', { placeholder:'User UID from the console',
-    'aria-label':'User UID', autocapitalize:'off', spellcheck:'false' });
   const role = h('select', { 'aria-label':'What they may do' },
     h('option', { value:'editor', text:'Editor \u2014 may write and publish' }),
     h('option', { value:'owner', text:'Owner \u2014 may also change this list' }));
   const add = h('button', { class:'btn small primary', type:'button',
-    onclick: () => {
+    onclick: async () => {
       const email = (mail.value || '').trim().toLowerCase();
-      const k = (uid.value || '').trim();
       if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){ toast('That is not an email address.'); return; }
-      /* the id is what the database will be asked about, so a mistyped
-         one is a person who can sign in and do nothing, with nothing
-         to say why */
-      if(!/^[A-Za-z0-9_-]{20,128}$/.test(k)){
-        toast('That does not look like a User UID. Copy it from Authentication \u2192 Users.');
+      /* An address holding one of these cannot be a key, so it could be
+         written to the list and then never match anybody. Said here,
+         where it can be fixed, rather than discovered later. */
+      if(!KEYABLE(email)){
+        toast('That address has a character this cannot file \u2014 $ # [ ] or / \u2014 so it '
+          + 'cannot be given access.');
         return;
       }
-      if(State.people[k]){ toast('That id is already on the list.'); return; }
-      save(k, { name: (name.value || '').trim() || email, email, role: role.value,
-                added: Date.now(), addedBy: (State.user && State.user.email) || '' });
-      name.value = ''; mail.value = ''; uid.value = '';
-      toast(email + ' may edit.');
+      const k = peopleKey(email);
+      if(State.people[k]){ toast(email + ' is already on the list.'); return; }
+      add.disabled = true;
+      try{
+        const made = await createLogin(email);
+        await save(k, { name: (name.value || '').trim() || email, role: role.value,
+                        added: Date.now(), addedBy: (State.user && State.user.email) || '' });
+        name.value = ''; mail.value = '';
+        toast(email + ' may edit \u2014 ' + made + '.');
+      }catch(e){
+        toast('Not added: ' + (e.message || e));
+      }finally{ add.disabled = false; }
     } }, 'Add');
-  card.append(h('div', { class:'fp-row peopleadd' }, name, mail, uid, role, add));
+  card.append(h('div', { class:'fp-row peopleadd' }, name, mail, role, add));
   card.append(h('p', { class:'hint', text:
-    'Two things make an editor: a login, made in the Firebase console under '
-    + 'Authentication \u2192 Users, and a line on this list. Copy the User UID the '
-    + 'console shows beside their address \u2014 that is what the database is asked '
-    + 'about. Adding somebody here does not create their login, and removing them '
-    + 'here does not delete it, but it does take away everything they could do '
-    + 'with it.' }));
+    'Adding somebody makes their login and gives them permission in one press. '
+    + 'They are emailed a link to set their own password \u2014 nobody here invents one '
+    + 'for them. Removing them takes away everything they can do, at once, but it '
+    + 'does not delete their login; that is done in the Firebase console if they '
+    + 'are gone for good.' }));
   return card;
 }
 
@@ -7700,7 +7760,9 @@ function workAccount(work){
     text: `${mags.length} issues · ${arts.length} articles · ${pics.toLocaleString()} photographs.` }));
   arch.append(h('div', { class:'fp-row' },
     h('button', { class:'btn small', onclick: openImport }, 'Import a library…'),
-    h('button', { class:'btn small', onclick: publishPages }, 'Publish the written pages')));
+    mayPublish()
+      ? h('button', { class:'btn small', onclick: publishPages }, 'Publish the written pages')
+      : h('span', { class:'hint', text:'An owner publishes these.' })));
   s.append(arch);
 
   work.append(s);
@@ -8104,7 +8166,9 @@ function workPage(work){
   s.append(h('label', { class:'check' }, show, ' Show this tab in the reader'));
   s.append(h('p', { class:'hint', text:'This page appears in the reader’s own typography, beside the Library and Gallery tabs. It belongs to the site, not to any issue, and goes out on its own.' }));
   const pub = h('div', { class:'fp-row', style:'margin:.2rem 0 .8rem' },
-    h('button', { class:'btn small primary', onclick: publishPages }, 'Publish About and Links'),
+    mayPublish()
+      ? h('button', { class:'btn small primary', onclick: publishPages }, 'Publish About and Links')
+      : null,
     h('span', { class:'hint', text: pg.show ? '' : 'Not shown — publishing now takes the tab away.' }));
   s.append(pub);
   s.append(toolbars());
@@ -10507,6 +10571,10 @@ function photoUse(p){
 }
 
 async function deletePhoto(p){
+  if(!mayDelete()){
+    toast('An owner takes a photograph off the list.');
+    return;
+  }
   if(!photoIsUnused(p)){
     toast(`That photograph is in use — it is ${photoUse(p)}. Take it out there first.`);
     return;
@@ -10782,7 +10850,7 @@ function renderCurate(){
   /* One gallery, so one thing to send, and it is sent from the view that
      shows what will go. */
   const btn = $('#cuPublish');
-  btn.hidden = kind !== 'gallery';
+  btn.hidden = kind !== 'gallery' || !mayPublish();
   const waiting = galleryIsStale();
   btn.disabled = !waiting;
   btn.textContent = waiting ? 'Publish the gallery' : 'The gallery is up to date';
@@ -13165,20 +13233,7 @@ function wire(){
     gateSays('If ' + email + ' has an account, a link to set a new password is on its way.', true);
   };
   $('#gateCancel').onclick = () => { location.hash = '#/'; };
-  $('#gateRead').onclick = () => { location.hash = '#/'; };
   $('#gateOut').onclick = async () => { await signOutNow(); showGate(true); };
-  $('#gateCopy').onclick = async () => {
-    const id = $('#gateUid').textContent || '';
-    try{ await navigator.clipboard.writeText(id); toast('Copied.'); }
-    catch(e){
-      /* a browser that will not copy for us can still be given the
-         words to copy from */
-      const r = document.createRange();
-      r.selectNodeContents($('#gateUid'));
-      const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r);
-      toast('Press Ctrl+C \u2014 the id is selected.');
-    }
-  };
 
   /* reader controls */
   $$('#reader .sizes button').forEach(b => b.onclick = () => setSize(+b.dataset.size));
