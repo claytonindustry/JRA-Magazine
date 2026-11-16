@@ -398,20 +398,34 @@ body{background:var(--paper)}
   #reader .spread{grid-template-columns:15rem minmax(0,1fr);align-items:start}
 }
 #reader .nowbar{
-  display:none;width:100%;border:0;border-top:1px solid var(--rule);
-  background:none;color:var(--brine);font-family:var(--sans);
-  font-size:.76rem;line-height:1.2;text-align:start;cursor:pointer;
-  padding:.4rem var(--gutter);
+  display:none;width:100%;border-top:1px solid var(--rule);
+  padding:.3rem var(--gutter);
+  align-items:center;gap:.4rem;
+}
+#reader .nowwhere{
+  flex:1;min-width:0;border:0;background:none;color:var(--brine);
+  font-family:var(--sans);font-size:.76rem;line-height:1.2;
+  text-align:start;cursor:pointer;padding:.1rem 0;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
 }
-#reader .nowbar:hover{color:var(--ink)}
-#reader .nowbar b{font-weight:600;color:var(--ink)}
-#reader .nowbar.flat{cursor:default}
-#reader .nowbar.flat:hover{color:var(--brine)}
+#reader .nowwhere:hover{color:var(--ink)}
+#reader .nowwhere b{font-weight:600;color:var(--ink)}
+#reader .nowbar.flat .nowwhere{cursor:default}
+#reader .nowbar.flat .nowwhere:hover{color:var(--brine)}
+/* The way on and back. Two characters wide, because the titles they
+   lead to will not fit beside a title that is already there. */
+#reader .nowstep{
+  flex:none;display:grid;place-items:center;
+  width:1.9rem;height:1.9rem;border-radius:6px;
+  text-decoration:none;color:var(--brine);font-family:var(--sans);
+  font-size:1.1rem;line-height:1;
+}
+#reader .nowstep:hover{color:var(--ink);background:var(--paper-raised)}
+#reader .nowstep[hidden]{display:none}
 /* The rail is the better answer whenever there is room for it, so this
    appears only where it cannot. */
 @container reader (max-width:63.99rem){
-  #reader .nowbar.on{display:block}
+  #reader .nowbar.on{display:flex}
 }
 
 #reader .rail{display:none}
@@ -542,8 +556,21 @@ body{background:var(--paper)}
 .capmarks{display:flex;gap:.3rem;align-items:center;margin:.1rem 0 .35rem}
 .capmarks .btn{padding:.1rem .4rem;font-size:.78rem}
 #reader .body figcaption .credit{font-style:normal}
-#reader .getpdf{margin:.9rem 0 0;font-family:var(--sans);font-size:.88rem}
-#reader .getpdf a{color:var(--tanbark);text-underline-offset:.15em}
+/* the two things a reader does with an issue they have chosen: look
+   inside it, or take it away */
+#reader .searchrow{
+  display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;
+  margin:0 0 clamp(1.5rem,4cqi,2.25rem);
+}
+#reader .searchrow .search{flex:1 1 14rem;min-width:0;margin:0}
+#reader .getpdf{
+  flex:none;font-family:var(--sans);font-size:.85rem;text-decoration:none;
+  color:var(--tanbark);border:1px solid var(--rule);border-radius:999px;
+  padding:.45rem .9rem;white-space:nowrap;
+}
+#reader .getpdf:hover{border-color:var(--tanbark);background:var(--paper-raised)}
+/* the printed-edition-only page still offers it the old way */
+#reader .pdfonly .getpdf{border:0;padding:0}
 #reader .body a{color:var(--tanbark);text-underline-offset:.15em}
 #reader .body figure{margin:1.9em 0;max-width:100%}
 #reader .body figure.wide figcaption{max-width:var(--measure)}
@@ -689,18 +716,13 @@ body{background:var(--paper)}
 }
 #reader .foot .off{opacity:.3;pointer-events:none}
 
-/* Where the rail cannot be shown, this is the only thing that says what
-   you are reading and where you can go from it, so it stays on screen
-   rather than waiting at the bottom of a long piece. It is sticky
-   rather than fixed: it rides at the foot of the window while the
-   article is passing and settles into its own place at the end, so a
-   short piece is not left with a bar floating over nothing. */
+/* The foot is the foot again. What has to stay within reach on a narrow
+   screen is in the header, which holds itself at the top anyway, so
+   there is no second bar hovering over the words. This is what you
+   meet when you get to the end, as it always was. */
 @container reader (max-width:63.99rem){
   #reader .foot{
-    position:sticky;bottom:0;z-index:5;
-    margin-top:2.5rem;padding:.5rem 0 calc(.5rem + env(safe-area-inset-bottom));
-    background:var(--paper);border-top:1px solid var(--rule);
-    box-shadow:0 -8px 16px -12px rgba(0,0,0,.35);
+    margin-top:2.5rem;padding-top:.75rem;
     gap:.6rem;align-items:center;
   }
   #reader .foot a,#reader .foot button,#reader .foot .off{padding:.25rem 0}
@@ -727,11 +749,6 @@ body{background:var(--paper)}
   padding:.55rem .9rem;border-radius:3px;
 }
 
-#reader .draftbar{
-  background:var(--e-sel);color:#fff;font-family:var(--sans);
-  font-size:.78rem;font-weight:600;letter-spacing:.04em;
-  padding:.4rem var(--gutter);text-align:center;
-}
 
 .skip{
   position:absolute;inset-inline-start:-9999px;top:0;
@@ -963,7 +980,6 @@ dialog #coverBody .subhead:first-child{margin-top:.2rem}
    the pane it scrolls in: a bar stuck to the foot measures from the
    pane's padding box, and padding there would hold it that far up. */
 #editor .sheet{max-width:46rem;margin:0 auto;padding-bottom:2rem}
-#editor .art-head .row label{flex:0 0 auto}
 /* ---- the article's header, now three blocks like any other ----
    The faces and sizes they had as form fields, kept exactly, so the
    only thing that changed is that they can be written in. */
@@ -1179,6 +1195,25 @@ dialog .ed-cap{font-size:.95rem;min-height:2.2em}
   background:var(--e-accent);color:#fff;border-radius:999px;font-size:.68rem;line-height:1.5;
 }
 
+/* ---------- the printed edition ---------- */
+#editor .pdfrow,dialog .pdfrow{margin:.2rem 0 1rem}
+#editor .pdfrow .pdfat,dialog .pdfrow .pdfat{font-size:.75rem;color:var(--e-muted)}
+#editor .pdfrow .pdfsay,dialog .pdfrow .pdfsay{margin:.35rem 0 0;min-height:1.1em}
+dialog#dlgPickFile{max-width:min(30rem,94vw);width:30rem}
+#dlgPickFile h3{margin:0 0 .3rem}
+#dlgPickFile .filelist{
+  max-height:min(50vh,20rem);overflow:auto;margin:.5rem 0;
+  border:1px solid var(--e-line);border-radius:6px;background:#fff;
+}
+#dlgPickFile .filerow{
+  display:flex;gap:.6rem;align-items:baseline;width:100%;text-align:left;
+  padding:.4rem .55rem;background:none;border:0;border-bottom:1px solid var(--e-line);
+  color:var(--e-ink);font-family:var(--ui);font-size:.85rem;cursor:pointer;
+}
+#dlgPickFile .filerow:last-child{border-bottom:0}
+#dlgPickFile .filerow:hover{background:var(--e-bg)}
+#dlgPickFile .filerow .hint{margin-left:auto}
+
 /* ---------- what a piece is made of, and what goes in it ---------- */
 dialog#dlgText{max-width:min(24rem,94vw);width:24rem}
 dialog#dlgVideo{max-width:min(28rem,94vw);width:28rem}
@@ -1382,6 +1417,15 @@ dialog .figctl .btn[aria-pressed="true"],
 #editor .addbar{
   display:flex;gap:.4rem;align-items:center;flex-wrap:wrap;margin-top:.45rem;
 }
+/* what is added, and then what the piece does */
+#editor .addbar .barsplit{
+  width:1px;align-self:stretch;margin:.1rem .25rem;background:var(--e-line);
+}
+#editor .addbar .check{
+  display:flex;align-items:center;gap:.3rem;margin:0;
+  font-size:.78rem;color:var(--e-muted);white-space:nowrap;cursor:pointer;
+}
+#editor .addbar .check input{width:auto;margin:0}
 /* so a block added or walked to does not come to rest under the bar */
 /* clear of the header a block is being scrolled to sits under */
 #editor .blk{scroll-margin-top:7rem;scroll-margin-bottom:1rem}
@@ -1982,7 +2026,6 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
 <!-- ===================== the reader ===================== -->
 <div id="reader">
   <a class="skip" href="#top" id="skip">Skip to content</a>
-  <div class="draftbar" id="draftbar" hidden>Preview — this is the working copy, not the published issue</div>
   <header class="bar">
     <div class="bar-in" id="barIn">
       <button class="flag" id="flag">JRA Magazine</button>
@@ -2003,8 +2046,15 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
     <nav class="tabs" id="tabs" aria-label="Sections"></nav>
     <!-- Narrow enough to lose the contents rail, and the reader has
          nothing on screen saying where they are. This says it, and
-         gives back the one thing the rail was for. -->
-    <button class="nowbar" id="nowBar" type="button"></button>
+         gives back the one thing the rail was for: where you are, and
+         the way on and back. It is in the header, which already holds
+         itself at the top of the screen, so nothing had to be stuck
+         over the foot of the words to be within reach. -->
+    <div class="nowbar" id="nowBar">
+      <a class="nowstep" id="nowPrev" aria-label="Previous" hidden>‹</a>
+      <button class="nowwhere" id="nowWhere" type="button"></button>
+      <a class="nowstep" id="nowNext" aria-label="Next" hidden>›</a>
+    </div>
   </header>
   <main id="top"></main>
 </div>
@@ -2268,6 +2318,14 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
      toolbar, always there whether or not anything was being written;
      they are the same four, a press further away, and the toolbar is
      the three things you add rather than the seven. -->
+<!-- What is already in the bucket, for a file put there by hand. -->
+<dialog id="dlgPickFile">
+  <h3>Already on the host</h3>
+  <p class="hint">Files under <code>issues/</code> in the bucket.</p>
+  <div class="filelist" id="pickFileList"></div>
+  <div class="fp-row"><button class="btn" type="button" id="pickFileShut">Cancel</button></div>
+</dialog>
+
 <dialog id="dlgText">
   <h3>Add text</h3>
   <div class="kindlist" id="textKinds"></div>
@@ -2456,7 +2514,7 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
    when the file changes. It is unrelated to the database's own VERSION,
    which governs schema upgrades and must not be moved for a cosmetic
    change. */
-const APP_VERSION = '1.47';
+const APP_VERSION = '1.49';
 
 /* Nothing is imported at the top any more. The Firebase libraries are
    several hundred kilobytes and, loaded this way, the browser must fetch
@@ -4310,22 +4368,38 @@ function store(key, val){
 /* Where the reader is, for the narrow screens that have no room for the
    contents rail. Set as an article is drawn and emptied by anything
    else, so it can never be left behind saying something untrue. */
-function setNowBar(issue, title, num){
-  const bar = $('#nowBar');
-  if(!bar) return;
-  bar.textContent = '';
-  bar.append(h('b', { text: issue }));
-  if(title) bar.append(' \u00b7 ' + title);
+function setNowBar(issue, title, num, prev, next){
+  const bar = $('#nowBar'), where = $('#nowWhere');
+  if(!bar || !where) return;
+  where.textContent = '';
+  where.append(h('b', { text: issue }));
+  if(title) where.append(' \u00b7 ' + title);
   bar.classList.add('on');
   bar.classList.toggle('flat', !num);
-  bar.onclick = num ? () => { location.hash = '#/' + num; } : null;
+  where.onclick = num ? () => { location.hash = '#/' + num; } : null;
+  /* Where there is nowhere to step, the control is gone rather than
+     greyed: this bar is two centimetres tall on a telephone and has no
+     room to say no. */
+  [['#nowPrev', prev], ['#nowNext', next]].forEach(([sel, to]) => {
+    const el = $(sel);
+    if(!el) return;
+    el.hidden = !to;
+    if(to) el.setAttribute('href', to);
+    else el.removeAttribute('href');
+  });
 }
 function clearNowBar(){
-  const bar = $('#nowBar');
+  const bar = $('#nowBar'), where = $('#nowWhere');
   if(!bar) return;
   bar.classList.remove('on');
-  bar.textContent = '';
-  bar.onclick = null;
+  /* Empty what is written, not what it is written in. This used to be
+     one button and clearing it meant clearing its words; it holds the
+     steps as well now, and taking those out took them out for good. */
+  if(where){ where.textContent = ''; where.onclick = null; }
+  ['#nowPrev', '#nowNext'].forEach(sel => {
+    const e = $(sel);
+    if(e){ e.hidden = true; e.removeAttribute('href'); }
+  });
 }
 
 const scrollTop0 = () => {
@@ -4953,13 +5027,20 @@ function renderIssue(num, query, mode){
         <p class="date">${esc(meta.date)}</p>
         <p class="tally">${esc(S().tally(arts.length, totalWords.toLocaleString(),
             longSpan(mins(totalWords))))}</p>
-        ${meta.pdf ? `<p class="getpdf"><a href="${esc(meta.pdf)}" download>${esc(S().printEdition)}</a></p>` : ''}
       </div>
     </div>
-    <div class="search">${SEARCH_SVG}
-      <input id="q" type="search" placeholder="${esc(S().searchIssue)}" value="${esc(q)}"
-             aria-label="${esc(S().searchIssue)}" autocomplete="off">
-      <button class="search-clear" id="qclear" ${q ? '' : 'hidden'}>${esc(S().clear)}</button>
+    <!-- The printed edition sits beside the search rather than under the
+         tally. It is one of the two things a reader does with an issue
+         they have decided on: look inside it, or take it away. -->
+    <div class="searchrow">
+      <div class="search">${SEARCH_SVG}
+        <input id="q" type="search" placeholder="${esc(S().searchIssue)}" value="${esc(q)}"
+               aria-label="${esc(S().searchIssue)}" autocomplete="off">
+        <button class="search-clear" id="qclear" ${q ? '' : 'hidden'}>${esc(S().clear)}</button>
+      </div>
+      ${meta.pdf
+        ? `<a class="getpdf" href="${esc(meta.pdf)}" download>${esc(S().printEdition)}</a>`
+        : ''}
     </div>
     <div id="list">${q ? searchIssueMarkup(num, q, qm) : contentsMarkup}</div>`;
 
@@ -5168,7 +5249,8 @@ function renderArticle(num, id, query, mode){
   const inLang = LANG !== 'en' && arr(issueMeta(num) && issueMeta(num).langs).includes(LANG);
   /* A loose proof is not in an issue, so there is no contents to send
      anyone back to; it still says which piece this is. */
-  setNowBar(where, a.title || '', bare ? '' : num);
+  setNowBar(where, a.title || '', bare ? '' : num,
+    prev ? `#/${num}/${prev.id}` : '', next ? `#/${num}/${next.id}` : '');
 
   main.className = 'reading';
   barIn.classList.add('wide');
@@ -5670,7 +5752,6 @@ function setMode(m){
   document.body.classList.toggle('mode-edit', m === 'edit');
   editorEl.hidden = m !== 'edit';
   readerEl.hidden = (m === 'edit' && !State.previewing);
-  $('#draftbar').hidden = !State.previewing;
 }
 
 /* Preview borrows the reader whole and puts it inside the editor, so
@@ -7349,17 +7430,20 @@ function openMagSettings(existing){
     });
   }
 
-  /* ---- the two addresses ---- */
-  body.append(h('h3', { class:'subhead', text:'Where its files live' }));
-  const mb = h('input', { value: m.mediaBase || '' });
-  mb.oninput = () => { m.mediaBase = mb.value.trim(); saveMagazine(m); };
-  body.append(h('label', { text:'Photograph address' }, mb));
-  const pdf = h('input', { value: m.pdf || '' });
-  pdf.oninput = () => { m.pdf = pdf.value.trim(); saveMagazine(m); };
-  body.append(h('label', { text:'Print edition (PDF)' }, pdf));
+  /* Where an issue's photographs live was a box to be typed into, and
+     the one answer anybody ever gave it was the same answer as every
+     other issue. It is still carried on the magazine and still what
+     the reader looks in — it is only the typing of it that has gone.
+     Moving a whole archive from one host to another is a different
+     job, done in one place, in Account & settings. */
 
   /* ---- the printed edition ---- */
   body.append(h('h3', { class:'subhead', text:'The printed edition' }));
+  body.append(magPdfRow(m, dlg));
+
+  body.append(h('p', { class:'hint', text:
+    'And the magazine as this editor lays it out, which is a different '
+    + 'thing from the file above:' }));
   const onIssue = State.etab === 'issue';
   body.append(h('p', { class:'hint', text: onIssue
     ? 'The whole magazine, laid out as it would go to the printer.'
@@ -7378,6 +7462,118 @@ function openMagSettings(existing){
      taken away — the window has been rebuilt and only needs showing the
      first time. */
   if(!dlg.open) dlg.showModal();
+}
+
+/* ---------------------------------------------------------------------
+   The printed edition of an issue
+
+   The file readers download: the magazine as it went to the printer.
+   Two ways in, because the files are not all the same size. A normal
+   one goes up from here. A very large one is usually already in the
+   bucket, put there with everything else, and is chosen from a list
+   rather than typed out — a name copied by hand is a broken download
+   nobody notices until a reader says so.
+   --------------------------------------------------------------------- */
+const pdfKeyFor = (m) => `issues/jra-${(m.num || 'issue')}-${uid('')}.pdf`;
+const niceSize = (n) => !n ? '' :
+  n >= 1048576 ? (n / 1048576).toFixed(n > 10485760 ? 0 : 1) + ' MB'
+               : Math.max(1, Math.round(n / 1024)) + ' KB';
+
+function magPdfRow(m, dlg){
+  const box = h('div', { class:'pdfrow' });
+  const draw = () => {
+    box.textContent = '';
+    if(m.pdf){
+      box.append(h('p', { class:'hint' },
+        h('b', { text:'Readers can download it.' }), ' ',
+        h('code', { class:'pdfat', text: String(m.pdf).split('/').pop() })));
+    }else{
+      box.append(h('p', { class:'hint', text:
+        'None yet, so no download is offered. It reaches readers when the '
+        + 'issue is published.' }));
+    }
+    const row = h('div', { class:'fp-row' });
+    row.append(h('button', { class:'btn small primary', type:'button',
+      onclick: () => choose() }, m.pdf ? 'Replace it\u2026' : 'Choose a file\u2026'));
+    row.append(h('button', { class:'btn small', type:'button',
+      onclick: () => fromHost() }, 'Already on the host\u2026'));
+    if(m.pdf) row.append(h('button', { class:'btn small danger', type:'button',
+      onclick: () => {
+        if(!confirm('Take the printed edition off this issue?\n\n'
+          + 'The file stays on the host; readers stop being offered it once '
+          + 'the issue is published again.')) return;
+        m.pdf = ''; saveMagazine(m); draw();
+      } }, 'Remove'));
+    box.append(row);
+    const say = h('p', { class:'hint pdfsay' });
+    box.append(say);
+    return say;
+  };
+
+  let say = draw();
+
+  const choose = () => {
+    const pick = h('input', { type:'file', accept:'application/pdf', hidden: true });
+    document.body.append(pick);
+    pick.onchange = async () => {
+      const file = pick.files && pick.files[0];
+      pick.remove();
+      if(!file) return;
+      if(!/pdf$/i.test(file.name) && file.type !== 'application/pdf'){
+        toast('That is not a PDF.'); return;
+      }
+      const key = pdfKeyFor(m);
+      say.textContent = `Sending ${niceSize(file.size)}\u2026`;
+      try{
+        const url = await sendBigFile(file, key, (words) =>
+          { say.textContent = words + ' ' + niceSize(file.size) + ' in all.'; });
+        m.pdf = url;
+        saveMagazine(m);
+        say = draw();
+        say.textContent = 'Sent.';
+        toast('The printed edition is on the host.');
+      }catch(e){
+        say.textContent = 'It did not go: ' + (e.message || e);
+      }
+    };
+    pick.click();
+  };
+
+  const fromHost = async () => {
+    say.textContent = 'Looking\u2026';
+    let files;
+    try{ files = await filesOnHost('issues/'); }
+    catch(e){ say.textContent = 'Could not ask the host: ' + (e.message || e); return; }
+    const pdfs = files.filter(f => /\.pdf$/i.test(f.key))
+      .sort((a, b) => String(b.at || '').localeCompare(String(a.at || '')));
+    say.textContent = '';
+    if(!pdfs.length){
+      say.textContent = 'There are no PDFs in the bucket under issues/ yet.';
+      return;
+    }
+    openPickFile(pdfs, (key) => {
+      m.pdf = MEDIA_HOST + encodeURI(key);
+      saveMagazine(m);
+      say = draw();
+      toast('Chosen.');
+    });
+  };
+
+  return box;
+}
+
+/* A list of what is on the host, to choose one from. */
+function openPickFile(files, then){
+  const dlg = $('#dlgPickFile'), list = $('#pickFileList');
+  list.textContent = '';
+  files.forEach(f => {
+    list.append(h('button', { class:'filerow', type:'button',
+      onclick: () => { dlg.close(); then(f.key); } },
+      h('b', { text: String(f.key).replace(/^issues\//, '') }),
+      h('span', { class:'hint', text: niceSize(f.size) })));
+  });
+  $('#pickFileShut').onclick = () => dlg.close();
+  dlg.showModal();
 }
 
 /* ---------------------------------------------------------------------
@@ -8532,26 +8728,10 @@ function workArticle(work){
     return;
   }
   /* The title, the byline and the standfirst are blocks now, at the top
-     of the list below. What is left here is the two things that are
-     about the article rather than in it. */
-  const head = h('div', { class:'art-head' });
-  const newPage = h('input', { type:'checkbox' });
-  newPage.checked = a.newPage !== false;
-  newPage.onchange = () => { a.newPage = newPage.checked; saveArticle(a, { fast:true }); };
-  /* The web issue is not bound by a page count, so a piece can run here
-     that was never in the edition that went to the printer. */
-  const webOnly = h('input', { type:'checkbox' });
-  webOnly.checked = !!a.webOnly;
-  webOnly.onchange = () => {
-    a.webOnly = webOnly.checked;
-    saveArticle(a, { fast:true });
-    renderSide(); relayout();
-  };
-  head.append(h('div', { class:'row' },
-    h('label', { class:'check' }, newPage, ' Start on a new page'),
-    h('label', { class:'check', title:'Read on the web, left out of the printed issue' },
-      webOnly, ' Online only')));
-  s.append(head);
+     of the list below. The two things that are about the article rather
+     than in it used to sit here in a panel of their own, above
+     everything, which made them look like part of the writing. They
+     are settings, so they are with the other settings, in the bar. */
 
   /* Writing a translation rather than the article itself. Everything
      about translating lives on its own tab now; what is left here is a
@@ -8589,7 +8769,7 @@ function workArticle(work){
       'Something has been written, moved or added to it that is not here.'));
   }
 
-  s.append(toolbars());
+  s.append(toolbars(a));
   const blocks = h('div', { id:'blocks' });
   s.append(blocks);
 
@@ -8621,15 +8801,17 @@ function workPage(work){
       : null,
     h('span', { class:'hint', text: pg.show ? '' : 'Not shown — publishing now takes the tab away.' }));
   s.append(pub);
-  s.append(toolbars());
+  s.append(toolbars(null));
   s.append(h('div', { id:'blocks' }));
   work.append(s);
   renderBlocks();
 }
 
-/* The two rows travel together, so they stick together. */
-function toolbars(){
-  return h('div', { class:'toolbars' }, fmtBar(), addBar());
+/* The two rows travel together, so they stick together. The article is
+   passed through because the second row carries two of its settings,
+   and a page that is not an article has neither. */
+function toolbars(a){
+  return h('div', { class:'toolbars' }, fmtBar(), addBar(a || null));
 }
 
 /* ---------------------------------------------------------------------
@@ -9013,11 +9195,35 @@ const TEXT_KINDS = [
   ['quote', 'Quote',      'set apart, in italic']
 ];
 
-function addBar(){
+function addBar(a){
   const bar = h('div', { class:'addbar' });
   bar.append(h('button', { class:'btn small', onclick: () => openAddText() }, '+ Text…'));
   bar.append(h('button', { class:'btn small', onclick: () => openAdd(insertPoint()) }, '+ Photo…'));
   bar.append(h('button', { class:'btn small', onclick: () => openVideo() }, '+ Video…'));
+
+  /* What this piece does rather than what is in it. Only for an
+     article: the About and Links pages are not in an issue, are never
+     printed, and have no page to start on. */
+  if(a){
+    const newPage = h('input', { type:'checkbox' });
+    newPage.checked = a.newPage !== false;
+    newPage.onchange = () => { a.newPage = newPage.checked; saveArticle(a, { fast:true }); };
+    /* The web issue is not bound by a page count, so a piece can run
+       there that was never in the edition that went to the printer. */
+    const webOnly = h('input', { type:'checkbox' });
+    webOnly.checked = !!a.webOnly;
+    webOnly.onchange = () => {
+      a.webOnly = webOnly.checked;
+      saveArticle(a, { fast:true });
+      renderSide(); relayout();
+    };
+    bar.append(h('span', { class:'barsplit' }));
+    bar.append(h('label', { class:'check', title:'Begins a fresh page in the printed issue' },
+      newPage, ' Start on a new page'));
+    bar.append(h('label', { class:'check', title:'Read on the web, left out of the printed issue' },
+      webOnly, ' Online only'));
+  }
+
   /* With nothing chosen these add to the end, and no block is lit to say
      so — which looks the same as something being wrong. */
   bar.append(h('span', { class:'hint', id:'addWhere' }));
@@ -11053,6 +11259,82 @@ function archivePhotos(){
     out.push({ key, m: null, b: null, a: null, f, uses: 0, rec });
   });
   return out;
+}
+
+/* ---------------------------------------------------------------------
+   A file too big to hand over in one go
+
+   A printed edition runs to a few hundred megabytes, which is more
+   than a Worker may be given in one request. So it goes in pieces: the
+   Worker is told what is coming, handed a piece at a time, and told
+   when it is finished, and R2 joins them.
+
+   A piece that fails is tried again rather than the whole file, which
+   on a connection that comes and goes is the difference between losing
+   ten megabytes and losing an hour.
+   --------------------------------------------------------------------- */
+const BIG_URL = UPLOAD_URL.replace(/\/upload$/, '/big');
+const BIG_TRIES = 3;
+
+async function bigAsk(what, opts){
+  const token = await idToken();
+  if(!token) throw new Error('not signed in');
+  const r = await fetch(BIG_URL + '/' + what + (opts.query || ''), {
+    method: opts.method || 'POST',
+    headers: Object.assign({ Authorization: 'Bearer ' + token },
+      opts.json ? { 'Content-Type': 'application/json' } : {}),
+    body: opts.json ? JSON.stringify(opts.json) : opts.body
+  });
+  const out = await r.json().catch(() => ({}));
+  if(!r.ok || !out.ok) throw new Error(out.error || ('HTTP ' + r.status));
+  return out;
+}
+
+async function sendBigFile(file, key, say){
+  const start = await bigAsk('start', { json: { key, type: file.type } });
+  const size = Number(start.partBytes) || (10 * 1024 * 1024);
+  const parts = [];
+  const count = Math.max(1, Math.ceil(file.size / size));
+  try{
+    for(let i = 0; i < count; i++){
+      const piece = file.slice(i * size, Math.min(file.size, (i + 1) * size));
+      let got = null, last = null;
+      for(let tries = 0; tries < BIG_TRIES && !got; tries++){
+        if(say) say(`Sending piece ${i + 1} of ${count}`
+          + (tries ? ` (try ${tries + 1})` : '') + '…');
+        try{
+          got = await bigAsk('part', { method:'PUT', body: piece,
+            query: '?key=' + encodeURIComponent(key)
+                 + '&uploadId=' + encodeURIComponent(start.uploadId)
+                 + '&part=' + (i + 1) });
+        }catch(e){ last = e; }
+      }
+      if(!got) throw last || new Error('a piece would not go');
+      parts.push({ partNumber: got.partNumber, etag: got.etag });
+    }
+    if(say) say('Finishing…');
+    await bigAsk('done', { json: { key, uploadId: start.uploadId, parts } });
+    return MEDIA_HOST + encodeURI(key);
+  }catch(e){
+    /* leave nothing half-written behind; R2 would clear it in a week
+       anyway, but a bucket full of abandoned pieces is nobody's idea
+       of tidy */
+    try{ await bigAsk('abort', { json: { key, uploadId: start.uploadId } }); }
+    catch(x){ /* then the week will do it */ }
+    throw e;
+  }
+}
+
+/* What is already in the bucket, for a file put there by hand. */
+async function filesOnHost(prefix){
+  const token = await idToken();
+  if(!token) throw new Error('not signed in');
+  const r = await fetch(UPLOAD_URL.replace(/\/upload$/, '/files')
+    + '?prefix=' + encodeURIComponent(prefix),
+    { headers: { Authorization: 'Bearer ' + token } });
+  const out = await r.json().catch(() => ({}));
+  if(!r.ok || !out.ok) throw new Error(out.error || ('HTTP ' + r.status));
+  return arr(out.files);
 }
 
 /* ---------------------------------------------------------------------
