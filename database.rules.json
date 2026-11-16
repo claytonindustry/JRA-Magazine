@@ -1,0 +1,98 @@
+{
+  "//": [
+    "JRA Magazine - who may read and write what.",
+    "",
+    "The published magazine is public to read and nothing else is. Writing",
+    "anything at all needs a line under /people for the signed-in person,",
+    "which is what makes removing them from that list the whole of taking",
+    "their access away: the editor, the published issues and the photograph",
+    "upload all ask this same question.",
+    "",
+    "A person is filed under the user id Firebase gives them, which is what",
+    "auth.uid holds. Their address is kept inside the record for people to",
+    "read; no rule depends on it, so no rule depends on rewriting a string.",
+    "",
+    "Publishing this with /people empty locks everybody out, including",
+    "whoever would add the first line. Add that one record by hand first,",
+    "in Realtime Database > Data, using the User UID from",
+    "Authentication > Users:",
+    "",
+    "    people/<your User UID> = {",
+    "      name: \"Your Name\", email: \"you@example.com\",",
+    "      role: \"owner\", added: 0",
+    "    }"
+  ],
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "library": {
+      ".read": true,
+      ".write": "auth != null && root.child('people').child(auth.uid).exists()"
+    },
+    "issues": {
+      ".read": true,
+      ".write": "auth != null && root.child('people').child(auth.uid).exists()"
+    },
+    "searchindex": {
+      ".read": true,
+      ".write": "auth != null && root.child('people').child(auth.uid).exists()"
+    },
+    "site": {
+      ".read": true,
+      ".write": "auth != null && root.child('people').child(auth.uid).exists()"
+    },
+    "gallery": {
+      ".read": true,
+      ".write": "auth != null && root.child('people').child(auth.uid).exists()"
+    },
+    "articles": {
+      ".read": "auth != null && root.child('people').child(auth.uid).exists()",
+      ".write": "auth != null && root.child('people').child(auth.uid).exists()"
+    },
+    "magazines": {
+      ".read": "auth != null && root.child('people').child(auth.uid).exists()",
+      ".write": "auth != null && root.child('people').child(auth.uid).exists()"
+    },
+    "images": {
+      ".read": "auth != null && root.child('people').child(auth.uid).exists()",
+      ".write": "auth != null && root.child('people').child(auth.uid).exists()"
+    },
+    "icons": {
+      ".read": "auth != null && root.child('people').child(auth.uid).exists()",
+      ".write": "auth != null && root.child('people').child(auth.uid).exists()"
+    },
+    "pages": {
+      ".read": "auth != null && root.child('people').child(auth.uid).exists()",
+      ".write": "auth != null && root.child('people').child(auth.uid).exists()"
+    },
+    "people": {
+      ".read": "auth != null",
+      "$person": {
+        ".write": "auth != null && root.child('people').child(auth.uid).child('role').val() === 'owner'",
+        ".validate": "newData.hasChildren(['name', 'role'])",
+        "name": {
+          ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length < 120"
+        },
+        "email": {
+          ".validate": "newData.isString() && newData.val().length < 200"
+        },
+        "role": {
+          ".validate": "newData.isString() && (newData.val() === 'owner' || newData.val() === 'editor')"
+        },
+        "added": {
+          ".validate": "newData.isNumber()"
+        },
+        "addedBy": {
+          ".validate": "newData.isString() && newData.val().length < 200"
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    },
+    "admins": {
+      ".read": false,
+      ".write": false
+    }
+  }
+}
