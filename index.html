@@ -1057,8 +1057,79 @@ dialog .ed-cap{font-size:.95rem;min-height:2.2em}
 }
 #editor .person .tag.own{border-color:var(--e-accent);color:var(--e-accent)}
 #editor .person .btn{white-space:nowrap}
+/* an arrow is square; a word is not */
+#editor .fmtbar .steps{display:flex;gap:2px}
+#editor .btn.small.icon{
+  min-width:1.9rem;padding:.18rem .3rem;font-size:.95rem;line-height:1.1;
+}
 #editor .peopleadd{flex-wrap:wrap}
 #editor .peopleadd input{flex:1;min-width:9rem;margin:0}
+
+/* ---------- the web chat ---------- */
+#chat{
+  position:fixed;inset-inline-end:1rem;bottom:1rem;z-index:110;
+  width:min(22rem,calc(100vw - 2rem));max-height:min(28rem,70vh);
+  display:flex;flex-direction:column;
+  background:var(--e-panel);border:1px solid var(--e-line);border-radius:12px;
+  box-shadow:0 10px 40px rgba(0,0,0,.18);font-family:var(--ui);color:var(--e-ink);
+}
+#chat[hidden]{display:none}
+#chat .chat-top{
+  display:flex;gap:.5rem;align-items:baseline;padding:.6rem .7rem .4rem;
+  border-bottom:1px solid var(--e-line);
+}
+#chat .chat-top b{font-size:.9rem}
+#chat .chat-top .hint{flex:1;font-size:.72rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#chat .chat-top button{
+  border:0;background:none;font:inherit;font-size:1.1rem;line-height:1;
+  color:var(--e-muted);cursor:pointer;padding:0 .2rem;
+}
+#chat .chat-log{
+  flex:1;overflow:auto;padding:.6rem .7rem;display:flex;flex-direction:column;gap:.35rem;
+}
+#chat .chat-msg{
+  display:flex;flex-direction:column;align-items:flex-start;max-width:85%;
+  background:#fff;border:1px solid var(--e-line);border-radius:10px;
+  padding:.3rem .5rem;font-size:.85rem;
+}
+#chat .chat-msg.own{align-self:flex-end;background:var(--e-bg)}
+#chat .chat-msg b{font-size:.7rem;color:var(--e-muted);font-weight:600}
+#chat .chat-msg .chat-text{white-space:pre-wrap;overflow-wrap:anywhere}
+#chat .chat-msg time{font-size:.65rem;color:var(--e-muted);align-self:flex-end}
+#chat .chat-say{display:flex;gap:.4rem;padding:.5rem .7rem .6rem;border-top:1px solid var(--e-line)}
+/* the chat sits beside the editor rather than inside it, so it is
+   dressed here rather than inheriting */
+#chat .btn{
+  border:1px solid var(--e-accent);background:var(--e-accent);color:#fff;
+  padding:.4rem .75rem;border-radius:6px;cursor:pointer;font:inherit;font-size:.85rem;
+  white-space:nowrap;
+}
+#chat .btn:disabled{opacity:.5;cursor:default}
+#chat .chat-say input{
+  flex:1;min-width:0;font:inherit;font-size:.85rem;padding:.4rem .5rem;
+  border:1px solid var(--e-line);border-radius:6px;background:#fff;color:var(--e-ink);
+}
+#editor .brand .dot{
+  display:inline-block;min-width:1.1em;margin-inline-start:.35rem;padding:0 .3em;
+  background:var(--e-accent);color:#fff;border-radius:999px;font-size:.68rem;line-height:1.5;
+}
+
+/* ---------- what a piece is made of, and what goes in it ---------- */
+dialog#dlgText{max-width:min(24rem,94vw);width:24rem}
+dialog#dlgVideo{max-width:min(28rem,94vw);width:28rem}
+#dlgText h3,#dlgVideo h3{margin:0 0 .6rem}
+#dlgText .kindlist{display:flex;flex-direction:column;gap:.35rem;margin-bottom:.6rem}
+#dlgText .kindlist .btn{
+  justify-content:flex-start;text-align:left;padding:.5rem .7rem;font-size:.95rem;
+}
+#dlgText .kindlist .btn small{color:var(--e-muted);font-weight:400;margin-inline-start:.5rem}
+#dlgVideo input{
+  width:100%;font:inherit;font-size:.9rem;padding:.45rem .55rem;
+  border:1px solid var(--e-line);border-radius:6px;background:#fff;color:var(--e-ink);
+}
+#dlgVideo .err{color:#b3261e;font-size:.82rem;margin:.4rem 0 0;min-height:1.1em}
+/* the ways into the photograph window, above what it is showing */
+#dlgAdd .addways{margin-bottom:.6rem}
 
 /* ---------- the list of every language there is ---------- */
 dialog#dlgLang{max-width:min(30rem,94vw);width:30rem}
@@ -1879,7 +1950,7 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
     <!-- The masthead is the way to everything that is not writing:
          the gallery, the written pages, the account, the settings. -->
     <button class="brand" id="brandBtn" aria-haspopup="true" aria-expanded="false">
-      <span class="brand-name">JRA&nbsp;Editor</span>
+      <span class="brand-name">JRA&nbsp;Editor<span class="dot" id="chatDot" hidden></span></span>
       <span class="brand-sub">settings</span>
     </button>
     <!-- Two places to be: writing a piece, and assembling an issue out of
@@ -2056,6 +2127,22 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
 
 <input type="file" id="fileImages" accept="image/*" multiple hidden>
 <input type="file" id="fileCover" accept="image/*" hidden>
+<!-- Beside the work rather than over it: you are talking about what is
+     on the screen, so the screen has to stay. -->
+<aside id="chat" hidden aria-label="Web chat">
+  <header class="chat-top">
+    <b>Web chat</b>
+    <span class="hint" id="chatHere"></span>
+    <button type="button" id="chatShut" title="Close" aria-label="Close the chat">×</button>
+  </header>
+  <div class="chat-log" id="chatLog"></div>
+  <form class="chat-say" id="chatSay">
+    <input id="chatBox" autocomplete="off" placeholder="Say something…"
+           aria-label="What to say">
+    <button class="btn small primary" type="submit">Send</button>
+  </form>
+</aside>
+
 <div id="toast" role="status" hidden></div>
 <div id="busy" hidden><div class="box" id="busyText"></div></div>
 
@@ -2112,6 +2199,30 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
      than typed. A code typed from memory is how Chinese became
      Chamorro: ch is a real language, just not that one, and nothing
      downstream could tell. -->
+<!-- The kinds of text a piece is made of. They were four buttons in the
+     toolbar, always there whether or not anything was being written;
+     they are the same four, a press further away, and the toolbar is
+     the three things you add rather than the seven. -->
+<dialog id="dlgText">
+  <h3>Add text</h3>
+  <div class="kindlist" id="textKinds"></div>
+  <div class="fp-row"><button class="btn" type="button" id="textShut">Cancel</button></div>
+</dialog>
+
+<!-- A video, which is an address rather than a file: the magazine never
+     holds it, it points at it. -->
+<dialog id="dlgVideo">
+  <h3>Add a video</h3>
+  <p class="hint">The address of a video on YouTube or Vimeo.</p>
+  <input id="vidUrl" type="url" autocomplete="off" spellcheck="false"
+         placeholder="https://www.youtube.com/watch?v=…" aria-label="Video address">
+  <p class="err" id="vidErr"></p>
+  <div class="fp-row">
+    <button class="btn primary" type="button" id="vidGo">Add it</button>
+    <button class="btn" type="button" id="vidShut">Cancel</button>
+  </div>
+</dialog>
+
 <dialog id="dlgLang">
   <h3>Add a language</h3>
   <input class="langfind" id="langFind" type="search" autocomplete="off"
@@ -2208,9 +2319,13 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
 <dialog id="dlgAdd">
   <form method="dialog">
     <h3 id="addTitle">Add a photograph</h3>
-    <div class="srctabs" id="addTabs" role="tablist">
-      <button type="button" role="tab" data-src="upload">From this computer</button>
-      <button type="button" role="tab" data-src="here">Already here</button>
+    <!-- What is already here is what you usually want, so that is what
+         this opens on. The other two are things you do rather than
+         places to look, so they are buttons above it rather than tabs
+         beside it. -->
+    <div class="fp-row addways">
+      <button class="btn small" type="button" id="addUpload">Upload…</button>
+      <button class="btn small" type="button" id="addIcons">Add an icon…</button>
     </div>
     <div id="addPane"></div>
     <div class="fp-row"><button class="btn" value="cancel">Close</button></div>
@@ -2276,7 +2391,7 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
    when the file changes. It is unrelated to the database's own VERSION,
    which governs schema upgrades and must not be moved for a cosmetic
    change. */
-const APP_VERSION = '1.44';
+const APP_VERSION = '1.45';
 
 /* Nothing is imported at the top any more. The Firebase libraries are
    several hundred kilobytes and, loaded this way, the browser must fetch
@@ -2582,9 +2697,11 @@ async function restoreSession(){
    end. A token that has gone stale between asking and sending is the
    one error worth handling here: fetch a new one and try once more,
    rather than handing a save failure to somebody who is signed in. */
-async function dbReq(method, path, value){
+async function dbReq(method, path, value, query){
   const send = async (token) => {
-    const url = `${DB_URL}/${path}.json` + (token ? '?auth=' + encodeURIComponent(token) : '');
+    const ask = [query || '', token ? 'auth=' + encodeURIComponent(token) : '']
+      .filter(Boolean).join('&');
+    const url = `${DB_URL}/${path}.json` + (ask ? '?' + ask : '');
     const init = { method };
     if(value !== undefined){
       init.headers = { 'Content-Type': 'application/json' };
@@ -2603,7 +2720,7 @@ async function dbReq(method, path, value){
   const out = await r.text();
   return out ? JSON.parse(out) : null;
 }
-const dbGet = (p) => dbReq('GET', p);
+const dbGet = (p, q) => dbReq('GET', p, undefined, q);
 const dbSet = (p, v) => dbReq('PUT', p, v === undefined ? null : v);
 const dbUpd = (p, v) => dbReq('PATCH', p, v === undefined ? {} : v);
 const dbDel = (p) => dbReq('DELETE', p);
@@ -5978,6 +6095,9 @@ async function onUser(user){
       toast('Signed in, but whether you may edit could not be checked \u2014 ' + why);
   }
   document.body.classList.toggle('signed-in', State.admin);
+  /* the chat belongs to the people who may edit, so it starts and stops
+     with being one of them */
+  if(State.admin) chatStart(); else chatStop();
   if(!user) store(KNOWN_EDITOR, '');   // stop pre-loading it for a reader
   if(State.admin && !State.loaded){
     try{ await loadEditorData(); }
@@ -5991,6 +6111,169 @@ async function onUser(user){
   }
   if(!State.admin && State.mode === 'edit'){ location.hash = '#/'; }
   route();
+}
+
+/* =====================================================================
+   The web chat
+
+   Two people working on the same magazine at the same time, in
+   different houses, with no way to say "I am in issue 101, leave it
+   alone" except by telephone. This is that, and nothing more: who else
+   is here, and what has been said.
+
+   It asks the database rather than being told by it. There is no live
+   connection to keep open — this magazine gave up the Firebase library
+   for a reason, and a socket held open on a slow line is the first
+   thing to go. So it looks: every few seconds while the window is
+   open, and seldom while it is shut, which is enough to put a count on
+   the menu. The messages are small and the asking is cheap.
+
+   Being "here" is a line written every so often and read as stale
+   after two minutes. Nothing has to be cleaned up when a browser is
+   closed mid-sentence, because nothing was promised.
+   ===================================================================== */
+const CHAT_SEEN  = 'jra-chat-seen';
+const CHAT_FAST  = 5000;      // while you are looking at it
+const CHAT_SLOW  = 45000;     // while you are not
+const CHAT_BEAT  = 45000;     // how often you say you are here
+const CHAT_STALE = 150000;    // how long that lasts before it is doubted
+const CHAT_KEEP  = 60;        // how much of the conversation is shown
+
+const Chat = { on:false, open:false, said:[], here:{}, timer:null, beat:null,
+               seen: Number(store(CHAT_SEEN) || 0) };
+
+const chatKey  = () => peopleKey((State.user && State.user.email) || '');
+const chatName = () => (State.role && State.role.name)
+  || (State.user && State.user.email) || 'somebody';
+/* A key that sorts the way the clock does, so the last sixty are the
+   last sixty and nothing has to be ordered after the fact. */
+const chatId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+
+function chatStart(){
+  if(Chat.on || !State.admin) return;
+  Chat.on = true;
+  chatBeat();
+  Chat.beat = setInterval(chatBeat, CHAT_BEAT);
+  chatPull();
+}
+function chatStop(){
+  Chat.on = false;
+  clearInterval(Chat.beat); Chat.beat = null;
+  clearTimeout(Chat.timer); Chat.timer = null;
+  Chat.said = []; Chat.here = {};
+  $('#chat').hidden = true;
+  Chat.open = false;
+  markChatDot();
+}
+
+async function chatBeat(){
+  if(!Chat.on || !State.admin) return;
+  try{ await dbSet('chat/here/' + chatKey(), { name: chatName(), at: Date.now() }); }
+  catch(e){ /* saying you are here is not worth an error message */ }
+}
+
+async function chatPull(){
+  clearTimeout(Chat.timer);
+  if(!Chat.on || !State.admin) return;
+  try{
+    const [said, here] = await Promise.all([
+      dbGet('chat/said', 'orderBy=%22%24key%22&limitToLast=' + CHAT_KEEP),
+      dbGet('chat/here')
+    ]);
+    Chat.said = Object.keys(said || {}).sort()
+      .map(k => Object.assign({ id: k }, said[k]));
+    Chat.here = here || {};
+    if(Chat.open) drawChat();
+    markChatDot();
+  }catch(e){
+    /* A chat that cannot be reached is not an emergency and should not
+       behave like one: it goes quiet and tries again. */
+  }
+  Chat.timer = setTimeout(chatPull, Chat.open ? CHAT_FAST : CHAT_SLOW);
+}
+
+const chatUnread = () => Chat.said.filter(m =>
+  m && Number(m.at) > Chat.seen && m.by !== chatKey()).length;
+
+function markChatDot(){
+  const n = State.admin ? chatUnread() : 0;
+  const dot = $('#chatDot');
+  if(dot){ dot.hidden = !n; dot.textContent = n > 9 ? '9+' : String(n); }
+  const item = $('#chatItem');
+  if(item) item.textContent = n ? `Web chat (${n})` : 'Web chat';
+}
+
+function chatHereNow(){
+  const now = Date.now();
+  return Object.keys(Chat.here || {})
+    .map(k => Chat.here[k])
+    .filter(x => x && now - Number(x.at || 0) < CHAT_STALE)
+    .map(x => x.name || 'somebody');
+}
+
+function drawChat(){
+  const log = $('#chatLog');
+  const mine = chatKey();
+  const atEnd = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
+  log.textContent = '';
+  if(!Chat.said.length)
+    log.append(h('p', { class:'hint', text:'Nothing said yet.' }));
+  let lastBy = '', lastAt = 0;
+  Chat.said.forEach(m => {
+    const own = m.by === mine;
+    /* one name above a run of messages, not one above each */
+    const fresh = m.by !== lastBy || Number(m.at) - lastAt > 300000;
+    const row = h('div', { class:'chat-msg' + (own ? ' own' : '') });
+    if(fresh) row.append(h('b', { text: own ? 'You' : (m.name || 'somebody') }));
+    row.append(h('span', { class:'chat-text', text: m.text || '' }));
+    row.append(h('time', { text: chatWhen(m.at) }));
+    log.append(row);
+    lastBy = m.by; lastAt = Number(m.at) || 0;
+  });
+  const here = chatHereNow().filter(n => n !== chatName());
+  $('#chatHere').textContent = here.length
+    ? here.join(', ') + (here.length === 1 ? ' is here' : ' are here')
+    : 'nobody else here';
+  if(atEnd) log.scrollTop = log.scrollHeight;
+}
+
+function chatWhen(at){
+  const d = new Date(Number(at) || 0);
+  if(!Number(at)) return '';
+  const same = d.toDateString() === new Date().toDateString();
+  const hm = String(d.getHours()).padStart(2, '0') + ':'
+           + String(d.getMinutes()).padStart(2, '0');
+  return same ? hm : (d.getDate() + ' ' + MONTHS[d.getMonth()].slice(0, 3) + ' ' + hm);
+}
+
+function openChat(on){
+  const box = $('#chat');
+  Chat.open = on === undefined ? box.hidden : !!on;
+  box.hidden = !Chat.open;
+  if(Chat.open){
+    Chat.seen = Date.now();
+    store(CHAT_SEEN, String(Chat.seen));
+    drawChat();
+    markChatDot();
+    chatPull();                       // look now rather than in forty seconds
+    setTimeout(() => $('#chatBox').focus(), 30);
+  }
+}
+
+async function chatSay(text){
+  text = String(text || '').trim();
+  if(!text || !State.admin) return;
+  const msg = { by: chatKey(), name: chatName(), at: Date.now(),
+                text: text.slice(0, 2000) };
+  /* it appears at once, because waiting for the database to agree is
+     how a chat comes to feel broken on a slow line */
+  Chat.said.push(Object.assign({ id:'pending' }, msg));
+  Chat.seen = msg.at; store(CHAT_SEEN, String(Chat.seen));
+  drawChat();
+  try{
+    await dbSet('chat/said/' + chatId(), msg);
+    await chatPull();
+  }catch(e){ toast('That was not sent: ' + (e.message || e)); }
 }
 
 /* =====================================================================
@@ -6564,6 +6847,10 @@ function toggleMenu(){
     onclick: () => { closeMenu(); window.open(location.pathname + location.search, '_blank', 'noopener'); } },
     'View the live site'));
   menu.append(h('hr'));
+  /* Beside signing out, because it is the same kind of thing: about you
+     and the people you work with rather than about the magazine. */
+  menu.append(h('button', { role:'menuitem', id:'chatItem',
+    onclick: () => { closeMenu(); openChat(true); } }, 'Web chat'));
   menu.append(h('button', { role:'menuitem',
     onclick: async () => { closeMenu(); await signOutNow(); location.hash = '#/'; } }, 'Sign out'));
   menu.append(h('hr'));
@@ -8443,14 +8730,21 @@ function fmtBar(){
   bar.append(face);
 
   /* The way back through this piece, and the way forward again. */
-  const undo = h('button', { class:'btn small', id:'undoBtn', text:'\u21B6 Undo' });
+  /* The arrow says it. The word beside it took the width of two
+     buttons to repeat what the arrow and the title already said, and
+     pushed everything else about on a narrow screen. */
+  const steps = h('div', { class:'steps', role:'group', 'aria-label':'Undo and redo' });
+  const undo = h('button', { class:'btn small icon', id:'undoBtn', text:'\u21B6',
+    'aria-label':'Undo' });
   undo.onmousedown = e => e.preventDefault();
   undo.onclick = stepBack;
-  bar.append(undo);
-  const redo = h('button', { class:'btn small', id:'redoBtn', text:'\u21B7 Redo' });
+  steps.append(undo);
+  const redo = h('button', { class:'btn small icon', id:'redoBtn', text:'\u21B7',
+    'aria-label':'Redo' });
   redo.onmousedown = e => e.preventDefault();
   redo.onclick = stepOn;
-  bar.append(redo);
+  steps.append(redo);
+  bar.append(steps);
 
   setTimeout(() => { markAligns(); markTsizes(); markFace(); markUndo(); }, 0);
   return bar;
@@ -8544,25 +8838,61 @@ function setAlign(how){
 /* The bar stays at the foot of the screen, and what it adds goes where
    you are rather than at the end of the article — so a photograph can be
    put in the middle of a piece without walking it up with the arrows. */
+/* There are three things a piece is made of — words, a photograph, a
+   video — and the toolbar says so. It used to carry seven buttons, four
+   of them kinds of text, all of them on screen whether or not you were
+   adding anything. Which kind of text is a question worth asking once
+   you have decided to add some, not before. */
+const TEXT_KINDS = [
+  ['p',     'Text',       'an ordinary paragraph'],
+  ['h2',    'Heading',    'the big one'],
+  ['h3',    'Subheading', 'the smaller one'],
+  ['quote', 'Quote',      'set apart, in italic']
+];
+
 function addBar(){
   const bar = h('div', { class:'addbar' });
-  /* Named for the block it makes. The other three are abbreviated in
-     the block's own column for want of room; this one was a different
-     word for the same thing. */
-  [['p','+ Text'],['h2','+ Heading'],['h3','+ Subheading'],['quote','+ Quote']].forEach(([t, label]) => {
-    bar.append(h('button', { class:'btn small',
-      onclick: () => addBlockHere({ t, html:'' }, true) }, label));
-  });
-  /* One button for a photograph, wherever it is coming from — and a
-     separate one for an icon, which is a different kind of thing and was
-     confusing as a third tab behind the same button. */
+  bar.append(h('button', { class:'btn small', onclick: () => openAddText() }, '+ Text…'));
   bar.append(h('button', { class:'btn small', onclick: () => openAdd(insertPoint()) }, '+ Photo…'));
-  bar.append(h('button', { class:'btn small', onclick: () => openAdd(insertPoint(), { icons:true }) }, '+ Icon…'));
-  bar.append(h('button', { class:'btn small', onclick: () => addVideo(insertPoint()) }, '+ Video…'));
+  bar.append(h('button', { class:'btn small', onclick: () => openVideo() }, '+ Video…'));
   /* With nothing chosen these add to the end, and no block is lit to say
      so — which looks the same as something being wrong. */
   bar.append(h('span', { class:'hint', id:'addWhere' }));
   return bar;
+}
+
+/* Which kind of words, asked once you have said you want some. */
+function openAddText(){
+  if(!curDoc()){ toast('Open an article first.'); return; }
+  const dlg = $('#dlgText'), list = $('#textKinds');
+  list.textContent = '';
+  TEXT_KINDS.forEach(([t, label, says]) => {
+    list.append(h('button', { class:'btn', type:'button',
+      onclick: () => { dlg.close(); addBlockHere({ t, html:'' }, true); } },
+      label, h('small', { text: says })));
+  });
+  $('#textShut').onclick = () => dlg.close();
+  dlg.showModal();
+}
+
+/* An address, in a box that can be read and corrected, rather than in
+   the browser's own one-line prompt. */
+function openVideo(){
+  if(!curDoc()){ toast('Open an article first.'); return; }
+  const dlg = $('#dlgVideo'), box = $('#vidUrl'), err = $('#vidErr');
+  box.value = ''; err.textContent = '';
+  const go = () => {
+    const url = (box.value || '').trim();
+    if(!url){ err.textContent = 'Paste the address first.'; return; }
+    if(!parseVideo(url)){ err.textContent = 'That is not a YouTube or Vimeo address.'; return; }
+    dlg.close();
+    addVideo(insertPoint(), url);
+  };
+  $('#vidGo').onclick = go;
+  $('#vidShut').onclick = () => dlg.close();
+  box.onkeydown = (e) => { if(e.key === 'Enter'){ e.preventDefault(); go(); } };
+  dlg.showModal();
+  setTimeout(() => box.focus(), 30);
 }
 
 /* ---------- which block the next thing goes under ----------
@@ -8586,10 +8916,13 @@ function setAtBlock(id){
 }
 
 /* ---------- a film, from wherever it already lives ---------- */
-async function addVideo(after){
+async function addVideo(after, address){
   const doc = curDoc();
   if(!doc){ toast('Open an article first.'); return; }
-  const url = prompt('Address of the video on YouTube or Vimeo');
+  /* the address is asked for in a window of its own now; the prompt is
+     kept for anything still calling this the old way */
+  const url = address !== undefined ? address
+            : prompt('Address of the video on YouTube or Vimeo');
   if(url === null) return;
   const got = parseVideo(url);
   if(!got){ toast('That is not a YouTube or Vimeo address.'); return; }
@@ -9861,31 +10194,40 @@ function candidateOfIcon(e){
 }
 
 /* ---------- the chooser ---------- */
-let addSource = 'upload';
+let addSource = 'here';
 let libScope = 'pool';
 
 function openAdd(after, opts){
   if(!curDoc()){ toast('Open an article first.'); return; }
   const onlyIcons = !!(opts && opts.icons);
   const dlg = $('#dlgAdd');
-  if(onlyIcons) addSource = 'icons';
-  else if(addSource === 'icons') addSource = 'upload';
-  $('#addTitle').textContent = onlyIcons ? 'Add an icon' : 'Add a photograph';
-  $('#addTabs').hidden = onlyIcons;
-  $$('#addTabs button').forEach(b => b.onclick = () => {
-    addSource = b.dataset.src;
+  addSource = onlyIcons ? 'icons' : 'here';
+  const draw = () => {
+    $('#addTitle').textContent =
+      addSource === 'icons' ? 'Add an icon'
+      : addSource === 'upload' ? 'Upload a photograph'
+      : 'Add a photograph';
+    /* the way back to the library, from wherever the two buttons took
+       you — without this, choosing Upload is a one-way door */
+    $('#addUpload').textContent = addSource === 'here' ? 'Upload\u2026' : '\u2190 Everything here';
+    $('#addIcons').textContent  = addSource === 'icons' ? '\u2190 Everything here' : 'Add an icon\u2026';
     drawAddPane(dlg, after);
-  });
-  drawAddPane(dlg, after);
+  };
+  $('#addUpload').onclick = () => {
+    addSource = addSource === 'upload' ? 'here' : 'upload';
+    draw();
+  };
+  $('#addIcons').onclick = () => {
+    addSource = addSource === 'icons' ? 'here' : 'icons';
+    draw();
+  };
+  draw();
   dlg.showModal();
 }
 
 function drawAddPane(dlg, after){
   const pane = $('#addPane');
   pane.textContent = '';
-  $$('#addTabs button').forEach(b =>
-    b.setAttribute('aria-selected', String(b.dataset.src === addSource)));
-
   if(addSource === 'upload'){ paneUpload(pane, dlg, after); return; }
   if(addSource === 'icons'){ paneIcons(pane, dlg, after); return; }
   paneHere(pane, dlg, after);
@@ -13067,6 +13409,14 @@ function wire(){
   loadSplit();
   wireSplit();
 
+  $('#chatShut').onclick = () => openChat(false);
+  $('#chatSay').addEventListener('submit', e => {
+    e.preventDefault();
+    const box = $('#chatBox');
+    const said = box.value;
+    box.value = '';
+    chatSay(said);
+  });
   $('#brandBtn').onclick = e => { e.stopPropagation(); toggleMenu(); };
   document.addEventListener('mousedown', e => {
     if(State.menuOpen && !e.target.closest('#brandMenu') && !e.target.closest('#brandBtn')) closeMenu();

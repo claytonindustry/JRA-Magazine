@@ -48,6 +48,45 @@
       ".read": "auth != null && root.child('people').child(auth.token.email.toLowerCase().replace('.', ',')).exists()",
       ".write": "auth != null && root.child('people').child(auth.token.email.toLowerCase().replace('.', ',')).exists()"
     },
+    "chat": {
+      ".read": "auth != null && root.child('people').child(auth.token.email.toLowerCase().replace('.', ',')).exists()",
+      "said": {
+        "$said": {
+          ".write": "auth != null && root.child('people').child(auth.token.email.toLowerCase().replace('.', ',')).exists()",
+          ".validate": "newData.hasChildren(['by', 'text', 'at'])",
+          "by": {
+            ".validate": "newData.isString() && newData.val().length < 200"
+          },
+          "name": {
+            ".validate": "newData.isString() && newData.val().length < 120"
+          },
+          "text": {
+            ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 2000"
+          },
+          "at": {
+            ".validate": "newData.isNumber()"
+          },
+          "$other": {
+            ".validate": false
+          }
+        }
+      },
+      "here": {
+        "$person": {
+          ".write": "auth != null && root.child('people').child(auth.token.email.toLowerCase().replace('.', ',')).exists() && $person === auth.token.email.toLowerCase().replace('.', ',')",
+          ".validate": "newData.hasChildren(['at'])",
+          "name": {
+            ".validate": "newData.isString() && newData.val().length < 120"
+          },
+          "at": {
+            ".validate": "newData.isNumber()"
+          },
+          "$other": {
+            ".validate": false
+          }
+        }
+      }
+    },
     "people": {
       ".read": "auth != null && root.child('people').child(auth.token.email.toLowerCase().replace('.', ',')).exists()",
       "$person": {
