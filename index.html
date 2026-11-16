@@ -388,6 +388,12 @@ body{background:var(--paper)}
 
 #reader main.reading{max-width:72rem}
 #reader .spread{display:grid;gap:clamp(1.5rem,4cqi,3rem)}
+/* A grid item will not go narrower than the widest unbreakable thing
+   inside it unless it is told it may. The foot's titles do not wrap, so
+   without this the whole column takes their width and the page runs off
+   the side of a telephone — which is where Next went. The wide rule
+   below says minmax(0,1fr) for the same reason. */
+#reader .spread > *{min-width:0}
 @container reader (min-width:64rem){
   #reader .spread{grid-template-columns:15rem minmax(0,1fr);align-items:start}
 }
@@ -417,6 +423,16 @@ body{background:var(--paper)}
     scrollbar-width:thin;scrollbar-color:var(--rule) transparent;
   }
 }
+#reader .rail .railback{display:block;margin:0 0 1rem;text-decoration:none}
+#reader .rail .railcover{
+  margin:0;width:100%;
+  box-shadow:0 1px 0 var(--rule),0 10px 24px -16px rgba(0,0,0,.5);
+  transition:transform .12s ease;
+}
+#reader .rail .railcover > img,#reader .rail .railcover > .co-wrap{
+  display:block;width:100%;height:auto;background:var(--paper-raised);
+}
+#reader .rail .railback:hover .railcover{transform:translateY(-2px)}
 #reader .rail h2{
   font-family:var(--sans);font-size:.74rem;font-weight:600;
   margin:0 0 .6rem;padding-bottom:.5rem;border-bottom:2px solid var(--ink);
@@ -654,8 +670,16 @@ body{background:var(--paper)}
 #reader .foot small{display:block;font-size:.72rem;color:var(--brine)}
 #reader .foot b{font-weight:500;font-size:.9rem}
 #reader .foot a:hover b{color:var(--tanbark)}
+/* Every cell may shrink. Without this the middle sizes itself to a
+   title it will not wrap, the row grows past the screen, and Next is
+   somewhere off the right-hand edge — which is what a long title did:
+   a bar 504 pixels wide in a window 430 wide. min-width on a flex child
+   is auto until it is told otherwise, and auto means "no smaller than
+   what is in me". */
+#reader .foot > *{min-width:0}
+#reader .foot b{overflow-wrap:anywhere}
 #reader .foot .mid{
-  flex:none;max-width:40%;align-self:center;text-align:center;
+  flex:0 1 auto;max-width:40%;align-self:center;text-align:center;
   overflow:hidden;
 }
 #reader .foot .mid small{font-size:.72rem}
@@ -686,8 +710,10 @@ body{background:var(--paper)}
      there is no room to read the title of the piece beside this one */
   #reader .foot a b,#reader .foot .off b{font-size:0}
   #reader .foot a small,#reader .foot .off small{font-size:.8rem;color:var(--ink)}
-  #reader .foot .mid{max-width:56%}
+  #reader .foot .mid{max-width:52%}
   #reader .foot .mid b{font-size:.82rem}
+  /* the ends are two words; they are not what gives way */
+  #reader .foot a,#reader .foot .off{flex:0 1 auto}
 }
 
 #reader .pdfonly{
@@ -1095,6 +1121,12 @@ dialog .ed-cap{font-size:.95rem;min-height:2.2em}
 #editor .btn.small.icon{
   min-width:1.9rem;padding:.18rem .3rem;font-size:.95rem;line-height:1.1;
 }
+#editor .favlangs{display:flex;flex-direction:column;gap:.3rem;margin:.2rem 0 .6rem}
+#editor .favlang{
+  display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;
+  padding:.4rem .5rem;background:#fff;border:1px solid var(--e-line);border-radius:6px;
+}
+#editor .favlang .btn{white-space:nowrap}
 #editor .peopleadd{flex-wrap:wrap}
 #editor .peopleadd input{flex:1;min-width:9rem;margin:0}
 
@@ -2424,7 +2456,7 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
    when the file changes. It is unrelated to the database's own VERSION,
    which governs schema upgrades and must not be moved for a cosmetic
    change. */
-const APP_VERSION = '1.46';
+const APP_VERSION = '1.47';
 
 /* Nothing is imported at the top any more. The Firebase libraries are
    several hundred kilobytes and, loaded this way, the browser must fetch
@@ -3727,6 +3759,8 @@ const State = {
   legacyLoose: [],
   /* the gallery screen's own two filters: which issue, and which kind */
   galMag: '', galArt: '', galKind: 'all',
+  /* the languages a reader is offered first, the same for everybody */
+  favLangs: [],
   /* who may edit, read with everything else at sign-in */
   people: {},
   /* the split: how much of the pane the editor takes, which preview the
@@ -3859,12 +3893,14 @@ const magByNum = (n) => Object.values(State.magazines)
 
 /* ---------- loading and saving ---------- */
 async function loadEditorData(){
-  const [articles, magazines, images, pages, langs, people] = await Promise.all([
+  const [articles, magazines, images, pages, langs, people, fav] = await Promise.all([
     dbGet('articles'), dbGet('magazines'), dbGet('images'), dbGet('pages'),
     dbGet('site/langs').catch(() => null),
-    dbGet('people').catch(() => null)
+    dbGet('people').catch(() => null),
+    dbGet('site/favlangs').catch(() => null)
   ]);
   State.tongues = arr(langs);
+  State.favLangs = arr(fav).filter(c => typeof c === 'string');
   State.people = (people && typeof people === 'object') ? people : {};
   /* The icon set is a convenience, not the magazine. If its node is
      unreachable — most likely because the rules have not caught up with
@@ -4169,9 +4205,9 @@ function busy(msg){
    built in memory and says so at the top of the screen.
    ===================================================================== */
 const Reader = { library: null, issues: {}, gallery: null, pages: {}, searchIndex: null,
-  /* the languages whole issues have been written in by hand, which go
-     to the top of the picker ahead of everything the machine can do */
-  written: [] };
+  /* the languages the magazine puts at the top of the picker, chosen by
+     an owner and the same for everybody */
+  fav: [] };
 
 const WPM = 220;
 const readerEl = $('#reader');
@@ -4359,13 +4395,14 @@ async function loadLibrary(force){
   if(Reader.library && !force) return Reader.library;
   if(State.previewing){
     registerTongues(State.tongues);
-    Reader.written = tongues().map(t => t.code).filter(c => LANGS[c]);
+    Reader.fav = arr(State.favLangs).filter(c => LANGS[c]);
     Reader.library = previewLibrary();
     return Reader.library;
   }
-  const [node, langs] = await Promise.all([
+  const [node, langs, fav] = await Promise.all([
     restGet('library/issues'),
-    restGet('site/langs').catch(() => null)
+    restGet('site/langs').catch(() => null),
+    restGet('site/favlangs').catch(() => null)
   ]);
   /* A language is offered only where there is a whole issue to read in
      it. Being on the magazine's list means somebody has begun; it does
@@ -4374,7 +4411,7 @@ async function loadLibrary(force){
   arr(node).forEach(c => arr(c && c.langs).forEach(x => out.add(x)));
   registerWidgetLangs();
   registerTongues(arr(langs).filter(t => t && out.has(t.code)));
-  Reader.written = [...out].filter(c => c !== 'en' && LANGS[c]);
+  Reader.fav = arr(fav).filter(c => c !== 'en' && LANGS[c]);
   {
     buildLangControl();
     /* a language chosen on an earlier visit, which could not be
@@ -5138,6 +5175,13 @@ function renderArticle(num, id, query, mode){
   main.innerHTML = `
     <div class="spread">
       ${bare ? '' : `<nav class="rail" aria-label="${esc(S().articlesIn)}">
+        <!-- The issue this piece is in, as it looks on the shelf, and the
+             way back to it. A list of titles says what else is here; the
+             cover says what you are holding. -->
+        ${coverMarkup(issueMeta(num), '14rem', 'railcover')
+          ? `<a class="railback" href="#/${esc(num)}" aria-label="${esc(S().issueN(num))}">${
+              coverMarkup(issueMeta(num), '14rem', 'railcover')}</a>`
+          : ''}
         <h2>${esc(where)}<button id="railUp">${esc(S().allIssues)}</button></h2>
         <ol>${railMarkup(num, a.id)}</ol>
       </nav>`}
@@ -5540,7 +5584,12 @@ function setLang(code){
    The order is English, then the languages this archive has really been
    written in, then every other language the translator can manage. */
 function langOptionList(){
-  const written = arr(Reader.written).filter(c => c !== 'en' && LANGS[c]);
+  /* The ones the magazine has chosen to put first. It used to be the
+     languages whole issues had been written in by hand, which is why
+     French sat at the top without anybody deciding it should: it was
+     the only one anybody had finished. That is a fact about the
+     archive, not an answer to what a reader is most likely to want. */
+  const written = arr(Reader.fav).filter(c => c !== 'en' && LANGS[c]);
   const rest = Object.keys(LANGS)
     .filter(c => c !== 'en' && !written.includes(c))
     .sort((a, b) => String(LANGS[a].name).localeCompare(String(LANGS[b].name)));
@@ -8007,6 +8056,81 @@ function peopleCard(){
   return card;
 }
 
+/* ---------------------------------------------------------------------
+   The languages a reader is offered first
+
+   The picker on the reader's side holds every language the translator
+   can manage, which is a long list to come down. These few sit at the
+   top of it, above the line, for everybody — not per browser and not
+   per magazine, because it is one answer to one question: who reads
+   this magazine, and in what.
+
+   It used to be the languages whole issues had been written in by
+   hand. That put French at the top because French was the only one
+   anybody had finished, which is a fact about the work rather than
+   about the readers.
+   --------------------------------------------------------------------- */
+function favLangsCard(){
+  const card = h('section', { class:'card' },
+    h('h2', { text:'Languages readers see first' }));
+  const list = h('div', { class:'favlangs' });
+
+  const save = async (next) => {
+    const was = arr(State.favLangs);
+    State.favLangs = next;
+    draw();
+    try{ await dbSet('site/favlangs', next); toast('Saved.'); }
+    catch(e){ State.favLangs = was; draw(); toast('Not saved: ' + (e.message || e)); }
+  };
+
+  const draw = () => {
+    list.textContent = '';
+    const fav = arr(State.favLangs).filter(c => canonTongue(c));
+    if(!fav.length)
+      list.append(h('p', { class:'hint', text:
+        'None chosen, so the picker reads English and then every language in '
+        + 'alphabetical order.' }));
+    fav.forEach((code, i) => {
+      const row = h('div', { class:'favlang' });
+      row.append(h('b', { class:'notranslate', translate:'no', text: tongueNative(code) }));
+      row.append(h('span', { class:'hint', text: tongueEnglish(code) }));
+      row.append(h('span', { class:'spacer' }));
+      if(isOwner()){
+        row.append(h('button', { class:'btn small ghost', type:'button', title:'Higher up',
+          disabled: i === 0 || null,
+          onclick: () => { const n = fav.slice(); [n[i-1], n[i]] = [n[i], n[i-1]]; save(n); } },
+          '\u2191'));
+        row.append(h('button', { class:'btn small ghost', type:'button', title:'Lower down',
+          disabled: i === fav.length - 1 || null,
+          onclick: () => { const n = fav.slice(); [n[i+1], n[i]] = [n[i], n[i+1]]; save(n); } },
+          '\u2193'));
+        row.append(h('button', { class:'btn small danger', type:'button',
+          title:'Take it out of the top of the list',
+          onclick: () => save(fav.filter(c => c !== code)) }, 'Remove'));
+      }
+      list.append(row);
+    });
+  };
+  draw();
+  card.append(list);
+
+  if(!isOwner()){
+    card.append(h('p', { class:'hint', text:'Only an owner changes these.' }));
+    return card;
+  }
+  card.append(h('div', { class:'fp-row' },
+    h('button', { class:'btn small primary', type:'button',
+      onclick: () => pickTongue((code) => save(arr(State.favLangs).concat([code])),
+                                arr(State.favLangs)) },
+      '+ Add a language')));
+  card.append(h('p', { class:'hint', text:
+    'These sit above a line at the top of the reader\u2019s language picker, in this '
+    + 'order. Everything else follows alphabetically. This is about what readers are '
+    + 'offered first \u2014 which languages the magazine is written in by hand is a '
+    + 'different list, in a magazine\u2019s Translations.' }));
+  return card;
+}
+
 function workAccount(work){
   const s = sheet();
   s.append(h('h2', { style:'margin:0 0 .2rem', text:'Account & settings' }));
@@ -8027,6 +8151,7 @@ function workAccount(work){
       onclick: async () => { await signOutNow(); location.hash = '#/'; } }, 'Sign out')));
   s.append(acc);
   s.append(peopleCard());
+  s.append(favLangsCard());
 
   const pics0 = h('section', { class:'card' }, h('h2', { text:'Photographs' }));
   const waiting = pendingImages();
@@ -8317,9 +8442,14 @@ function trTargets(a, d){
    tongue and in English, because an editor hunting for Portuguese types
    "Portuguese" while the reader who wants it reads "Português", and
    both have to find the same row. */
-function pickTongue(then){
+function pickTongue(then, taken){
   const dlg = $('#dlgLang'), list = $('#langList'), find = $('#langFind');
-  const have = new Set(tongues().map(t => canonTongue(t.code)).filter(Boolean));
+  /* what counts as already chosen depends on what is being chosen for:
+     a language the magazine is written in, or one a reader is offered
+     first. The same list, asked a different question. */
+  const have = new Set(taken
+    ? arr(taken).map(c => canonTongue(c)).filter(Boolean)
+    : tongues().map(t => canonTongue(t.code)).filter(Boolean));
   const draw = () => {
     const q = find.value.trim().toLowerCase();
     list.textContent = '';
