@@ -23,9 +23,11 @@
 
    The lookup is made with the editor's own token, so this Worker holds
    no credentials of its own and can read no more than the person it is
-   asking about. A person is filed under the user id Firebase gives
-   them, which is what the token resolves to, so nothing here has to
-   rewrite an address into a database key and get it exactly right.
+   asking about.
+
+   A person is filed under their address, with the dots written as
+   commas because a database key may not hold one. index.html and
+   database.rules.json spell it the same way; all three must agree.
 
    Setting it up (dashboard, no terminal)
    --------------------------------------
@@ -92,12 +94,14 @@ const CACHE_MS = 60 * 1000;
 
 /* Asked with the editor's own token, so this Worker needs no credentials
    and sees exactly what that person is allowed to see. */
-async function listed(uid, token, env){
+const peopleKey = (email) => String(email || '').trim().toLowerCase().replace(/\./g, ',');
+
+async function listed(email, token, env){
   const base = String(env.DB_URL || '').replace(/\/+$/, '');
-  if(!base || !uid) return false;
+  if(!base || !email) return false;
   let r;
   try{
-    r = await fetch(base + '/people/' + encodeURIComponent(uid)
+    r = await fetch(base + '/people/' + encodeURIComponent(peopleKey(email))
                     + '.json?auth=' + encodeURIComponent(token));
   }catch(e){ return false; }
   if(!r.ok) return false;
@@ -124,16 +128,15 @@ async function editorOf(token, env){
 
   const data  = await r.json().catch(() => null);
   const user  = data && data.users && data.users[0];
-  const uid   = user && String(user.localId || '');
   const email = user ? String(user.email || '').toLowerCase() : '';
-  if(!uid) return null;
+  if(!email) return null;
 
   // the magazine's own list decides, not a name kept on this Worker
-  if(!await listed(uid, token, env)) return null;
+  if(!await listed(email, token, env)) return null;
 
   if(seen.size > 200) seen.clear();
-  seen.set(token, { email: email || uid, until: Date.now() + CACHE_MS });
-  return email || uid;
+  seen.set(token, { email, until: Date.now() + CACHE_MS });
+  return email;
 }
 
 /* A key arrives from the page, so it is checked rather than trusted. */
