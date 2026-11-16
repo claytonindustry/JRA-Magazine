@@ -1464,7 +1464,8 @@ body.pdf-building #editor .work,body.pdf-building #editor .sp-grip{display:none!
   position:fixed;inset:0;z-index:90;display:grid;place-items:center;
   background:var(--e-bg);font-family:var(--ui);color:var(--e-ink);
 }
-#gate form{
+/* the form and the not-yet-listed panel are the same card */
+#gate form,#gate #gateNo{
   background:var(--e-panel);border:1px solid var(--e-line);border-radius:12px;
   padding:1.4rem 1.5rem;width:min(22rem,92vw);box-shadow:0 10px 40px rgba(0,0,0,.12);
 }
@@ -1491,7 +1492,14 @@ body.pdf-building #editor .work,body.pdf-building #editor .sp-grip{display:none!
 #gate input#gatePass{letter-spacing:.12em}
 #gate .said{color:var(--e-accent)}
 #gate .sr{display:block;font-size:0;margin-bottom:0}   /* label for readers only */
-/* signed in, but not an editor — the form is no use, the way out is */
+/* signed in, but not an editor — the form is no use, the id is */
+#gate #gateNo p{margin-bottom:.6rem}
+#gate .uid{
+  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  font-size:.85rem;word-break:break-all;user-select:all;
+  background:var(--e-bg,#f3f1ec);border:1px solid var(--e-line,#d9d4c9);
+  border-radius:6px;padding:.5rem .6rem;margin:.3rem 0 .6rem;
+}
 
 #toast{
   position:fixed;left:50%;bottom:1.2rem;transform:translateX(-50%);
@@ -2038,6 +2046,24 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
       <button class="btn ghost" type="button" id="gateCancel">Just read the magazine</button>
     </div>
   </form>
+  <!-- Signed in, and not on the list. Asking for the password again is
+       no answer: the password was right. What is wanted is the id an
+       owner needs in order to add them. -->
+  <div id="gateNo" hidden>
+    <h2>JRA Magazine</h2>
+    <p id="gateWho"></p>
+    <p class="hint">This account may read the magazine but has not been given
+       permission to edit it. An owner adds it in Account &amp; settings →
+       People, using the id below.</p>
+    <p class="uid" id="gateUid"></p>
+    <div class="acts">
+      <button class="btn" type="button" id="gateCopy">Copy the id</button>
+    </div>
+    <div class="acts alt">
+      <button class="btn ghost" type="button" id="gateOut">Sign out</button>
+      <button class="btn ghost" type="button" id="gateRead">Just read the magazine</button>
+    </div>
+  </div>
 </div>
 
 <input type="file" id="fileImages" accept="image/*" multiple hidden>
@@ -2262,7 +2288,7 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
    when the file changes. It is unrelated to the database's own VERSION,
    which governs schema upgrades and must not be moved for a cosmetic
    change. */
-const APP_VERSION = '1.42';
+const APP_VERSION = '1.43';
 
 /* Nothing is imported at the top any more. The Firebase libraries are
    several hundred kilobytes and, loaded this way, the browser must fetch
@@ -5857,6 +5883,17 @@ function showGate(on, waiting){
   if(!on) return;
   readerEl.hidden = true;
   editorEl.hidden = true;
+  /* Two different problems wear the same screen. Not signed in wants a
+     password. Signed in and not listed does not — that password was
+     right, and asking for it again says nothing and fixes nothing. */
+  const notYet = !!(State.user && !State.admin);
+  $('#gateForm').hidden = notYet;
+  $('#gateNo').hidden = !notYet;
+  if(notYet){
+    $('#gateWho').textContent = 'Signed in as ' + (State.user.email || 'this account') + '.';
+    $('#gateUid').textContent = State.user.uid || '';
+    return;
+  }
   /* While the sign-in library is still on its way there is nothing
      useful to type into, so the form says so rather than looking
      broken. */
@@ -5906,11 +5943,12 @@ async function onUser(user){
         Session.email = String(State.role.email).toLowerCase();
     }catch(e){ why = e.message || 'it could not be checked'; }
     State.admin = !!State.role;
-    if(!State.admin)
-      toast(why
-        ? 'Signed in, but whether you may edit could not be checked \u2014 ' + why
-        : 'Signed in as ' + (user.email || 'that account') + ', but it is not on the '
-          + 'list of people who may edit this magazine.');
+    /* Not being listed is said on the screen itself, with the id to
+       hand on, so it is not also thrown as a message that disappears.
+       A list that could not be read at all is a different matter: that
+       is a fault rather than an answer, and it is worth saying. */
+    if(!State.admin && why)
+      toast('Signed in, but whether you may edit could not be checked \u2014 ' + why);
   }
   document.body.classList.toggle('signed-in', State.admin);
   if(!user) store(KNOWN_EDITOR, '');   // stop pre-loading it for a reader
@@ -13127,6 +13165,20 @@ function wire(){
     gateSays('If ' + email + ' has an account, a link to set a new password is on its way.', true);
   };
   $('#gateCancel').onclick = () => { location.hash = '#/'; };
+  $('#gateRead').onclick = () => { location.hash = '#/'; };
+  $('#gateOut').onclick = async () => { await signOutNow(); showGate(true); };
+  $('#gateCopy').onclick = async () => {
+    const id = $('#gateUid').textContent || '';
+    try{ await navigator.clipboard.writeText(id); toast('Copied.'); }
+    catch(e){
+      /* a browser that will not copy for us can still be given the
+         words to copy from */
+      const r = document.createRange();
+      r.selectNodeContents($('#gateUid'));
+      const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r);
+      toast('Press Ctrl+C \u2014 the id is selected.');
+    }
+  };
 
   /* reader controls */
   $$('#reader .sizes button').forEach(b => b.onclick = () => setSize(+b.dataset.size));
