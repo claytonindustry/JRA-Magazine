@@ -46,6 +46,14 @@
    ===================================================================== */
 
 const MAX_BYTES  = 25 * 1024 * 1024;   // one photograph, generously
+/* A printed edition is not a photograph. Some of them are three
+   hundred megabytes, which is more than a Worker may be handed in one
+   request on any plan — so they arrive in pieces and R2 is asked to
+   put them back together. Every piece but the last must be at least
+   five mebibytes; ten keeps the count low without making any one of
+   them a long wait on a slow line. */
+const PART_BYTES = 10 * 1024 * 1024;
+const MAX_PART   = 64 * 1024 * 1024;   // a piece larger than this is a mistake
 const MAX_FILES  = 12;                 // four sizes, with room to spare
 const MAX_COPY   = 20;                 // fetches per call: the free plan allows 50 subrequests
 const KEY_OK     = /^[A-Za-z0-9][A-Za-z0-9._/-]{0,200}$/;
@@ -65,7 +73,7 @@ const TYPES = {
    Locking this down would only break the editor the day it moves house. */
 const CORS = {
   'Access-Control-Allow-Origin':  '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Methods': 'GET, PUT, POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Authorization, Content-Type',
   'Access-Control-Max-Age':       '86400'
 };
@@ -137,6 +145,83 @@ async function editorOf(token, env){
   if(seen.size > 200) seen.clear();
   seen.set(token, { email, until: Date.now() + CACHE_MS });
   return email;
+}
+
+/* ---------------------------------------------------------------------
+   A file too big to hand over in one go
+
+   Three calls and a listing. The page says what it is about to send,
+   sends it a piece at a time, and says when it is finished; R2 holds
+   the pieces and joins them. Nothing is buffered here — a piece is
+   passed straight through as it arrives — so the Worker's memory does
+   not care whether the file is ten megabytes or three hundred.
+
+   An upload that is begun and never finished costs nothing: R2 throws
+   away the pieces of an incomplete one after seven days.
+   --------------------------------------------------------------------- */
+async function bigUpload(url, request, env){
+  const what = url.pathname.slice('/big/'.length);
+
+  if(what === 'start'){
+    const body = await request.json().catch(() => ({}));
+    const key = safeKey(body && body.key);
+    if(!key) return json({ error: 'Bad key.' }, 400);
+    const up = await env.BUCKET.createMultipartUpload(key, {
+      httpMetadata: {
+        contentType: typeOf(key, body && body.type),
+        cacheControl: 'public, max-age=31536000, immutable'
+      }
+    });
+    return json({ ok: true, key, uploadId: up.uploadId, partBytes: PART_BYTES });
+  }
+
+  if(what === 'part'){
+    const key = safeKey(url.searchParams.get('key'));
+    const uploadId = url.searchParams.get('uploadId') || '';
+    const n = Number(url.searchParams.get('part') || 0);
+    if(!key || !uploadId || !(n >= 1)) return json({ error: 'Bad piece.' }, 400);
+    const len = Number(request.headers.get('content-length') || 0);
+    if(len > MAX_PART) return json({ error: 'That piece is too large.' }, 413);
+    if(!request.body) return json({ error: 'No piece in that request.' }, 400);
+    const up = env.BUCKET.resumeMultipartUpload(key, uploadId);
+    const part = await up.uploadPart(n, request.body);
+    return json({ ok: true, partNumber: part.partNumber, etag: part.etag });
+  }
+
+  if(what === 'done'){
+    const body = await request.json().catch(() => ({}));
+    const key = safeKey(body && body.key);
+    const uploadId = body && body.uploadId;
+    const parts = Array.isArray(body && body.parts) ? body.parts : [];
+    if(!key || !uploadId || !parts.length) return json({ error: 'Nothing to finish.' }, 400);
+    const up = env.BUCKET.resumeMultipartUpload(key, uploadId);
+    const done = await up.complete(parts.map(p => ({
+      partNumber: Number(p.partNumber), etag: String(p.etag) })));
+    return json({ ok: true, key, size: done && done.size });
+  }
+
+  if(what === 'abort'){
+    const body = await request.json().catch(() => ({}));
+    const key = safeKey(body && body.key);
+    const uploadId = body && body.uploadId;
+    if(!key || !uploadId) return json({ error: 'Nothing to abandon.' }, 400);
+    try{ await env.BUCKET.resumeMultipartUpload(key, uploadId).abort(); }
+    catch(e){ /* seven days from now R2 does it anyway */ }
+    return json({ ok: true });
+  }
+
+  return json({ error: 'Post to /big/start, /big/part, /big/done or /big/abort.' }, 404);
+}
+
+/* What is already in the bucket under a prefix, so a file put there by
+   hand can be chosen from a list rather than typed out. */
+async function listFiles(url, env){
+  const prefix = String(url.searchParams.get('prefix') || '');
+  if(!PREFIXES.some(p => prefix.startsWith(p)))
+    return json({ error: 'Only photos/ and issues/ can be listed.' }, 400);
+  const out = await env.BUCKET.list({ prefix, limit: 1000 });
+  return json({ ok: true, files: (out.objects || []).map(o => ({
+    key: o.key, size: o.size, at: o.uploaded })) });
 }
 
 /* A key arrives from the page, so it is checked rather than trusted. */
@@ -215,8 +300,12 @@ export default {
 
     const isUpload = request.method === 'POST' && url.pathname === '/upload';
     const isCopy   = request.method === 'POST' && url.pathname === '/copy';
-    if(!isUpload && !isCopy)
-      return json({ error: 'Post files to /upload, or addresses to /copy.' }, 404);
+    const isBig    = url.pathname.startsWith('/big/')
+                     && (request.method === 'POST' || request.method === 'PUT');
+    const isList   = request.method === 'GET' && url.pathname === '/files';
+    if(!isUpload && !isCopy && !isBig && !isList)
+      return json({ error: 'Post files to /upload, addresses to /copy, '
+                         + 'a large file to /big/*, or ask /files what is here.' }, 404);
 
     if(!env.BUCKET)
       return json({ error: 'No bucket is bound to this Worker. Add an R2 binding named BUCKET.' }, 500);
@@ -232,6 +321,10 @@ export default {
     const token = auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
     const email = await editorOf(token, env);
     if(!email) return json({ error: 'Not signed in as an editor.' }, 401);
+
+    /* the same check guards these as guards a photograph */
+    if(isBig)  return bigUpload(url, request, env);
+    if(isList) return listFiles(url, env);
 
     /* ---- copying from somewhere else on the web ---- */
     if(isCopy){

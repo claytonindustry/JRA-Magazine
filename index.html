@@ -556,8 +556,21 @@ body{background:var(--paper)}
 .capmarks{display:flex;gap:.3rem;align-items:center;margin:.1rem 0 .35rem}
 .capmarks .btn{padding:.1rem .4rem;font-size:.78rem}
 #reader .body figcaption .credit{font-style:normal}
-#reader .getpdf{margin:.9rem 0 0;font-family:var(--sans);font-size:.88rem}
-#reader .getpdf a{color:var(--tanbark);text-underline-offset:.15em}
+/* the two things a reader does with an issue they have chosen: look
+   inside it, or take it away */
+#reader .searchrow{
+  display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;
+  margin:0 0 clamp(1.5rem,4cqi,2.25rem);
+}
+#reader .searchrow .search{flex:1 1 14rem;min-width:0;margin:0}
+#reader .getpdf{
+  flex:none;font-family:var(--sans);font-size:.85rem;text-decoration:none;
+  color:var(--tanbark);border:1px solid var(--rule);border-radius:999px;
+  padding:.45rem .9rem;white-space:nowrap;
+}
+#reader .getpdf:hover{border-color:var(--tanbark);background:var(--paper-raised)}
+/* the printed-edition-only page still offers it the old way */
+#reader .pdfonly .getpdf{border:0;padding:0}
 #reader .body a{color:var(--tanbark);text-underline-offset:.15em}
 #reader .body figure{margin:1.9em 0;max-width:100%}
 #reader .body figure.wide figcaption{max-width:var(--measure)}
@@ -1181,6 +1194,25 @@ dialog .ed-cap{font-size:.95rem;min-height:2.2em}
   display:inline-block;min-width:1.1em;margin-inline-start:.35rem;padding:0 .3em;
   background:var(--e-accent);color:#fff;border-radius:999px;font-size:.68rem;line-height:1.5;
 }
+
+/* ---------- the printed edition ---------- */
+#editor .pdfrow,dialog .pdfrow{margin:.2rem 0 1rem}
+#editor .pdfrow .pdfat,dialog .pdfrow .pdfat{font-size:.75rem;color:var(--e-muted)}
+#editor .pdfrow .pdfsay,dialog .pdfrow .pdfsay{margin:.35rem 0 0;min-height:1.1em}
+dialog#dlgPickFile{max-width:min(30rem,94vw);width:30rem}
+#dlgPickFile h3{margin:0 0 .3rem}
+#dlgPickFile .filelist{
+  max-height:min(50vh,20rem);overflow:auto;margin:.5rem 0;
+  border:1px solid var(--e-line);border-radius:6px;background:#fff;
+}
+#dlgPickFile .filerow{
+  display:flex;gap:.6rem;align-items:baseline;width:100%;text-align:left;
+  padding:.4rem .55rem;background:none;border:0;border-bottom:1px solid var(--e-line);
+  color:var(--e-ink);font-family:var(--ui);font-size:.85rem;cursor:pointer;
+}
+#dlgPickFile .filerow:last-child{border-bottom:0}
+#dlgPickFile .filerow:hover{background:var(--e-bg)}
+#dlgPickFile .filerow .hint{margin-left:auto}
 
 /* ---------- what a piece is made of, and what goes in it ---------- */
 dialog#dlgText{max-width:min(24rem,94vw);width:24rem}
@@ -2286,6 +2318,14 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
      toolbar, always there whether or not anything was being written;
      they are the same four, a press further away, and the toolbar is
      the three things you add rather than the seven. -->
+<!-- What is already in the bucket, for a file put there by hand. -->
+<dialog id="dlgPickFile">
+  <h3>Already on the host</h3>
+  <p class="hint">Files under <code>issues/</code> in the bucket.</p>
+  <div class="filelist" id="pickFileList"></div>
+  <div class="fp-row"><button class="btn" type="button" id="pickFileShut">Cancel</button></div>
+</dialog>
+
 <dialog id="dlgText">
   <h3>Add text</h3>
   <div class="kindlist" id="textKinds"></div>
@@ -2474,7 +2514,7 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
    when the file changes. It is unrelated to the database's own VERSION,
    which governs schema upgrades and must not be moved for a cosmetic
    change. */
-const APP_VERSION = '1.48';
+const APP_VERSION = '1.49';
 
 /* Nothing is imported at the top any more. The Firebase libraries are
    several hundred kilobytes and, loaded this way, the browser must fetch
@@ -4987,13 +5027,20 @@ function renderIssue(num, query, mode){
         <p class="date">${esc(meta.date)}</p>
         <p class="tally">${esc(S().tally(arts.length, totalWords.toLocaleString(),
             longSpan(mins(totalWords))))}</p>
-        ${meta.pdf ? `<p class="getpdf"><a href="${esc(meta.pdf)}" download>${esc(S().printEdition)}</a></p>` : ''}
       </div>
     </div>
-    <div class="search">${SEARCH_SVG}
-      <input id="q" type="search" placeholder="${esc(S().searchIssue)}" value="${esc(q)}"
-             aria-label="${esc(S().searchIssue)}" autocomplete="off">
-      <button class="search-clear" id="qclear" ${q ? '' : 'hidden'}>${esc(S().clear)}</button>
+    <!-- The printed edition sits beside the search rather than under the
+         tally. It is one of the two things a reader does with an issue
+         they have decided on: look inside it, or take it away. -->
+    <div class="searchrow">
+      <div class="search">${SEARCH_SVG}
+        <input id="q" type="search" placeholder="${esc(S().searchIssue)}" value="${esc(q)}"
+               aria-label="${esc(S().searchIssue)}" autocomplete="off">
+        <button class="search-clear" id="qclear" ${q ? '' : 'hidden'}>${esc(S().clear)}</button>
+      </div>
+      ${meta.pdf
+        ? `<a class="getpdf" href="${esc(meta.pdf)}" download>${esc(S().printEdition)}</a>`
+        : ''}
     </div>
     <div id="list">${q ? searchIssueMarkup(num, q, qm) : contentsMarkup}</div>`;
 
@@ -7383,17 +7430,20 @@ function openMagSettings(existing){
     });
   }
 
-  /* ---- the two addresses ---- */
-  body.append(h('h3', { class:'subhead', text:'Where its files live' }));
-  const mb = h('input', { value: m.mediaBase || '' });
-  mb.oninput = () => { m.mediaBase = mb.value.trim(); saveMagazine(m); };
-  body.append(h('label', { text:'Photograph address' }, mb));
-  const pdf = h('input', { value: m.pdf || '' });
-  pdf.oninput = () => { m.pdf = pdf.value.trim(); saveMagazine(m); };
-  body.append(h('label', { text:'Print edition (PDF)' }, pdf));
+  /* Where an issue's photographs live was a box to be typed into, and
+     the one answer anybody ever gave it was the same answer as every
+     other issue. It is still carried on the magazine and still what
+     the reader looks in — it is only the typing of it that has gone.
+     Moving a whole archive from one host to another is a different
+     job, done in one place, in Account & settings. */
 
   /* ---- the printed edition ---- */
   body.append(h('h3', { class:'subhead', text:'The printed edition' }));
+  body.append(magPdfRow(m, dlg));
+
+  body.append(h('p', { class:'hint', text:
+    'And the magazine as this editor lays it out, which is a different '
+    + 'thing from the file above:' }));
   const onIssue = State.etab === 'issue';
   body.append(h('p', { class:'hint', text: onIssue
     ? 'The whole magazine, laid out as it would go to the printer.'
@@ -7412,6 +7462,118 @@ function openMagSettings(existing){
      taken away — the window has been rebuilt and only needs showing the
      first time. */
   if(!dlg.open) dlg.showModal();
+}
+
+/* ---------------------------------------------------------------------
+   The printed edition of an issue
+
+   The file readers download: the magazine as it went to the printer.
+   Two ways in, because the files are not all the same size. A normal
+   one goes up from here. A very large one is usually already in the
+   bucket, put there with everything else, and is chosen from a list
+   rather than typed out — a name copied by hand is a broken download
+   nobody notices until a reader says so.
+   --------------------------------------------------------------------- */
+const pdfKeyFor = (m) => `issues/jra-${(m.num || 'issue')}-${uid('')}.pdf`;
+const niceSize = (n) => !n ? '' :
+  n >= 1048576 ? (n / 1048576).toFixed(n > 10485760 ? 0 : 1) + ' MB'
+               : Math.max(1, Math.round(n / 1024)) + ' KB';
+
+function magPdfRow(m, dlg){
+  const box = h('div', { class:'pdfrow' });
+  const draw = () => {
+    box.textContent = '';
+    if(m.pdf){
+      box.append(h('p', { class:'hint' },
+        h('b', { text:'Readers can download it.' }), ' ',
+        h('code', { class:'pdfat', text: String(m.pdf).split('/').pop() })));
+    }else{
+      box.append(h('p', { class:'hint', text:
+        'None yet, so no download is offered. It reaches readers when the '
+        + 'issue is published.' }));
+    }
+    const row = h('div', { class:'fp-row' });
+    row.append(h('button', { class:'btn small primary', type:'button',
+      onclick: () => choose() }, m.pdf ? 'Replace it\u2026' : 'Choose a file\u2026'));
+    row.append(h('button', { class:'btn small', type:'button',
+      onclick: () => fromHost() }, 'Already on the host\u2026'));
+    if(m.pdf) row.append(h('button', { class:'btn small danger', type:'button',
+      onclick: () => {
+        if(!confirm('Take the printed edition off this issue?\n\n'
+          + 'The file stays on the host; readers stop being offered it once '
+          + 'the issue is published again.')) return;
+        m.pdf = ''; saveMagazine(m); draw();
+      } }, 'Remove'));
+    box.append(row);
+    const say = h('p', { class:'hint pdfsay' });
+    box.append(say);
+    return say;
+  };
+
+  let say = draw();
+
+  const choose = () => {
+    const pick = h('input', { type:'file', accept:'application/pdf', hidden: true });
+    document.body.append(pick);
+    pick.onchange = async () => {
+      const file = pick.files && pick.files[0];
+      pick.remove();
+      if(!file) return;
+      if(!/pdf$/i.test(file.name) && file.type !== 'application/pdf'){
+        toast('That is not a PDF.'); return;
+      }
+      const key = pdfKeyFor(m);
+      say.textContent = `Sending ${niceSize(file.size)}\u2026`;
+      try{
+        const url = await sendBigFile(file, key, (words) =>
+          { say.textContent = words + ' ' + niceSize(file.size) + ' in all.'; });
+        m.pdf = url;
+        saveMagazine(m);
+        say = draw();
+        say.textContent = 'Sent.';
+        toast('The printed edition is on the host.');
+      }catch(e){
+        say.textContent = 'It did not go: ' + (e.message || e);
+      }
+    };
+    pick.click();
+  };
+
+  const fromHost = async () => {
+    say.textContent = 'Looking\u2026';
+    let files;
+    try{ files = await filesOnHost('issues/'); }
+    catch(e){ say.textContent = 'Could not ask the host: ' + (e.message || e); return; }
+    const pdfs = files.filter(f => /\.pdf$/i.test(f.key))
+      .sort((a, b) => String(b.at || '').localeCompare(String(a.at || '')));
+    say.textContent = '';
+    if(!pdfs.length){
+      say.textContent = 'There are no PDFs in the bucket under issues/ yet.';
+      return;
+    }
+    openPickFile(pdfs, (key) => {
+      m.pdf = MEDIA_HOST + encodeURI(key);
+      saveMagazine(m);
+      say = draw();
+      toast('Chosen.');
+    });
+  };
+
+  return box;
+}
+
+/* A list of what is on the host, to choose one from. */
+function openPickFile(files, then){
+  const dlg = $('#dlgPickFile'), list = $('#pickFileList');
+  list.textContent = '';
+  files.forEach(f => {
+    list.append(h('button', { class:'filerow', type:'button',
+      onclick: () => { dlg.close(); then(f.key); } },
+      h('b', { text: String(f.key).replace(/^issues\//, '') }),
+      h('span', { class:'hint', text: niceSize(f.size) })));
+  });
+  $('#pickFileShut').onclick = () => dlg.close();
+  dlg.showModal();
 }
 
 /* ---------------------------------------------------------------------
@@ -11097,6 +11259,82 @@ function archivePhotos(){
     out.push({ key, m: null, b: null, a: null, f, uses: 0, rec });
   });
   return out;
+}
+
+/* ---------------------------------------------------------------------
+   A file too big to hand over in one go
+
+   A printed edition runs to a few hundred megabytes, which is more
+   than a Worker may be given in one request. So it goes in pieces: the
+   Worker is told what is coming, handed a piece at a time, and told
+   when it is finished, and R2 joins them.
+
+   A piece that fails is tried again rather than the whole file, which
+   on a connection that comes and goes is the difference between losing
+   ten megabytes and losing an hour.
+   --------------------------------------------------------------------- */
+const BIG_URL = UPLOAD_URL.replace(/\/upload$/, '/big');
+const BIG_TRIES = 3;
+
+async function bigAsk(what, opts){
+  const token = await idToken();
+  if(!token) throw new Error('not signed in');
+  const r = await fetch(BIG_URL + '/' + what + (opts.query || ''), {
+    method: opts.method || 'POST',
+    headers: Object.assign({ Authorization: 'Bearer ' + token },
+      opts.json ? { 'Content-Type': 'application/json' } : {}),
+    body: opts.json ? JSON.stringify(opts.json) : opts.body
+  });
+  const out = await r.json().catch(() => ({}));
+  if(!r.ok || !out.ok) throw new Error(out.error || ('HTTP ' + r.status));
+  return out;
+}
+
+async function sendBigFile(file, key, say){
+  const start = await bigAsk('start', { json: { key, type: file.type } });
+  const size = Number(start.partBytes) || (10 * 1024 * 1024);
+  const parts = [];
+  const count = Math.max(1, Math.ceil(file.size / size));
+  try{
+    for(let i = 0; i < count; i++){
+      const piece = file.slice(i * size, Math.min(file.size, (i + 1) * size));
+      let got = null, last = null;
+      for(let tries = 0; tries < BIG_TRIES && !got; tries++){
+        if(say) say(`Sending piece ${i + 1} of ${count}`
+          + (tries ? ` (try ${tries + 1})` : '') + '…');
+        try{
+          got = await bigAsk('part', { method:'PUT', body: piece,
+            query: '?key=' + encodeURIComponent(key)
+                 + '&uploadId=' + encodeURIComponent(start.uploadId)
+                 + '&part=' + (i + 1) });
+        }catch(e){ last = e; }
+      }
+      if(!got) throw last || new Error('a piece would not go');
+      parts.push({ partNumber: got.partNumber, etag: got.etag });
+    }
+    if(say) say('Finishing…');
+    await bigAsk('done', { json: { key, uploadId: start.uploadId, parts } });
+    return MEDIA_HOST + encodeURI(key);
+  }catch(e){
+    /* leave nothing half-written behind; R2 would clear it in a week
+       anyway, but a bucket full of abandoned pieces is nobody's idea
+       of tidy */
+    try{ await bigAsk('abort', { json: { key, uploadId: start.uploadId } }); }
+    catch(x){ /* then the week will do it */ }
+    throw e;
+  }
+}
+
+/* What is already in the bucket, for a file put there by hand. */
+async function filesOnHost(prefix){
+  const token = await idToken();
+  if(!token) throw new Error('not signed in');
+  const r = await fetch(UPLOAD_URL.replace(/\/upload$/, '/files')
+    + '?prefix=' + encodeURIComponent(prefix),
+    { headers: { Authorization: 'Bearer ' + token } });
+  const out = await r.json().catch(() => ({}));
+  if(!r.ok || !out.ok) throw new Error(out.error || ('HTTP ' + r.status));
+  return arr(out.files);
 }
 
 /* ---------------------------------------------------------------------
