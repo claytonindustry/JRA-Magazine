@@ -398,20 +398,34 @@ body{background:var(--paper)}
   #reader .spread{grid-template-columns:15rem minmax(0,1fr);align-items:start}
 }
 #reader .nowbar{
-  display:none;width:100%;border:0;border-top:1px solid var(--rule);
-  background:none;color:var(--brine);font-family:var(--sans);
-  font-size:.76rem;line-height:1.2;text-align:start;cursor:pointer;
-  padding:.4rem var(--gutter);
+  display:none;width:100%;border-top:1px solid var(--rule);
+  padding:.3rem var(--gutter);
+  align-items:center;gap:.4rem;
+}
+#reader .nowwhere{
+  flex:1;min-width:0;border:0;background:none;color:var(--brine);
+  font-family:var(--sans);font-size:.76rem;line-height:1.2;
+  text-align:start;cursor:pointer;padding:.1rem 0;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
 }
-#reader .nowbar:hover{color:var(--ink)}
-#reader .nowbar b{font-weight:600;color:var(--ink)}
-#reader .nowbar.flat{cursor:default}
-#reader .nowbar.flat:hover{color:var(--brine)}
+#reader .nowwhere:hover{color:var(--ink)}
+#reader .nowwhere b{font-weight:600;color:var(--ink)}
+#reader .nowbar.flat .nowwhere{cursor:default}
+#reader .nowbar.flat .nowwhere:hover{color:var(--brine)}
+/* The way on and back. Two characters wide, because the titles they
+   lead to will not fit beside a title that is already there. */
+#reader .nowstep{
+  flex:none;display:grid;place-items:center;
+  width:1.9rem;height:1.9rem;border-radius:6px;
+  text-decoration:none;color:var(--brine);font-family:var(--sans);
+  font-size:1.1rem;line-height:1;
+}
+#reader .nowstep:hover{color:var(--ink);background:var(--paper-raised)}
+#reader .nowstep[hidden]{display:none}
 /* The rail is the better answer whenever there is room for it, so this
    appears only where it cannot. */
 @container reader (max-width:63.99rem){
-  #reader .nowbar.on{display:block}
+  #reader .nowbar.on{display:flex}
 }
 
 #reader .rail{display:none}
@@ -689,18 +703,13 @@ body{background:var(--paper)}
 }
 #reader .foot .off{opacity:.3;pointer-events:none}
 
-/* Where the rail cannot be shown, this is the only thing that says what
-   you are reading and where you can go from it, so it stays on screen
-   rather than waiting at the bottom of a long piece. It is sticky
-   rather than fixed: it rides at the foot of the window while the
-   article is passing and settles into its own place at the end, so a
-   short piece is not left with a bar floating over nothing. */
+/* The foot is the foot again. What has to stay within reach on a narrow
+   screen is in the header, which holds itself at the top anyway, so
+   there is no second bar hovering over the words. This is what you
+   meet when you get to the end, as it always was. */
 @container reader (max-width:63.99rem){
   #reader .foot{
-    position:sticky;bottom:0;z-index:5;
-    margin-top:2.5rem;padding:.5rem 0 calc(.5rem + env(safe-area-inset-bottom));
-    background:var(--paper);border-top:1px solid var(--rule);
-    box-shadow:0 -8px 16px -12px rgba(0,0,0,.35);
+    margin-top:2.5rem;padding-top:.75rem;
     gap:.6rem;align-items:center;
   }
   #reader .foot a,#reader .foot button,#reader .foot .off{padding:.25rem 0}
@@ -727,11 +736,6 @@ body{background:var(--paper)}
   padding:.55rem .9rem;border-radius:3px;
 }
 
-#reader .draftbar{
-  background:var(--e-sel);color:#fff;font-family:var(--sans);
-  font-size:.78rem;font-weight:600;letter-spacing:.04em;
-  padding:.4rem var(--gutter);text-align:center;
-}
 
 .skip{
   position:absolute;inset-inline-start:-9999px;top:0;
@@ -963,7 +967,6 @@ dialog #coverBody .subhead:first-child{margin-top:.2rem}
    the pane it scrolls in: a bar stuck to the foot measures from the
    pane's padding box, and padding there would hold it that far up. */
 #editor .sheet{max-width:46rem;margin:0 auto;padding-bottom:2rem}
-#editor .art-head .row label{flex:0 0 auto}
 /* ---- the article's header, now three blocks like any other ----
    The faces and sizes they had as form fields, kept exactly, so the
    only thing that changed is that they can be written in. */
@@ -1382,6 +1385,15 @@ dialog .figctl .btn[aria-pressed="true"],
 #editor .addbar{
   display:flex;gap:.4rem;align-items:center;flex-wrap:wrap;margin-top:.45rem;
 }
+/* what is added, and then what the piece does */
+#editor .addbar .barsplit{
+  width:1px;align-self:stretch;margin:.1rem .25rem;background:var(--e-line);
+}
+#editor .addbar .check{
+  display:flex;align-items:center;gap:.3rem;margin:0;
+  font-size:.78rem;color:var(--e-muted);white-space:nowrap;cursor:pointer;
+}
+#editor .addbar .check input{width:auto;margin:0}
 /* so a block added or walked to does not come to rest under the bar */
 /* clear of the header a block is being scrolled to sits under */
 #editor .blk{scroll-margin-top:7rem;scroll-margin-bottom:1rem}
@@ -1982,7 +1994,6 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
 <!-- ===================== the reader ===================== -->
 <div id="reader">
   <a class="skip" href="#top" id="skip">Skip to content</a>
-  <div class="draftbar" id="draftbar" hidden>Preview — this is the working copy, not the published issue</div>
   <header class="bar">
     <div class="bar-in" id="barIn">
       <button class="flag" id="flag">JRA Magazine</button>
@@ -2003,8 +2014,15 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
     <nav class="tabs" id="tabs" aria-label="Sections"></nav>
     <!-- Narrow enough to lose the contents rail, and the reader has
          nothing on screen saying where they are. This says it, and
-         gives back the one thing the rail was for. -->
-    <button class="nowbar" id="nowBar" type="button"></button>
+         gives back the one thing the rail was for: where you are, and
+         the way on and back. It is in the header, which already holds
+         itself at the top of the screen, so nothing had to be stuck
+         over the foot of the words to be within reach. -->
+    <div class="nowbar" id="nowBar">
+      <a class="nowstep" id="nowPrev" aria-label="Previous" hidden>‹</a>
+      <button class="nowwhere" id="nowWhere" type="button"></button>
+      <a class="nowstep" id="nowNext" aria-label="Next" hidden>›</a>
+    </div>
   </header>
   <main id="top"></main>
 </div>
@@ -2456,7 +2474,7 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
    when the file changes. It is unrelated to the database's own VERSION,
    which governs schema upgrades and must not be moved for a cosmetic
    change. */
-const APP_VERSION = '1.47';
+const APP_VERSION = '1.48';
 
 /* Nothing is imported at the top any more. The Firebase libraries are
    several hundred kilobytes and, loaded this way, the browser must fetch
@@ -4310,22 +4328,38 @@ function store(key, val){
 /* Where the reader is, for the narrow screens that have no room for the
    contents rail. Set as an article is drawn and emptied by anything
    else, so it can never be left behind saying something untrue. */
-function setNowBar(issue, title, num){
-  const bar = $('#nowBar');
-  if(!bar) return;
-  bar.textContent = '';
-  bar.append(h('b', { text: issue }));
-  if(title) bar.append(' \u00b7 ' + title);
+function setNowBar(issue, title, num, prev, next){
+  const bar = $('#nowBar'), where = $('#nowWhere');
+  if(!bar || !where) return;
+  where.textContent = '';
+  where.append(h('b', { text: issue }));
+  if(title) where.append(' \u00b7 ' + title);
   bar.classList.add('on');
   bar.classList.toggle('flat', !num);
-  bar.onclick = num ? () => { location.hash = '#/' + num; } : null;
+  where.onclick = num ? () => { location.hash = '#/' + num; } : null;
+  /* Where there is nowhere to step, the control is gone rather than
+     greyed: this bar is two centimetres tall on a telephone and has no
+     room to say no. */
+  [['#nowPrev', prev], ['#nowNext', next]].forEach(([sel, to]) => {
+    const el = $(sel);
+    if(!el) return;
+    el.hidden = !to;
+    if(to) el.setAttribute('href', to);
+    else el.removeAttribute('href');
+  });
 }
 function clearNowBar(){
-  const bar = $('#nowBar');
+  const bar = $('#nowBar'), where = $('#nowWhere');
   if(!bar) return;
   bar.classList.remove('on');
-  bar.textContent = '';
-  bar.onclick = null;
+  /* Empty what is written, not what it is written in. This used to be
+     one button and clearing it meant clearing its words; it holds the
+     steps as well now, and taking those out took them out for good. */
+  if(where){ where.textContent = ''; where.onclick = null; }
+  ['#nowPrev', '#nowNext'].forEach(sel => {
+    const e = $(sel);
+    if(e){ e.hidden = true; e.removeAttribute('href'); }
+  });
 }
 
 const scrollTop0 = () => {
@@ -5168,7 +5202,8 @@ function renderArticle(num, id, query, mode){
   const inLang = LANG !== 'en' && arr(issueMeta(num) && issueMeta(num).langs).includes(LANG);
   /* A loose proof is not in an issue, so there is no contents to send
      anyone back to; it still says which piece this is. */
-  setNowBar(where, a.title || '', bare ? '' : num);
+  setNowBar(where, a.title || '', bare ? '' : num,
+    prev ? `#/${num}/${prev.id}` : '', next ? `#/${num}/${next.id}` : '');
 
   main.className = 'reading';
   barIn.classList.add('wide');
@@ -5670,7 +5705,6 @@ function setMode(m){
   document.body.classList.toggle('mode-edit', m === 'edit');
   editorEl.hidden = m !== 'edit';
   readerEl.hidden = (m === 'edit' && !State.previewing);
-  $('#draftbar').hidden = !State.previewing;
 }
 
 /* Preview borrows the reader whole and puts it inside the editor, so
@@ -8532,26 +8566,10 @@ function workArticle(work){
     return;
   }
   /* The title, the byline and the standfirst are blocks now, at the top
-     of the list below. What is left here is the two things that are
-     about the article rather than in it. */
-  const head = h('div', { class:'art-head' });
-  const newPage = h('input', { type:'checkbox' });
-  newPage.checked = a.newPage !== false;
-  newPage.onchange = () => { a.newPage = newPage.checked; saveArticle(a, { fast:true }); };
-  /* The web issue is not bound by a page count, so a piece can run here
-     that was never in the edition that went to the printer. */
-  const webOnly = h('input', { type:'checkbox' });
-  webOnly.checked = !!a.webOnly;
-  webOnly.onchange = () => {
-    a.webOnly = webOnly.checked;
-    saveArticle(a, { fast:true });
-    renderSide(); relayout();
-  };
-  head.append(h('div', { class:'row' },
-    h('label', { class:'check' }, newPage, ' Start on a new page'),
-    h('label', { class:'check', title:'Read on the web, left out of the printed issue' },
-      webOnly, ' Online only')));
-  s.append(head);
+     of the list below. The two things that are about the article rather
+     than in it used to sit here in a panel of their own, above
+     everything, which made them look like part of the writing. They
+     are settings, so they are with the other settings, in the bar. */
 
   /* Writing a translation rather than the article itself. Everything
      about translating lives on its own tab now; what is left here is a
@@ -8589,7 +8607,7 @@ function workArticle(work){
       'Something has been written, moved or added to it that is not here.'));
   }
 
-  s.append(toolbars());
+  s.append(toolbars(a));
   const blocks = h('div', { id:'blocks' });
   s.append(blocks);
 
@@ -8621,15 +8639,17 @@ function workPage(work){
       : null,
     h('span', { class:'hint', text: pg.show ? '' : 'Not shown — publishing now takes the tab away.' }));
   s.append(pub);
-  s.append(toolbars());
+  s.append(toolbars(null));
   s.append(h('div', { id:'blocks' }));
   work.append(s);
   renderBlocks();
 }
 
-/* The two rows travel together, so they stick together. */
-function toolbars(){
-  return h('div', { class:'toolbars' }, fmtBar(), addBar());
+/* The two rows travel together, so they stick together. The article is
+   passed through because the second row carries two of its settings,
+   and a page that is not an article has neither. */
+function toolbars(a){
+  return h('div', { class:'toolbars' }, fmtBar(), addBar(a || null));
 }
 
 /* ---------------------------------------------------------------------
@@ -9013,11 +9033,35 @@ const TEXT_KINDS = [
   ['quote', 'Quote',      'set apart, in italic']
 ];
 
-function addBar(){
+function addBar(a){
   const bar = h('div', { class:'addbar' });
   bar.append(h('button', { class:'btn small', onclick: () => openAddText() }, '+ Text…'));
   bar.append(h('button', { class:'btn small', onclick: () => openAdd(insertPoint()) }, '+ Photo…'));
   bar.append(h('button', { class:'btn small', onclick: () => openVideo() }, '+ Video…'));
+
+  /* What this piece does rather than what is in it. Only for an
+     article: the About and Links pages are not in an issue, are never
+     printed, and have no page to start on. */
+  if(a){
+    const newPage = h('input', { type:'checkbox' });
+    newPage.checked = a.newPage !== false;
+    newPage.onchange = () => { a.newPage = newPage.checked; saveArticle(a, { fast:true }); };
+    /* The web issue is not bound by a page count, so a piece can run
+       there that was never in the edition that went to the printer. */
+    const webOnly = h('input', { type:'checkbox' });
+    webOnly.checked = !!a.webOnly;
+    webOnly.onchange = () => {
+      a.webOnly = webOnly.checked;
+      saveArticle(a, { fast:true });
+      renderSide(); relayout();
+    };
+    bar.append(h('span', { class:'barsplit' }));
+    bar.append(h('label', { class:'check', title:'Begins a fresh page in the printed issue' },
+      newPage, ' Start on a new page'));
+    bar.append(h('label', { class:'check', title:'Read on the web, left out of the printed issue' },
+      webOnly, ' Online only'));
+  }
+
   /* With nothing chosen these add to the end, and no block is lit to say
      so — which looks the same as something being wrong. */
   bar.append(h('span', { class:'hint', id:'addWhere' }));
