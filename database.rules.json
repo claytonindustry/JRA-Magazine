@@ -91,7 +91,7 @@
       ".read": "auth != null && root.child('people').child(auth.token.email.toLowerCase().replace('.', ',')).exists()",
       "$person": {
         ".read": "auth != null && $person === auth.token.email.toLowerCase().replace('.', ',')",
-        ".write": "auth != null && root.child('people').child(auth.token.email.toLowerCase().replace('.', ',')).child('role').val() === 'owner'",
+        ".write": "auth != null && root.child('people').child(auth.token.email.toLowerCase().replace('.', ',')).child('role').val() === 'owner' || (auth != null && $person === auth.token.email.toLowerCase().replace('.', ',') && data.exists() && newData.exists() && newData.child('role').val() === data.child('role').val())",
         ".validate": "newData.hasChildren(['name', 'role'])",
         "name": {
           ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length < 120"

@@ -502,27 +502,51 @@ body{background:var(--paper)}
    know how to register a property */
 #reader .body blockquote p,.mag .mq p{--tz:1}
 
+/* There were a hundred and eleven pixels between the headline and the
+   first sentence, against a twenty-pixel paragraph rhythm: five
+   paragraph-gaps of air before the article began. The rule under the
+   byline is worth keeping — it says the piece starts here — but it
+   does not need a hand's width on either side of it. */
 #reader .art h1{
   font-size:calc(clamp(1.65rem,5cqi,2.4rem) * var(--tz,1));font-weight:600;line-height:1.1;
-  letter-spacing:-.018em;margin:0 0 .6rem;text-wrap:balance;
+  letter-spacing:-.018em;margin:0 0 .45rem;text-wrap:balance;
 }
-#reader .art .by{font-family:var(--sans);font-size:calc(.88rem * var(--tz,1));color:var(--brine);margin:0 0 .4rem}
+#reader .art .by{font-family:var(--sans);font-size:calc(.88rem * var(--tz,1));color:var(--brine);margin:0 0 .3rem}
 #reader .art .meta{
   font-family:var(--sans);font-size:.76rem;color:var(--brine);
-  margin:0 0 2rem;padding-bottom:1.25rem;border-bottom:1px solid var(--rule);
+  margin:0 0 1rem;padding-bottom:.65rem;border-bottom:1px solid var(--rule);
 }
 #reader .art .meta .corrected{display:block;margin-top:.2rem;opacity:.9}
+/* The space between one thing and the next is the grid's, not each
+   element's.
+
+   This is laid out as a grid so a photograph can break out past the
+   measure, and margins do not collapse in a grid. Every rule here was
+   written as though they did: a paragraph's margin and a photograph's
+   margin were both applied, so a picture had fifty-three pixels above
+   it and thirty-three below — the same distance asked for twice on one
+   side and once on the other, which is what made it look wrong rather
+   than merely roomy. A heading had seventy-three above and fifteen
+   below for the same reason.
+
+   So the row gap owns the rhythm and nothing carries a vertical margin
+   unless it wants more than the rhythm. Then every gap is the rhythm
+   plus what was asked for, on both sides, and the arithmetic is one
+   addition instead of a question about which browser collapses what. */
 #reader .body{
-  font-size:1.02em;display:grid;
+  font-size:1.02em;display:grid;row-gap:1.15em;
   grid-template-columns:
     [text-start] min(var(--measure),100%) [text-end]
     minmax(0,1fr) [media-end];
 }
-#reader .body>*{grid-column:text-start/text-end;min-width:0}
+#reader .body>*{grid-column:text-start/text-end;min-width:0;margin-block:0}
 #reader .body>figure.wide{grid-column:text-start/media-end}
-#reader .body p{margin:0 0 1.15em;overflow-wrap:break-word;font-size:calc(1em * var(--tz,1))}
+#reader .body p{margin:0;overflow-wrap:break-word;font-size:calc(1em * var(--tz,1))}
+/* A heading belongs to what follows it, so the extra space goes above.
+   Measured in its own size, so a subheading takes a little less than a
+   heading, which is right. */
 #reader .body h2,#reader .body h3,#reader .body h4{
-  font-weight:600;line-height:1.2;letter-spacing:-.01em;margin:2.2em 0 .6em;
+  font-weight:600;line-height:1.2;letter-spacing:-.01em;margin:1.05em 0 0;
 }
 #reader .body>:first-child{margin-top:0}
 #reader .body h2{font-size:calc(1.4em * var(--tz,1))}
@@ -530,7 +554,7 @@ body{background:var(--paper)}
 #reader .body h4{font-size:1.05em}
 #reader .body strong{font-weight:600}
 #reader .body em{font-style:italic}
-#reader .body blockquote{margin:1.6em 0;padding-inline-start:1.1em;border-inline-start:3px solid var(--rule);font-style:italic;font-size:calc(1em * var(--tz,1))}
+#reader .body blockquote{margin:.45em 0;padding-inline-start:1.1em;border-inline-start:3px solid var(--rule);font-style:italic;font-size:calc(1em * var(--tz,1))}
 #reader .body blockquote p{margin:0 0 .8em}
 #reader .body blockquote p:last-child{margin-bottom:0}
 #reader .body .standfirst{font-size:calc(1.12em * var(--tz,1));line-height:1.5;font-style:italic;color:var(--brine)}
@@ -572,7 +596,9 @@ body{background:var(--paper)}
 /* the printed-edition-only page still offers it the old way */
 #reader .pdfonly .getpdf{border:0;padding:0}
 #reader .body a{color:var(--tanbark);text-underline-offset:.15em}
-#reader .body figure{margin:1.9em 0;max-width:100%}
+/* A photograph wants more air than a paragraph, equally on both
+   sides. */
+#reader .body figure{margin:.75em 0;max-width:100%}
 #reader .body figure.wide figcaption{max-width:var(--measure)}
 #reader .body img{
   display:block;height:auto;border-radius:2px;
@@ -1145,6 +1171,29 @@ dialog .ed-cap{font-size:.95rem;min-height:2.2em}
 #editor .favlang .btn{white-space:nowrap}
 #editor .peopleadd{flex-wrap:wrap}
 #editor .peopleadd input{flex:1;min-width:9rem;margin:0}
+#editor .welcome{margin:.6rem 0 0}
+#editor .welcome .welcometext{
+  width:100%;font:inherit;font-size:.8rem;line-height:1.45;padding:.5rem .6rem;
+  border:1px solid var(--e-line);border-radius:6px;background:#fff;color:var(--e-ink);
+  resize:vertical;
+}
+
+/* ---------- an address not yet proved ---------- */
+#verifyBar{
+  position:fixed;left:50%;transform:translateX(-50%);bottom:1rem;z-index:115;
+  display:flex;gap:.6rem;align-items:center;flex-wrap:wrap;justify-content:center;
+  max-width:min(34rem,92vw);
+  background:var(--e-panel);border:1px solid var(--e-warn);border-radius:10px;
+  padding:.55rem .8rem;box-shadow:0 10px 30px rgba(0,0,0,.18);
+  font-family:var(--ui);font-size:.82rem;color:var(--e-ink);
+}
+#verifyBar[hidden]{display:none}
+#verifyBar .btn{
+  border:1px solid var(--e-line);background:#fff;color:var(--e-ink);
+  padding:.3rem .6rem;border-radius:6px;cursor:pointer;font:inherit;font-size:.78rem;
+  white-space:nowrap;
+}
+#verifyBar .btn.ghost{background:none;color:var(--e-muted)}
 
 /* ---------- the web chat ---------- */
 #chat{
@@ -1666,9 +1715,10 @@ body.pdf-building #editor .work,body.pdf-building #editor .sp-grip{display:none!
 #gate form.waiting label,#gate form.waiting button[type="submit"]{display:none}
 /* the way through without a code — always there, never the main act */
 #gate .acts.alt{margin-top:.6rem;padding-top:.8rem;border-top:1px solid var(--e-line)}
-#gate input#gateMail,#gate input#gatePass{
+#gate input#gateName,#gate input#gateMail,#gate input#gatePass{
   font-size:1rem;text-align:center;padding:.6rem .5rem;margin-bottom:.4rem;
 }
+#gate .sr[hidden]{display:none}
 #gate input#gatePass{letter-spacing:.12em}
 #gate .said{color:var(--e-accent)}
 #gate .sr{display:block;font-size:0;margin-bottom:0}   /* label for readers only */
@@ -2204,6 +2254,7 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
     <p class="shot-cap" id="shotCap"></p>
     <a class="btn" id="shotGo" href="#/">Read the article</a>
     <a class="btn" id="shotFull" href="#/" target="_blank" rel="noopener">Open the file</a>
+    <button class="btn" type="button" id="shotSave" hidden>Download</button>
   </div>
 </div>
 
@@ -2211,6 +2262,8 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
   <form id="gateForm">
     <h2>JRA Magazine</h2>
     <p>Sign in to edit</p>
+    <label class="sr" id="gateNameWrap" hidden>Name<input type="text" id="gateName"
+           autocomplete="name" placeholder="Your name"></label>
     <label class="sr">Email<input type="email" id="gateMail" autocomplete="username"
            autocapitalize="off" spellcheck="false" placeholder="Email" required></label>
     <label class="sr">Password<input type="password" id="gatePass"
@@ -2220,9 +2273,10 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
     <p class="hint said" id="gateSaid" hidden></p>
     <p class="err" id="gateErr"></p>
     <div class="acts">
-      <button class="btn" type="submit">Start editing</button>
+      <button class="btn" type="submit" id="gateGo">Start editing</button>
     </div>
     <div class="acts alt">
+      <button class="btn ghost" type="button" id="gateNew">Set up my account</button>
       <button class="btn ghost" type="button" id="gateForgot">Forgotten the password</button>
       <button class="btn ghost" type="button" id="gateCancel">Just read the magazine</button>
     </div>
@@ -2514,7 +2568,7 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
    when the file changes. It is unrelated to the database's own VERSION,
    which governs schema upgrades and must not be moved for a cosmetic
    change. */
-const APP_VERSION = '1.49';
+const APP_VERSION = '1.55';
 
 /* Nothing is imported at the top any more. The Firebase libraries are
    several hundred kilobytes and, loaded this way, the browser must fetch
@@ -2682,15 +2736,33 @@ async function authCall(method, body){
   return out;
 }
 
+/* What the token itself says. It carries the address and whether that
+   address has been proved, so neither has to be fetched: the middle
+   part is JSON, base64 with a web alphabet and the padding left off.
+
+   This is read, not trusted — anybody can write a token. What it is
+   used for is what the screen says. What may actually be done is
+   decided by the database, which reads its own copy. */
+function tokenSays(idToken){
+  try{
+    const mid = String(idToken).split('.')[1];
+    const pad = mid.replace(/-/g, '+').replace(/_/g, '/');
+    const json = atob(pad + '==='.slice((pad.length + 3) % 4));
+    return JSON.parse(decodeURIComponent(escape(json))) || {};
+  }catch(e){ return {}; }
+}
+
 function holdSession(d){
+  const said = tokenSays(d.idToken);
   Session = {
     idToken: d.idToken,
     refreshToken: d.refreshToken,
     /* a minute short of the hour, so a long save is never cut off
        halfway by a token going stale mid-request */
     until: Date.now() + (Number(d.expiresIn || 3600) - 60) * 1000,
-    uid: d.localId || (Session && Session.uid) || '',
-    email: (d.email || (Session && Session.email) || '').toLowerCase()
+    uid: d.localId || said.user_id || said.sub || (Session && Session.uid) || '',
+    email: (d.email || said.email || (Session && Session.email) || '').toLowerCase(),
+    verified: said.email_verified === true
   };
   store(SESSION, Session.refreshToken);
   return Session;
@@ -2737,7 +2809,59 @@ async function signInWithCode(email, password){
   const d = await authCall('signInWithPassword',
     { email, password, returnSecureToken: true });
   holdSession(d);
+  /* An address nobody has proved is not yet anybody. Rather than a
+     button to ask for another letter, the asking is the act of trying
+     to come in: a fresh one goes out and the door stays shut. A link
+     lost or left too long costs one more sign-in, not an errand. */
+  if(!Session.verified){
+    try{ await sendVerifyEmail(); }catch(e){ /* then the last one stands */ }
+    dropSession();
+    await onUser(null);
+    const e = new Error('NOT_VERIFIED');
+    e.code = 'NOT_VERIFIED';
+    throw e;
+  }
   await onUser(userShape());
+}
+
+/* Somebody setting themselves up: their name, their password, their
+   address. Nobody else ever knows the password and nobody has to pass
+   one along by whatever means was to hand.
+
+   It ends signed out, on purpose. A token says whether the address has
+   been proved, and the one minted here says no — it was made before
+   the letter was opened, and it would go on saying no for an hour.
+   Signing in afterwards mints a fresh one that says yes, so the way
+   through is the way it reads: set up, open the letter, sign in. */
+async function signUpWithPassword(email, password, name){
+  const d = await authCall('signUp', { email, password, returnSecureToken: true });
+  holdSession(d);
+  const called = String(name || '').trim();
+  /* on the account, where Firebase keeps it */
+  if(called){
+    try{ await authCall('update', { idToken: Session.idToken, displayName: called,
+                                    returnSecureToken: false }); }
+    catch(e){ /* a name is not worth failing a sign-up over */ }
+  }
+  /* and on the magazine's own list, if an owner has put them on it —
+     the one field of their own line they may write */
+  if(called){
+    try{ await dbUpd('people/' + peopleKey(email), { name: called }); }
+    catch(e){ /* not listed yet, or not allowed: neither stops anything */ }
+  }
+  try{ await sendVerifyEmail(); }
+  catch(e){ /* signing in again sends another */ }
+  dropSession();
+  await onUser(null);
+}
+
+/* Firebase will only send this for the person holding the token, which
+   is why it is asked for from inside a session rather than handed an
+   address. */
+async function sendVerifyEmail(){
+  const t = await freshToken();
+  if(!t) throw new Error('not signed in');
+  await authCall('sendOobCode', { requestType: 'VERIFY_EMAIL', idToken: t });
 }
 
 async function signOutNow(){
@@ -2749,38 +2873,20 @@ async function sendResetEmail(email){
   await authCall('sendOobCode', { requestType: 'PASSWORD_RESET', email });
 }
 
-/* Making somebody a login, from the editor rather than the console.
+/* Adding somebody no longer makes their login.
 
-   The password here is thrown away: it is random, nobody reads it, and
-   the person is sent a link to set their own. An editor's password
-   should never have been through anybody else's hands, and inventing
-   one for them means it travels by whatever way you tell them, which
-   is usually worse than email.
+   It used to: the editor signed them up with a password nobody ever
+   saw and sent them a link to set their own. That worked, and the
+   letter it sent said Reset your password, which is a strange thing
+   to read about an account you have never had — and the wording of it
+   is Firebase's, not ours.
 
-   Signing somebody up hands back a session for the account just made,
-   which would sign the owner doing it out of their own. Those tokens
-   are dropped on the floor: holdSession is not called, so the session
-   in hand is untouched.
-
-   Returns what happened, because an address that already has a login
-   is not a failure — it is somebody who has written for you before. */
-async function createLogin(email){
-  const bytes = new Uint8Array(24);
-  (self.crypto || window.crypto).getRandomValues(bytes);
-  const password = btoa(String.fromCharCode(...bytes)).replace(/[^A-Za-z0-9]/g, '') + 'aA1!';
-  try{
-    await authCall('signUp', { email, password, returnSecureToken: false });
-  }catch(e){
-    if(/EMAIL_EXISTS/.test(e.code || '')) return 'had one already';
-    if(/OPERATION_NOT_ALLOWED|ADMIN_ONLY_OPERATION/.test(e.code || ''))
-      throw new Error('this Firebase project will not let the editor make logins. '
-        + 'Authentication \u2192 Settings \u2192 User actions \u2192 tick "Enable create".');
-    throw e;
-  }
-  /* and now they set their own */
-  try{ await sendResetEmail(email); return 'made, and sent a link to set a password'; }
-  catch(e){ return 'made, but the password link would not send \u2014 ' + (e.message || e); }
-}
+   So it goes the other way round, as the landing manager does it. The
+   list is the permission and is written here; the account is made by
+   the person it belongs to, with a password only they ever know, and
+   the letter they get is the one worth sending: prove this address is
+   yours. Nothing is passed along by hand, and nobody has to explain
+   why an email says the wrong thing. */
 
 /* What the rest of the file has always been handed: an object with an
    address and a way to get a token. Keeping the shape means nothing
@@ -2789,6 +2895,7 @@ async function createLogin(email){
 const userShape = () => !Session ? null : {
   uid: Session.uid,
   email: Session.email,
+  verified: !!Session.verified,
   getIdToken: (force) => freshToken(force)
 };
 
@@ -3765,6 +3872,13 @@ function blocksFromHtml(html, base){
       const im = n.querySelector('img');
       const cap = n.querySelector('figcaption');
       if(!im) return;
+      /* The photographer's credit is printed inside the caption, so it
+         has to be lifted out before the caption is read — otherwise
+         re-editing a published issue glues "Photo: Jane Roe" onto the
+         end of the words and loses the credit as a field. */
+      const cr = cap && cap.querySelector('.credit');
+      const crText = cr ? plainText(cr.innerHTML).replace(/^\s*Photo:\s*/i, '') : '';
+      if(cr) cr.remove();
       blocks.push({
         id: uid('b'), t: 'fig',
         src: im.getAttribute('data-src') || '',
@@ -3793,7 +3907,7 @@ function blocksFromHtml(html, base){
              : n.classList.contains('al-left')   || n.classList.contains('alignleft')   ? 'left'
              : undefined,
         shape: 'auto',
-        caption: cap ? sanitizeInline(cap.innerHTML) : '', credit: '', webOnly: web
+        caption: cap ? sanitizeInline(cap.innerHTML) : '', credit: crText, webOnly: web
       });
     }
   });
@@ -4636,6 +4750,10 @@ function drawShot(){
   const full = $('#shotFull');
   full.hidden = !p.file;
   if(p.file) full.setAttribute('href', p.file);
+
+  const save = $('#shotSave');
+  save.hidden = !p.of;
+  save.onclick = p.of ? () => downloadPhoto(p.of) : null;
 
   $('#shotN').textContent = Shot.list.length > 1
     ? `${Shot.at + 1} of ${Shot.list.length}` : '';
@@ -6189,6 +6307,12 @@ function route(){
    The wall
    ===================================================================== */
 function showGate(on, waiting){
+  /* Whether this is the gate arriving or the gate being told again
+     that it is already here. onUser finishes by routing, and routing
+     does not wait, so a word written on this screen — account made,
+     address not proved — would otherwise be wiped a moment later by
+     the redraw that follows it. */
+  const wasUp = !$('#gate').hidden;
   $('#gate').hidden = !on;
   if(!on) return;
   readerEl.hidden = true;
@@ -6205,6 +6329,9 @@ function showGate(on, waiting){
     $('#gateWho').textContent = 'Signed in as ' + (State.user.email || 'this account') + '.';
     return;
   }
+  /* ready to sign in, whatever it was last asked to do — but only on
+     arriving, so that what it has just been told to say survives */
+  if(!wasUp) gateMode(false);
   /* While the sign-in library is still on its way there is nothing
      useful to type into, so the form says so rather than looking
      broken. */
@@ -6243,6 +6370,15 @@ async function onUser(user){
      and this is the second one. The database rules read the same list,
      so a person who is not on it is refused whichever way they ask —
      this only decides what the screen does about it. */
+  if(user && !user.verified){
+    /* a session restored from a browser that signed in before the
+       address was proved; the gate says what to do about it */
+    State.user = null;
+    document.body.classList.toggle('signed-in', false);
+    chatStop();
+    route();
+    return;
+  }
   if(user){
     let why = '';
     try{
@@ -6473,6 +6609,12 @@ const KINDS = { p:'¶ Text', h2:'H Head', h3:'h Sub', quote:'“” Quote' };
    and never otherwise.
    ===================================================================== */
 const GT_LIB = 'https://cdn.gtranslate.net/widgets/latest/lib.min.js';
+/* Which hat the sign-in form is wearing. It lives out here so that
+   showing the gate can put it back to signing in: setting up an
+   account is something done once, and the next person to see this
+   screen is almost always somebody coming back. */
+let gateMode = () => {};
+
 let gtLibP = null, gtFailed = false, gtLast = 0;
 function gtLib(){
   if(gtLibP) return gtLibP;
@@ -6999,16 +7141,13 @@ function toggleMenu(){
       onclick: () => { location.hash = '#editor/settings/' + k; }
     }, label));
   });
-  menu.append(h('hr'));
   /* The PDF and the magazine's own settings used to be here. They are
      both about the magazine rather than about the editor, so they live
      with it: the settings under its name in the side panel, and the PDF
-     inside that window. */
-  menu.append(h('button', { role:'menuitem',
-    onclick: () => { closeMenu(); openImport(); } }, 'Import a library…'));
-  menu.append(h('button', { role:'menuitem',
-    onclick: () => { closeMenu(); window.open(location.pathname + location.search, '_blank', 'noopener'); } },
-    'View the live site'));
+     inside that window. Importing a library and looking at the live
+     site went the same way, to Account & settings, which is where the
+     things that are about the whole site already are. What is left in
+     this menu is the four places to go and the way out. */
   menu.append(h('hr'));
   /* Beside signing out, because it is the same kind of thing: about you
      and the people you work with rather than about the magazine. */
@@ -8136,9 +8275,28 @@ function openMagTranslations(m){
    editor, the published issues, and the photograph upload — because
    all three ask this same list.
    --------------------------------------------------------------------- */
+/* What a new editor is about to receive, in words they will understand.
+
+   The letter itself is Firebase's and says Reset your password, which
+   is a strange thing to read about an account you have never had. Its
+   wording is not ours to change — this project will not take a new
+   template — so the next best thing is that somebody tells them what
+   is coming before it arrives. This is that message, ready to send. */
+function welcomeNote(email){
+  const where = location.origin + location.pathname + '#editor';
+  return 'You are now an editor on JRA Magazine.\n\n'
+    + 'Go to:\n' + where + '\n\n'
+    + 'Press "Set up my account" and give your name, this address \u2014 '
+    + email + ' \u2014 and a password of your own. Nobody else ever sees the '
+    + 'password.\n\n'
+    + 'A link will be sent to that address. Open it, come back, and sign in. '
+    + 'That is the whole of it.';
+}
+
 function peopleCard(){
   const card = h('section', { class:'card' }, h('h2', { text:'People' }));
   const list = h('div', { class:'people' });
+  const said = h('div', { class:'welcome', hidden:true });
   const owners = () => Object.values(State.people || {})
     .filter(x => x && x.role === 'owner').length;
 
@@ -8211,7 +8369,8 @@ function peopleCard(){
     return card;
   }
 
-  const name = h('input', { placeholder:'Name', 'aria-label':'Name' });
+  /* An address and what they may do. The name is theirs to give, and
+     arrives on this list when they set themselves up. */
   const mail = h('input', { type:'email', placeholder:'Email', 'aria-label':'Email',
     autocapitalize:'off', spellcheck:'false' });
   const role = h('select', { 'aria-label':'What they may do' },
@@ -8233,16 +8392,39 @@ function peopleCard(){
       if(State.people[k]){ toast(email + ' is already on the list.'); return; }
       add.disabled = true;
       try{
-        const made = await createLogin(email);
-        await save(k, { name: (name.value || '').trim() || email, role: role.value,
+        await save(k, { name: email, role: role.value,
                         added: Date.now(), addedBy: (State.user && State.user.email) || '' });
-        name.value = ''; mail.value = '';
-        toast(email + ' may edit \u2014 ' + made + '.');
+        mail.value = '';
+        toast(email + ' may edit, once they have set up an account.');
+        showWelcome(email);
       }catch(e){
         toast('Not added: ' + (e.message || e));
       }finally{ add.disabled = false; }
     } }, 'Add');
-  card.append(h('div', { class:'fp-row peopleadd' }, name, mail, role, add));
+  /* Firebase's letter is about to confuse somebody. This is the thing
+     to send them so that it does not. */
+  const showWelcome = (email) => {
+    said.textContent = '';
+    said.hidden = false;
+    said.append(h('p', { class:'hint' },
+      h('b', { text: 'Now tell ' + email + ' to set up an account. ' }),
+      'They give their own name and password, open the link sent to that '
+      + 'address, and then sign in. Their name appears here once they have.'));
+    const words = h('textarea', { class:'welcometext', rows:'7', readonly:true });
+    words.value = welcomeNote(email);
+    said.append(words);
+    said.append(h('div', { class:'fp-row' },
+      h('button', { class:'btn small primary', type:'button',
+        onclick: async () => {
+          try{ await navigator.clipboard.writeText(words.value); toast('Copied.'); }
+          catch(e){ words.select(); toast('Press Ctrl+C \u2014 it is selected.'); }
+        } }, 'Copy it'),
+      h('button', { class:'btn small ghost', type:'button',
+        onclick: () => { said.hidden = true; } }, 'Done')));
+  };
+
+  card.append(h('div', { class:'fp-row peopleadd' }, mail, role, add));
+  card.append(said);
   card.append(h('p', { class:'hint', text:
     'Adding somebody makes their login and gives them permission in one press. '
     + 'They are emailed a link to set their own password \u2014 nobody here invents one '
@@ -8346,6 +8528,26 @@ function workAccount(work){
     h('button', { class:'btn small ghost',
       onclick: async () => { await signOutNow(); location.hash = '#/'; } }, 'Sign out')));
   s.append(acc);
+  const site = h('section', { class:'card' }, h('h2', { text:'The site' }));
+  site.append(h('p', { class:'hint', text:
+    'The magazine as a reader meets it, and the way a whole archive comes in.' }));
+  const siteRow = h('div', { class:'fp-row' });
+  siteRow.append(h('button', { class:'btn small', type:'button',
+    onclick: () => window.open(location.pathname + location.search, '_blank', 'noopener') },
+    'View the live site'));
+  /* An import makes magazines, and making a magazine is an owner's. An
+     editor pressing this would be refused by the database halfway
+     through, which is a worse way to find out. */
+  if(isOwner()){
+    siteRow.append(h('button', { class:'btn small', type:'button',
+      onclick: () => openImport() }, 'Import a library\u2026'));
+  }
+  site.append(siteRow);
+  if(isOwner()) site.append(h('p', { class:'hint', text:
+    'An import overwrites any issue whose number it carries, and makes the '
+    + 'rest. The photographs it names are expected to be on the host already.' }));
+  s.append(site);
+
   s.append(peopleCard());
   s.append(favLangsCard());
 
@@ -11398,12 +11600,64 @@ let shownList = [];
 const shownShots = () => shownList.map(p => ({
   url:  figUrl(p.f, 2000),
   file: p.f.local ? figUrl(p.f, 2000) : p.f.base + encodeURI(p.f.src),
+  /* the whole entry, so the full-size view can hand the file over too */
+  of:   p,
   cap:  p.b ? plainText(p.b.caption || '')
             : ((galleryEntry(p.key) || {}).cap || (p.rec && p.rec.name) || ''),
   where: photoLabel(p) + (p.b && p.b.credit ? ' · ' + p.b.credit : ''),
   href: p.b && p.a ? '#editor/' + tabOf(p.a) + '/' + p.a.id : '',
   hrefLabel: 'Open the article'
 }));
+
+/* ---------------------------------------------------------------------
+   Taking a photograph away with you
+
+   The file is on the host and anybody may read it, so this is not
+   about permission — it is about getting the bytes onto the disc under
+   a name that means something, rather than opening a picture in a tab
+   and right-clicking it.
+
+   The browser will not let a page name a download that came from
+   another address, which the bucket is. So the bytes are fetched and
+   handed over as a file of our own making. That needs the bucket to
+   say an origin may read it; where it does not, the picture is opened
+   in a tab instead and the reason is said out loud rather than the
+   press doing nothing.
+   --------------------------------------------------------------------- */
+function photoFileName(p){
+  const f = p && p.f;
+  const from = (p && p.rec && p.rec.name)
+    || String((f && f.src) || '').split('/').pop()
+    || 'photograph';
+  const stem = String(from).replace(/\.[a-z0-9]+$/i, '')
+    .replace(/[^\w\d-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'photograph';
+  const ext = (String((f && f.src) || '').match(/\.([a-z0-9]+)$/i) || [,'jpg'])[1];
+  return stem + '.' + ext.toLowerCase();
+}
+
+async function downloadPhoto(p){
+  const f = p && p.f;
+  if(!f) return;
+  const url = f.local ? figUrl(f, 4000) : f.base + encodeURI(f.src);
+  const name = photoFileName(p);
+  /* one held in this browser is already here; nothing to ask anybody */
+  try{
+    const r = await fetch(url);
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    const blob = await r.blob();
+    const to = URL.createObjectURL(blob);
+    const a = h('a', { href: to, download: name });
+    document.body.append(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(to), 10000);
+  }catch(e){
+    window.open(url, '_blank', 'noopener');
+    toast('The host will not hand the file to this page, so it is open in a '
+      + 'tab to save from. Allowing this address to read the bucket in its '
+      + 'CORS settings would let it download properly.');
+  }
+}
 
 function photoCard(p, n){
   const on = n != null;
@@ -11447,6 +11701,9 @@ function photoCard(p, n){
      article it happens to sit in. */
   row.append(h('button', { class:'btn small', title:'Edit this photograph’s words',
     onclick: () => openPhotoInfo(p) }, '✎'));
+
+  row.append(h('button', { class:'btn small', title:'Download the file',
+    onclick: () => downloadPhoto(p) }, '\u2913'));
 
   /* Only a file nothing is using can be taken off the list — a duplicate
      or an upload that went in by mistake. */
@@ -13984,7 +14241,15 @@ function wire(){
      sentence: which half was wrong is not the reader's business and
      saying so would tell a stranger which addresses have accounts. */
   const gateWhy = (code, fallback) =>
-    /INVALID_LOGIN_CREDENTIALS|INVALID_PASSWORD|EMAIL_NOT_FOUND/.test(code)
+    /NOT_VERIFIED/.test(code)
+      ? 'That address has not been proved yet. A link is on its way \u2014 open '
+        + 'it, then sign in.'
+    : /EMAIL_EXISTS/.test(code)
+      ? 'That address already has an account \u2014 sign in with it, or use '
+        + '\u201cForgotten the password\u201d.'
+    : /WEAK_PASSWORD/.test(code)
+      ? 'That password is too short. Six characters or more.'
+    : /INVALID_LOGIN_CREDENTIALS|INVALID_PASSWORD|EMAIL_NOT_FOUND/.test(code)
       ? 'That address and password do not match an account.'
     : /INVALID_EMAIL|MISSING_EMAIL/.test(code) ? 'That is not an email address.'
     : /MISSING_PASSWORD/.test(code)            ? 'The password is missing.'
@@ -13997,12 +14262,42 @@ function wire(){
       ? 'Could not reach the sign-in service. Check the connection and try again.'
     : (fallback || code || 'Could not start editing.');
 
+  /* Signing in and setting up are the same two boxes. Which one the
+     button does is the only difference, so it is one form wearing two
+     hats rather than two forms to keep in step. */
+  let gateMaking = false;
+  gateMode = (making) => {
+    gateMaking = making;
+    $('#gateGo').textContent = making ? 'Set up my account' : 'Start editing';
+    $('#gateNew').textContent = making ? '\u2190 I already have one' : 'Set up my account';
+    $('#gateNameWrap').hidden = !making;
+    $('#gatePass').setAttribute('autocomplete', making ? 'new-password' : 'current-password');
+    $('#gatePass').placeholder = making ? 'A password of your own' : 'Password';
+    $('#gateForgot').hidden = making;
+    gateSays(making
+      ? 'Your name, your address, and a password of your own \u2014 six '
+        + 'characters or more.'
+      : '', making);
+  };
+  $('#gateNew').onclick = () => gateMode(!gateMaking);
+
   $('#gateForm').addEventListener('submit', async e => {
     e.preventDefault();
     gateSays('', false);
     const email = ($('#gateMail').value || '').trim();
+    const pass = $('#gatePass').value;
     try{
-      await signInWithCode(email, $('#gatePass').value);
+      if(gateMaking){
+        await signUpWithPassword(email, pass, $('#gateName').value);
+        $('#gatePass').value = '';
+        $('#gateName').value = '';
+        store(LAST_EMAIL, email);
+        gateMode(false);
+        gateSays('Account made. Open the link sent to ' + email
+          + ', then sign in here.', true);
+        return;
+      }
+      await signInWithCode(email, pass);
       $('#gatePass').value = '';
       store(KNOWN_EDITOR, '1');       // so this browser checks it next time
       store(LAST_EMAIL, email);       // and does not ask the address twice
