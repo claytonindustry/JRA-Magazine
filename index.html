@@ -2568,7 +2568,7 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
    when the file changes. It is unrelated to the database's own VERSION,
    which governs schema upgrades and must not be moved for a cosmetic
    change. */
-const APP_VERSION = '1.54';
+const APP_VERSION = '1.55';
 
 /* Nothing is imported at the top any more. The Firebase libraries are
    several hundred kilobytes and, loaded this way, the browser must fetch
@@ -3872,6 +3872,13 @@ function blocksFromHtml(html, base){
       const im = n.querySelector('img');
       const cap = n.querySelector('figcaption');
       if(!im) return;
+      /* The photographer's credit is printed inside the caption, so it
+         has to be lifted out before the caption is read — otherwise
+         re-editing a published issue glues "Photo: Jane Roe" onto the
+         end of the words and loses the credit as a field. */
+      const cr = cap && cap.querySelector('.credit');
+      const crText = cr ? plainText(cr.innerHTML).replace(/^\s*Photo:\s*/i, '') : '';
+      if(cr) cr.remove();
       blocks.push({
         id: uid('b'), t: 'fig',
         src: im.getAttribute('data-src') || '',
@@ -3900,7 +3907,7 @@ function blocksFromHtml(html, base){
              : n.classList.contains('al-left')   || n.classList.contains('alignleft')   ? 'left'
              : undefined,
         shape: 'auto',
-        caption: cap ? sanitizeInline(cap.innerHTML) : '', credit: '', webOnly: web
+        caption: cap ? sanitizeInline(cap.innerHTML) : '', credit: crText, webOnly: web
       });
     }
   });
