@@ -2230,6 +2230,7 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
     <p class="shot-cap" id="shotCap"></p>
     <a class="btn" id="shotGo" href="#/">Read the article</a>
     <a class="btn" id="shotFull" href="#/" target="_blank" rel="noopener">Open the file</a>
+    <button class="btn" type="button" id="shotSave" hidden>Download</button>
   </div>
 </div>
 
@@ -2540,7 +2541,7 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
    when the file changes. It is unrelated to the database's own VERSION,
    which governs schema upgrades and must not be moved for a cosmetic
    change. */
-const APP_VERSION = '1.50';
+const APP_VERSION = '1.51';
 
 /* Nothing is imported at the top any more. The Firebase libraries are
    several hundred kilobytes and, loaded this way, the browser must fetch
@@ -4662,6 +4663,10 @@ function drawShot(){
   const full = $('#shotFull');
   full.hidden = !p.file;
   if(p.file) full.setAttribute('href', p.file);
+
+  const save = $('#shotSave');
+  save.hidden = !p.of;
+  save.onclick = p.of ? () => downloadPhoto(p.of) : null;
 
   $('#shotN').textContent = Shot.list.length > 1
     ? `${Shot.at + 1} of ${Shot.list.length}` : '';
@@ -11441,12 +11446,64 @@ let shownList = [];
 const shownShots = () => shownList.map(p => ({
   url:  figUrl(p.f, 2000),
   file: p.f.local ? figUrl(p.f, 2000) : p.f.base + encodeURI(p.f.src),
+  /* the whole entry, so the full-size view can hand the file over too */
+  of:   p,
   cap:  p.b ? plainText(p.b.caption || '')
             : ((galleryEntry(p.key) || {}).cap || (p.rec && p.rec.name) || ''),
   where: photoLabel(p) + (p.b && p.b.credit ? ' · ' + p.b.credit : ''),
   href: p.b && p.a ? '#editor/' + tabOf(p.a) + '/' + p.a.id : '',
   hrefLabel: 'Open the article'
 }));
+
+/* ---------------------------------------------------------------------
+   Taking a photograph away with you
+
+   The file is on the host and anybody may read it, so this is not
+   about permission — it is about getting the bytes onto the disc under
+   a name that means something, rather than opening a picture in a tab
+   and right-clicking it.
+
+   The browser will not let a page name a download that came from
+   another address, which the bucket is. So the bytes are fetched and
+   handed over as a file of our own making. That needs the bucket to
+   say an origin may read it; where it does not, the picture is opened
+   in a tab instead and the reason is said out loud rather than the
+   press doing nothing.
+   --------------------------------------------------------------------- */
+function photoFileName(p){
+  const f = p && p.f;
+  const from = (p && p.rec && p.rec.name)
+    || String((f && f.src) || '').split('/').pop()
+    || 'photograph';
+  const stem = String(from).replace(/\.[a-z0-9]+$/i, '')
+    .replace(/[^\w\d-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'photograph';
+  const ext = (String((f && f.src) || '').match(/\.([a-z0-9]+)$/i) || [,'jpg'])[1];
+  return stem + '.' + ext.toLowerCase();
+}
+
+async function downloadPhoto(p){
+  const f = p && p.f;
+  if(!f) return;
+  const url = f.local ? figUrl(f, 4000) : f.base + encodeURI(f.src);
+  const name = photoFileName(p);
+  /* one held in this browser is already here; nothing to ask anybody */
+  try{
+    const r = await fetch(url);
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    const blob = await r.blob();
+    const to = URL.createObjectURL(blob);
+    const a = h('a', { href: to, download: name });
+    document.body.append(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(to), 10000);
+  }catch(e){
+    window.open(url, '_blank', 'noopener');
+    toast('The host will not hand the file to this page, so it is open in a '
+      + 'tab to save from. Allowing this address to read the bucket in its '
+      + 'CORS settings would let it download properly.');
+  }
+}
 
 function photoCard(p, n){
   const on = n != null;
@@ -11490,6 +11547,9 @@ function photoCard(p, n){
      article it happens to sit in. */
   row.append(h('button', { class:'btn small', title:'Edit this photograph’s words',
     onclick: () => openPhotoInfo(p) }, '✎'));
+
+  row.append(h('button', { class:'btn small', title:'Download the file',
+    onclick: () => downloadPhoto(p) }, '\u2913'));
 
   /* Only a file nothing is using can be taken off the list — a duplicate
      or an upload that went in by mistake. */
