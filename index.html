@@ -1171,6 +1171,12 @@ dialog .ed-cap{font-size:.95rem;min-height:2.2em}
 #editor .favlang .btn{white-space:nowrap}
 #editor .peopleadd{flex-wrap:wrap}
 #editor .peopleadd input{flex:1;min-width:9rem;margin:0}
+#editor .welcome{margin:.6rem 0 0}
+#editor .welcome .welcometext{
+  width:100%;font:inherit;font-size:.8rem;line-height:1.45;padding:.5rem .6rem;
+  border:1px solid var(--e-line);border-radius:6px;background:#fff;color:var(--e-ink);
+  resize:vertical;
+}
 
 /* ---------- the web chat ---------- */
 #chat{
@@ -2541,7 +2547,7 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
    when the file changes. It is unrelated to the database's own VERSION,
    which governs schema upgrades and must not be moved for a cosmetic
    change. */
-const APP_VERSION = '1.51';
+const APP_VERSION = '1.52';
 
 /* Nothing is imported at the top any more. The Firebase libraries are
    several hundred kilobytes and, loaded this way, the browser must fetch
@@ -8164,9 +8170,29 @@ function openMagTranslations(m){
    editor, the published issues, and the photograph upload — because
    all three ask this same list.
    --------------------------------------------------------------------- */
+/* What a new editor is about to receive, in words they will understand.
+
+   The letter itself is Firebase's and says Reset your password, which
+   is a strange thing to read about an account you have never had. Its
+   wording is not ours to change — this project will not take a new
+   template — so the next best thing is that somebody tells them what
+   is coming before it arrives. This is that message, ready to send. */
+function welcomeNote(email){
+  const where = location.origin + location.pathname;
+  return 'You are now an editor on JRA Magazine.\n\n'
+    + 'An email is on its way to ' + email + ' with a link to choose a '
+    + 'password. It comes from Firebase, which runs the sign-in, and it is '
+    + 'titled something like "Reset your password" \u2014 that is normal for a '
+    + 'new account, and the link is how you set your first one.\n\n'
+    + 'Open the link, choose a password, then sign in here:\n' + where + '\n\n'
+    + 'The link lasts an hour. If it runs out, press "Forgotten the password" '
+    + 'on that page and another will be sent.';
+}
+
 function peopleCard(){
   const card = h('section', { class:'card' }, h('h2', { text:'People' }));
   const list = h('div', { class:'people' });
+  const said = h('div', { class:'welcome', hidden:true });
   const owners = () => Object.values(State.people || {})
     .filter(x => x && x.role === 'owner').length;
 
@@ -8266,11 +8292,35 @@ function peopleCard(){
                         added: Date.now(), addedBy: (State.user && State.user.email) || '' });
         name.value = ''; mail.value = '';
         toast(email + ' may edit \u2014 ' + made + '.');
+        showWelcome(email);
       }catch(e){
         toast('Not added: ' + (e.message || e));
       }finally{ add.disabled = false; }
     } }, 'Add');
+  /* Firebase's letter is about to confuse somebody. This is the thing
+     to send them so that it does not. */
+  const showWelcome = (email) => {
+    said.textContent = '';
+    said.hidden = false;
+    said.append(h('p', { class:'hint' },
+      h('b', { text: 'Tell ' + email + ' what is coming. ' }),
+      'The email they get is Firebase\u2019s and is titled "Reset your password", '
+      + 'which reads oddly for an account they have never had.'));
+    const words = h('textarea', { class:'welcometext', rows:'7', readonly:true });
+    words.value = welcomeNote(email);
+    said.append(words);
+    said.append(h('div', { class:'fp-row' },
+      h('button', { class:'btn small primary', type:'button',
+        onclick: async () => {
+          try{ await navigator.clipboard.writeText(words.value); toast('Copied.'); }
+          catch(e){ words.select(); toast('Press Ctrl+C \u2014 it is selected.'); }
+        } }, 'Copy it'),
+      h('button', { class:'btn small ghost', type:'button',
+        onclick: () => { said.hidden = true; } }, 'Done')));
+  };
+
   card.append(h('div', { class:'fp-row peopleadd' }, name, mail, role, add));
+  card.append(said);
   card.append(h('p', { class:'hint', text:
     'Adding somebody makes their login and gives them permission in one press. '
     + 'They are emailed a link to set their own password \u2014 nobody here invents one '
