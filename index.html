@@ -1715,9 +1715,10 @@ body.pdf-building #editor .work,body.pdf-building #editor .sp-grip{display:none!
 #gate form.waiting label,#gate form.waiting button[type="submit"]{display:none}
 /* the way through without a code — always there, never the main act */
 #gate .acts.alt{margin-top:.6rem;padding-top:.8rem;border-top:1px solid var(--e-line)}
-#gate input#gateMail,#gate input#gatePass{
+#gate input#gateName,#gate input#gateMail,#gate input#gatePass{
   font-size:1rem;text-align:center;padding:.6rem .5rem;margin-bottom:.4rem;
 }
+#gate .sr[hidden]{display:none}
 #gate input#gatePass{letter-spacing:.12em}
 #gate .said{color:var(--e-accent)}
 #gate .sr{display:block;font-size:0;margin-bottom:0}   /* label for readers only */
@@ -2261,6 +2262,8 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
   <form id="gateForm">
     <h2>JRA Magazine</h2>
     <p>Sign in to edit</p>
+    <label class="sr" id="gateNameWrap" hidden>Name<input type="text" id="gateName"
+           autocomplete="name" placeholder="Your name"></label>
     <label class="sr">Email<input type="email" id="gateMail" autocomplete="username"
            autocapitalize="off" spellcheck="false" placeholder="Email" required></label>
     <label class="sr">Password<input type="password" id="gatePass"
@@ -2308,15 +2311,6 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
     <button class="btn small primary" type="submit">Send</button>
   </form>
 </aside>
-
-<!-- Signed in, allowed to edit, and the address not yet proved. Not a
-     wall: the list is what grants permission, and this is the one
-     thing only the person themselves can finish. -->
-<div id="verifyBar" hidden>
-  <span id="verifySays"></span>
-  <button class="btn small" type="button" id="verifySend">Send it again</button>
-  <button class="btn small ghost" type="button" id="verifyDone">I have done it</button>
-</div>
 
 <div id="toast" role="status" hidden></div>
 <div id="busy" hidden><div class="box" id="busyText"></div></div>
@@ -2574,7 +2568,7 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
    when the file changes. It is unrelated to the database's own VERSION,
    which governs schema upgrades and must not be moved for a cosmetic
    change. */
-const APP_VERSION = '1.53';
+const APP_VERSION = '1.54';
 
 /* Nothing is imported at the top any more. The Firebase libraries are
    several hundred kilobytes and, loaded this way, the browser must fetch
@@ -2815,19 +2809,50 @@ async function signInWithCode(email, password){
   const d = await authCall('signInWithPassword',
     { email, password, returnSecureToken: true });
   holdSession(d);
+  /* An address nobody has proved is not yet anybody. Rather than a
+     button to ask for another letter, the asking is the act of trying
+     to come in: a fresh one goes out and the door stays shut. A link
+     lost or left too long costs one more sign-in, not an errand. */
+  if(!Session.verified){
+    try{ await sendVerifyEmail(); }catch(e){ /* then the last one stands */ }
+    dropSession();
+    await onUser(null);
+    const e = new Error('NOT_VERIFIED');
+    e.code = 'NOT_VERIFIED';
+    throw e;
+  }
   await onUser(userShape());
 }
 
-/* Somebody setting themselves up. They choose the password — nobody
-   else ever knows it, and nobody has to pass one along by whatever
-   means was to hand. Then the address is proved, which is the one
-   letter worth sending about a new account. */
-async function signUpWithPassword(email, password){
+/* Somebody setting themselves up: their name, their password, their
+   address. Nobody else ever knows the password and nobody has to pass
+   one along by whatever means was to hand.
+
+   It ends signed out, on purpose. A token says whether the address has
+   been proved, and the one minted here says no — it was made before
+   the letter was opened, and it would go on saying no for an hour.
+   Signing in afterwards mints a fresh one that says yes, so the way
+   through is the way it reads: set up, open the letter, sign in. */
+async function signUpWithPassword(email, password, name){
   const d = await authCall('signUp', { email, password, returnSecureToken: true });
   holdSession(d);
+  const called = String(name || '').trim();
+  /* on the account, where Firebase keeps it */
+  if(called){
+    try{ await authCall('update', { idToken: Session.idToken, displayName: called,
+                                    returnSecureToken: false }); }
+    catch(e){ /* a name is not worth failing a sign-up over */ }
+  }
+  /* and on the magazine's own list, if an owner has put them on it —
+     the one field of their own line they may write */
+  if(called){
+    try{ await dbUpd('people/' + peopleKey(email), { name: called }); }
+    catch(e){ /* not listed yet, or not allowed: neither stops anything */ }
+  }
   try{ await sendVerifyEmail(); }
-  catch(e){ /* the account exists; the letter can be asked for again */ }
-  await onUser(userShape());
+  catch(e){ /* signing in again sends another */ }
+  dropSession();
+  await onUser(null);
 }
 
 /* Firebase will only send this for the person holding the token, which
@@ -2837,17 +2862,6 @@ async function sendVerifyEmail(){
   const t = await freshToken();
   if(!t) throw new Error('not signed in');
   await authCall('sendOobCode', { requestType: 'VERIFY_EMAIL', idToken: t });
-}
-
-/* Having followed the link, the token in hand still says otherwise: it
-   was minted before. A fresh one carries the answer. */
-async function recheckVerified(){
-  const t = await freshToken(true);
-  if(!t) return false;
-  if(Session) Session.verified = tokenSays(t).email_verified === true;
-  State.user = userShape();
-  renderVerifyBar();
-  return !!(Session && Session.verified);
 }
 
 async function signOutNow(){
@@ -6286,6 +6300,12 @@ function route(){
    The wall
    ===================================================================== */
 function showGate(on, waiting){
+  /* Whether this is the gate arriving or the gate being told again
+     that it is already here. onUser finishes by routing, and routing
+     does not wait, so a word written on this screen — account made,
+     address not proved — would otherwise be wiped a moment later by
+     the redraw that follows it. */
+  const wasUp = !$('#gate').hidden;
   $('#gate').hidden = !on;
   if(!on) return;
   readerEl.hidden = true;
@@ -6302,8 +6322,9 @@ function showGate(on, waiting){
     $('#gateWho').textContent = 'Signed in as ' + (State.user.email || 'this account') + '.';
     return;
   }
-  /* ready to sign in, whatever it was last asked to do */
-  gateMode(false);
+  /* ready to sign in, whatever it was last asked to do — but only on
+     arriving, so that what it has just been told to say survives */
+  if(!wasUp) gateMode(false);
   /* While the sign-in library is still on its way there is nothing
      useful to type into, so the form says so rather than looking
      broken. */
@@ -6342,6 +6363,15 @@ async function onUser(user){
      and this is the second one. The database rules read the same list,
      so a person who is not on it is refused whichever way they ask —
      this only decides what the screen does about it. */
+  if(user && !user.verified){
+    /* a session restored from a browser that signed in before the
+       address was proved; the gate says what to do about it */
+    State.user = null;
+    document.body.classList.toggle('signed-in', false);
+    chatStop();
+    route();
+    return;
+  }
   if(user){
     let why = '';
     try{
@@ -6360,7 +6390,6 @@ async function onUser(user){
   /* the chat belongs to the people who may edit, so it starts and stops
      with being one of them */
   if(State.admin) chatStart(); else chatStop();
-  renderVerifyBar();
   if(!user) store(KNOWN_EDITOR, '');   // stop pre-loading it for a reader
   if(State.admin && !State.loaded){
     try{ await loadEditorData(); }
@@ -6457,20 +6486,6 @@ async function chatPull(){
 
 const chatUnread = () => Chat.said.filter(m =>
   m && Number(m.at) > Chat.seen && m.by !== chatKey()).length;
-
-/* Shown to somebody who may edit and has not yet followed the link.
-   It is a reminder, not a gate: being on the list is what grants
-   permission, and the address was chosen by whoever added them. */
-function renderVerifyBar(){
-  const bar = $('#verifyBar');
-  if(!bar) return;
-  const u = State.user;
-  const want = !!(State.admin && u && u.email && !u.verified);
-  bar.hidden = !want;
-  if(!want) return;
-  $('#verifySays').textContent =
-    'Prove ' + u.email + ' is yours \u2014 there is a link in your inbox.';
-}
 
 function markChatDot(){
   const n = State.admin ? chatUnread() : 0;
@@ -8264,10 +8279,11 @@ function welcomeNote(email){
   const where = location.origin + location.pathname + '#editor';
   return 'You are now an editor on JRA Magazine.\n\n'
     + 'Go to:\n' + where + '\n\n'
-    + 'Press "Set up my account", use this address \u2014 ' + email + ' \u2014 and '
-    + 'choose a password of your own. Nobody else ever sees it.\n\n'
-    + 'You will be sent a link to prove the address is yours. Open it, and '
-    + 'that is the whole of it.';
+    + 'Press "Set up my account" and give your name, this address \u2014 '
+    + email + ' \u2014 and a password of your own. Nobody else ever sees the '
+    + 'password.\n\n'
+    + 'A link will be sent to that address. Open it, come back, and sign in. '
+    + 'That is the whole of it.';
 }
 
 function peopleCard(){
@@ -8346,7 +8362,8 @@ function peopleCard(){
     return card;
   }
 
-  const name = h('input', { placeholder:'Name', 'aria-label':'Name' });
+  /* An address and what they may do. The name is theirs to give, and
+     arrives on this list when they set themselves up. */
   const mail = h('input', { type:'email', placeholder:'Email', 'aria-label':'Email',
     autocapitalize:'off', spellcheck:'false' });
   const role = h('select', { 'aria-label':'What they may do' },
@@ -8368,9 +8385,9 @@ function peopleCard(){
       if(State.people[k]){ toast(email + ' is already on the list.'); return; }
       add.disabled = true;
       try{
-        await save(k, { name: (name.value || '').trim() || email, role: role.value,
+        await save(k, { name: email, role: role.value,
                         added: Date.now(), addedBy: (State.user && State.user.email) || '' });
-        name.value = ''; mail.value = '';
+        mail.value = '';
         toast(email + ' may edit, once they have set up an account.');
         showWelcome(email);
       }catch(e){
@@ -8384,9 +8401,8 @@ function peopleCard(){
     said.hidden = false;
     said.append(h('p', { class:'hint' },
       h('b', { text: 'Now tell ' + email + ' to set up an account. ' }),
-      'They choose their own password and are sent a link to prove the '
-      + 'address. They may edit the moment they sign in, because this list '
-      + 'is what decides.'));
+      'They give their own name and password, open the link sent to that '
+      + 'address, and then sign in. Their name appears here once they have.'));
     const words = h('textarea', { class:'welcometext', rows:'7', readonly:true });
     words.value = welcomeNote(email);
     said.append(words);
@@ -8400,7 +8416,7 @@ function peopleCard(){
         onclick: () => { said.hidden = true; } }, 'Done')));
   };
 
-  card.append(h('div', { class:'fp-row peopleadd' }, name, mail, role, add));
+  card.append(h('div', { class:'fp-row peopleadd' }, mail, role, add));
   card.append(said);
   card.append(h('p', { class:'hint', text:
     'Adding somebody makes their login and gives them permission in one press. '
@@ -14088,15 +14104,6 @@ function wire(){
   loadSplit();
   wireSplit();
 
-  $('#verifySend').onclick = async () => {
-    try{ await sendVerifyEmail(); toast('Sent. Look in ' + (State.user || {}).email + '.'); }
-    catch(e){ toast('Could not send it: ' + (e.message || e)); }
-  };
-  $('#verifyDone').onclick = async () => {
-    toast(await recheckVerified()
-      ? 'Thank you \u2014 that address is proved.'
-      : 'Not yet. Open the link in your inbox, then press this again.');
-  };
   $('#chatShut').onclick = () => openChat(false);
   $('#chatSay').addEventListener('submit', e => {
     e.preventDefault();
@@ -14227,7 +14234,10 @@ function wire(){
      sentence: which half was wrong is not the reader's business and
      saying so would tell a stranger which addresses have accounts. */
   const gateWhy = (code, fallback) =>
-    /EMAIL_EXISTS/.test(code)
+    /NOT_VERIFIED/.test(code)
+      ? 'That address has not been proved yet. A link is on its way \u2014 open '
+        + 'it, then sign in.'
+    : /EMAIL_EXISTS/.test(code)
       ? 'That address already has an account \u2014 sign in with it, or use '
         + '\u201cForgotten the password\u201d.'
     : /WEAK_PASSWORD/.test(code)
@@ -14253,12 +14263,13 @@ function wire(){
     gateMaking = making;
     $('#gateGo').textContent = making ? 'Set up my account' : 'Start editing';
     $('#gateNew').textContent = making ? '\u2190 I already have one' : 'Set up my account';
+    $('#gateNameWrap').hidden = !making;
     $('#gatePass').setAttribute('autocomplete', making ? 'new-password' : 'current-password');
     $('#gatePass').placeholder = making ? 'A password of your own' : 'Password';
     $('#gateForgot').hidden = making;
     gateSays(making
-      ? 'Choose a password \u2014 six characters or more. You will be sent a link '
-        + 'to prove the address is yours.'
+      ? 'Your name, your address, and a password of your own \u2014 six '
+        + 'characters or more.'
       : '', making);
   };
   $('#gateNew').onclick = () => gateMode(!gateMaking);
@@ -14270,11 +14281,16 @@ function wire(){
     const pass = $('#gatePass').value;
     try{
       if(gateMaking){
-        await signUpWithPassword(email, pass);
-        gateSays('', false);
-      }else{
-        await signInWithCode(email, pass);
+        await signUpWithPassword(email, pass, $('#gateName').value);
+        $('#gatePass').value = '';
+        $('#gateName').value = '';
+        store(LAST_EMAIL, email);
+        gateMode(false);
+        gateSays('Account made. Open the link sent to ' + email
+          + ', then sign in here.', true);
+        return;
       }
+      await signInWithCode(email, pass);
       $('#gatePass').value = '';
       store(KNOWN_EDITOR, '1');       // so this browser checks it next time
       store(LAST_EMAIL, email);       // and does not ask the address twice
