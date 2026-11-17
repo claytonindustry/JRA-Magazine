@@ -2568,7 +2568,7 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
    when the file changes. It is unrelated to the database's own VERSION,
    which governs schema upgrades and must not be moved for a cosmetic
    change. */
-const APP_VERSION = '1.55';
+const APP_VERSION = '1.56';
 
 /* Nothing is imported at the top any more. The Firebase libraries are
    several hundred kilobytes and, loaded this way, the browser must fetch
@@ -2664,11 +2664,13 @@ const MEDIA_BASE = 'https://jramag.org/wp-content/uploads/';
    the Worker, which is what keeps the bandwidth free. The Worker is only
    the door in, and it opens for a signed-in editor.
 
-   MEDIA_HOST is a development address: Cloudflare rate-limits r2.dev and
-   does not cache it. Before jramag.org points at this, it becomes a real
-   hostname — one change here, a rewrite of the stored bases, and a
-   republish of anything already out. */
-const MEDIA_HOST   = 'https://pub-252614a0987d48d7a2f16c57236caa0b.r2.dev/';
+   The bucket's own hostname, on the magazine's domain: Cloudflare caches
+   it for a year and serves it from wherever the reader is. The address
+   it replaced, pub-….r2.dev, was a development one that Cloudflare rate
+   -limits and never caches, and it is still answering for anything
+   published before the move. */
+const MEDIA_HOST   = 'https://media.jramagazine.com/';
+const MEDIA_WAS    = 'https://pub-252614a0987d48d7a2f16c57236caa0b.r2.dev/';
 const UPLOAD_URL   = 'https://jra-magazine.colinjamesclayton.workers.dev/upload';
 
 /* Photographs are filed by the month they were uploaded, never by the
@@ -8578,6 +8580,22 @@ function workAccount(work){
       h('small', { text: ` — ${count} photograph${count === 1 ? '' : 's'}` })));
   });
   where.append(list);
+
+  /* The one that matters: everything still on the development address,
+     moved and republished in a single press. Publishing is an owner's,
+     so the button is too. */
+  const away = stillAway();
+  if(away && isOwner()){
+    where.append(h('p', { class:'hint', text:
+      `${away} address${away === 1 ? '' : 'es'} still read from the old development `
+      + 'address, which is never cached and is rate-limited. Moving them rewrites '
+      + 'the articles, the covers, the media library and the PDFs, then republishes '
+      + 'every issue so readers get them. Nothing is marked as corrected.' }));
+    where.append(h('div', { class:'fp-row' },
+      h('button', { class:'btn small primary', type:'button', onclick: moveHome },
+        'Move everything to ' + hostOf(MEDIA_HOST))));
+  }
+
   where.append(h('p', { class:'hint', text:'Moving them rewrites every figure, cover and issue setting at that address. Upload the files to the new place first — this changes where the magazine looks, not where the pictures are.' }));
   const fromI = h('input', { value: (bases[0] && bases[0][0] !== LOCAL ? bases[0][0] : '') });
   const toI = h('input', {});
@@ -13521,6 +13539,90 @@ async function movePhotos(mags, from, to){
   return { figs, covers, mags: touched.size };
 }
 
+/* ---------- the whole magazine onto its own hostname ----------
+   The bucket used to be read from a development address that Cloudflare
+   rate-limits and never caches. Everything published before the move
+   still names it, and in more places than the per-issue button reaches:
+   the figures inside articles and the covers (which it does reach), and
+   also each magazine's own mediaBase, the PDF filed beside it, and the
+   media library's note of where each photograph was sent.
+
+   Rewriting the editor's copy is only half of it. What a reader holds is
+   the published issue, so each one has to go out again. And because the
+   address is written into the page, every article would otherwise come
+   out looking corrected today — which it is not: the same words are in
+   the same order, and only the signpost has moved. So the issues go out
+   with corrections left alone.
+
+   The old address keeps answering throughout, so there is no moment when
+   the magazine is half-moved and broken for a reader. */
+async function moveHome(){
+  const from = MEDIA_WAS, to = MEDIA_HOST;
+  const mags = Object.values(State.magazines);
+  const figs = countPhotosAt(mags, from);
+  const pics = Object.values(State.images).filter(i => i && i.base === from);
+  const pdfs = mags.filter(m => typeof m.pdf === 'string' && m.pdf.indexOf(from) === 0);
+  const live = mags.filter(m => m.published);
+  const tally = figs + pics.length + pdfs.length;
+  if(!tally){ toast('Everything already reads from ' + hostOf(to) + '.'); return; }
+  if(!confirm(
+      `Move the whole magazine onto ${hostOf(to)}?\n\n`
+    + `${figs} photograph${figs === 1 ? '' : 's'} in articles and covers\n`
+    + `${pics.length} in the media library\n`
+    + `${pdfs.length} issue PDF${pdfs.length === 1 ? '' : 's'}\n\n`
+    + `Then ${live.length} published issue${live.length === 1 ? '' : 's'} go out again so readers `
+    + `get the new address. The words are untouched, so nothing is marked as corrected.\n\n`
+    + `The old address keeps working while this runs, so readers see no gap.`)) return;
+
+  try{
+    /* the editor's own copy first: articles, covers, each magazine's base */
+    const r = await movePhotos(mags, from, to);
+
+    await busy('Rewriting the rest…');
+    for(const m of pdfs){
+      m.pdf = to + m.pdf.slice(from.length);
+      await dbSet('magazines/' + m.id, m);
+    }
+    for(const rec of pics){
+      rec.base = to;
+      await dbSet('images/' + rec.id, rec);
+    }
+
+    /* then what readers actually hold */
+    let n = 0, failed = [];
+    for(const m of live){
+      await busy(`Publishing ${++n} of ${live.length}…`);
+      try{ await doPublish(m, { quiet:true, sameWords:true }); }
+      catch(e){ failed.push((m.num || '—') + ': ' + e.message); }
+    }
+    await publishGallery({ quiet:true });
+
+    busy(null);
+    renderSide(); renderWork(); renderEditorChrome();
+    if(failed.length){
+      alert(`Moved, but ${failed.length} issue${failed.length === 1 ? '' : 's'} did not go out:\n\n`
+            + failed.join('\n') + '\n\nPublish those by hand.');
+    }else{
+      toast(`${tally} address${tally === 1 ? '' : 'es'} moved to ${hostOf(to)}, `
+            + `${live.length} issue${live.length === 1 ? '' : 's'} republished.`);
+    }
+  }catch(e){
+    busy(null);
+    toast('The move stopped: ' + e.message);
+  }
+}
+
+/* a hostname without the scheme or the trailing slash, for saying aloud */
+const hostOf = (u) => String(u || '').replace(/^https?:\/\//, '').replace(/\/$/, '');
+
+/* How much of the magazine still reads from the old address. */
+function stillAway(){
+  const mags = Object.values(State.magazines);
+  return countPhotosAt(mags, MEDIA_WAS)
+       + Object.values(State.images).filter(i => i && i.base === MEDIA_WAS).length
+       + mags.filter(m => typeof m.pdf === 'string' && m.pdf.indexOf(MEDIA_WAS) === 0).length;
+}
+
 /* ---------------------------------------------------------------------
    Bringing an issue's photographs home
 
@@ -13722,9 +13824,14 @@ function openPublish(){
   dlg.onclose = () => { if(dlg.returnValue === 'ok') doPublish(m); };
 }
 
-async function doPublish(m){
+async function doPublish(m, opts){
+  /* quiet: one of many, so the issue does not announce itself.
+     sameWords: the words are untouched and only an address has moved,
+     so nothing in here is a correction and no reader should be told it
+     was. */
+  const quiet = !!(opts && opts.quiet), sameWords = !!(opts && opts.sameWords);
   try{
-    await busy('Publishing…');
+    if(!quiet) await busy('Publishing…');
     const now = Date.now();
     /* An article that has been out before and reads differently now is
        a correction, and readers are told the date of it. This is worked
@@ -13736,7 +13843,7 @@ async function doPublish(m){
     magArticles(m).forEach(a => {
       const was = a.publishedStamp;
       const now_ = artStamp(a, m);
-      if(was && was !== now_ && String(a.publishedIn || '') === prevNum && prevNum)
+      if(!sameWords && was && was !== now_ && String(a.publishedIn || '') === prevNum && prevNum)
         a.correctedAt = now;
       a.pendingStamp = now_;
     });
@@ -13790,10 +13897,15 @@ async function doPublish(m){
     }
 
     forgetReader();
+    if(quiet) return num;
     busy(null);
     renderSide(); renderWork(); renderEditorChrome();
     toast(`Issue ${num} is published.`, 'See it', () => { location.hash = '#/' + num; });
   }catch(e){
+    /* in a run of many, the caller says what went wrong and where it
+       stopped — swallowing it here would leave half the shelf moved and
+       nobody any the wiser */
+    if(quiet) throw e;
     busy(null);
     toast('Publishing failed: ' + e.message);
   }
