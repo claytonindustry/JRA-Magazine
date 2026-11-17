@@ -502,27 +502,51 @@ body{background:var(--paper)}
    know how to register a property */
 #reader .body blockquote p,.mag .mq p{--tz:1}
 
+/* There were a hundred and eleven pixels between the headline and the
+   first sentence, against a twenty-pixel paragraph rhythm: five
+   paragraph-gaps of air before the article began. The rule under the
+   byline is worth keeping — it says the piece starts here — but it
+   does not need a hand's width on either side of it. */
 #reader .art h1{
   font-size:calc(clamp(1.65rem,5cqi,2.4rem) * var(--tz,1));font-weight:600;line-height:1.1;
-  letter-spacing:-.018em;margin:0 0 .6rem;text-wrap:balance;
+  letter-spacing:-.018em;margin:0 0 .45rem;text-wrap:balance;
 }
-#reader .art .by{font-family:var(--sans);font-size:calc(.88rem * var(--tz,1));color:var(--brine);margin:0 0 .4rem}
+#reader .art .by{font-family:var(--sans);font-size:calc(.88rem * var(--tz,1));color:var(--brine);margin:0 0 .3rem}
 #reader .art .meta{
   font-family:var(--sans);font-size:.76rem;color:var(--brine);
-  margin:0 0 2rem;padding-bottom:1.25rem;border-bottom:1px solid var(--rule);
+  margin:0 0 1rem;padding-bottom:.65rem;border-bottom:1px solid var(--rule);
 }
 #reader .art .meta .corrected{display:block;margin-top:.2rem;opacity:.9}
+/* The space between one thing and the next is the grid's, not each
+   element's.
+
+   This is laid out as a grid so a photograph can break out past the
+   measure, and margins do not collapse in a grid. Every rule here was
+   written as though they did: a paragraph's margin and a photograph's
+   margin were both applied, so a picture had fifty-three pixels above
+   it and thirty-three below — the same distance asked for twice on one
+   side and once on the other, which is what made it look wrong rather
+   than merely roomy. A heading had seventy-three above and fifteen
+   below for the same reason.
+
+   So the row gap owns the rhythm and nothing carries a vertical margin
+   unless it wants more than the rhythm. Then every gap is the rhythm
+   plus what was asked for, on both sides, and the arithmetic is one
+   addition instead of a question about which browser collapses what. */
 #reader .body{
-  font-size:1.02em;display:grid;
+  font-size:1.02em;display:grid;row-gap:1.15em;
   grid-template-columns:
     [text-start] min(var(--measure),100%) [text-end]
     minmax(0,1fr) [media-end];
 }
-#reader .body>*{grid-column:text-start/text-end;min-width:0}
+#reader .body>*{grid-column:text-start/text-end;min-width:0;margin-block:0}
 #reader .body>figure.wide{grid-column:text-start/media-end}
-#reader .body p{margin:0 0 1.15em;overflow-wrap:break-word;font-size:calc(1em * var(--tz,1))}
+#reader .body p{margin:0;overflow-wrap:break-word;font-size:calc(1em * var(--tz,1))}
+/* A heading belongs to what follows it, so the extra space goes above.
+   Measured in its own size, so a subheading takes a little less than a
+   heading, which is right. */
 #reader .body h2,#reader .body h3,#reader .body h4{
-  font-weight:600;line-height:1.2;letter-spacing:-.01em;margin:2.2em 0 .6em;
+  font-weight:600;line-height:1.2;letter-spacing:-.01em;margin:1.05em 0 0;
 }
 #reader .body>:first-child{margin-top:0}
 #reader .body h2{font-size:calc(1.4em * var(--tz,1))}
@@ -530,7 +554,7 @@ body{background:var(--paper)}
 #reader .body h4{font-size:1.05em}
 #reader .body strong{font-weight:600}
 #reader .body em{font-style:italic}
-#reader .body blockquote{margin:1.6em 0;padding-inline-start:1.1em;border-inline-start:3px solid var(--rule);font-style:italic;font-size:calc(1em * var(--tz,1))}
+#reader .body blockquote{margin:.45em 0;padding-inline-start:1.1em;border-inline-start:3px solid var(--rule);font-style:italic;font-size:calc(1em * var(--tz,1))}
 #reader .body blockquote p{margin:0 0 .8em}
 #reader .body blockquote p:last-child{margin-bottom:0}
 #reader .body .standfirst{font-size:calc(1.12em * var(--tz,1));line-height:1.5;font-style:italic;color:var(--brine)}
@@ -572,7 +596,9 @@ body{background:var(--paper)}
 /* the printed-edition-only page still offers it the old way */
 #reader .pdfonly .getpdf{border:0;padding:0}
 #reader .body a{color:var(--tanbark);text-underline-offset:.15em}
-#reader .body figure{margin:1.9em 0;max-width:100%}
+/* A photograph wants more air than a paragraph, equally on both
+   sides. */
+#reader .body figure{margin:.75em 0;max-width:100%}
 #reader .body figure.wide figcaption{max-width:var(--measure)}
 #reader .body img{
   display:block;height:auto;border-radius:2px;
@@ -2514,7 +2540,7 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
    when the file changes. It is unrelated to the database's own VERSION,
    which governs schema upgrades and must not be moved for a cosmetic
    change. */
-const APP_VERSION = '1.49';
+const APP_VERSION = '1.50';
 
 /* Nothing is imported at the top any more. The Firebase libraries are
    several hundred kilobytes and, loaded this way, the browser must fetch
@@ -6999,16 +7025,13 @@ function toggleMenu(){
       onclick: () => { location.hash = '#editor/settings/' + k; }
     }, label));
   });
-  menu.append(h('hr'));
   /* The PDF and the magazine's own settings used to be here. They are
      both about the magazine rather than about the editor, so they live
      with it: the settings under its name in the side panel, and the PDF
-     inside that window. */
-  menu.append(h('button', { role:'menuitem',
-    onclick: () => { closeMenu(); openImport(); } }, 'Import a library…'));
-  menu.append(h('button', { role:'menuitem',
-    onclick: () => { closeMenu(); window.open(location.pathname + location.search, '_blank', 'noopener'); } },
-    'View the live site'));
+     inside that window. Importing a library and looking at the live
+     site went the same way, to Account & settings, which is where the
+     things that are about the whole site already are. What is left in
+     this menu is the four places to go and the way out. */
   menu.append(h('hr'));
   /* Beside signing out, because it is the same kind of thing: about you
      and the people you work with rather than about the magazine. */
@@ -8346,6 +8369,26 @@ function workAccount(work){
     h('button', { class:'btn small ghost',
       onclick: async () => { await signOutNow(); location.hash = '#/'; } }, 'Sign out')));
   s.append(acc);
+  const site = h('section', { class:'card' }, h('h2', { text:'The site' }));
+  site.append(h('p', { class:'hint', text:
+    'The magazine as a reader meets it, and the way a whole archive comes in.' }));
+  const siteRow = h('div', { class:'fp-row' });
+  siteRow.append(h('button', { class:'btn small', type:'button',
+    onclick: () => window.open(location.pathname + location.search, '_blank', 'noopener') },
+    'View the live site'));
+  /* An import makes magazines, and making a magazine is an owner's. An
+     editor pressing this would be refused by the database halfway
+     through, which is a worse way to find out. */
+  if(isOwner()){
+    siteRow.append(h('button', { class:'btn small', type:'button',
+      onclick: () => openImport() }, 'Import a library\u2026'));
+  }
+  site.append(siteRow);
+  if(isOwner()) site.append(h('p', { class:'hint', text:
+    'An import overwrites any issue whose number it carries, and makes the '
+    + 'rest. The photographs it names are expected to be on the host already.' }));
+  s.append(site);
+
   s.append(peopleCard());
   s.append(favLangsCard());
 
