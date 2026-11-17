@@ -2568,7 +2568,7 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
    when the file changes. It is unrelated to the database's own VERSION,
    which governs schema upgrades and must not be moved for a cosmetic
    change. */
-const APP_VERSION = '1.56';
+const APP_VERSION = '1.57';
 
 /* Nothing is imported at the top any more. The Firebase libraries are
    several hundred kilobytes and, loaded this way, the browser must fetch
@@ -13556,44 +13556,80 @@ async function movePhotos(mags, from, to){
 
    The old address keeps answering throughout, so there is no moment when
    the magazine is half-moved and broken for a reader. */
+/* Any address under the old host, with whatever folder follows it kept
+   as it is. The folder matters: the back catalogue sits under media/,
+   anything uploaded since sits under photos/, and a few records name
+   the host alone and carry the folder in the filename instead. Matching
+   the host exactly, as the From/To box does, would have moved only that
+   last kind and walked past four thousand of the others. */
+const swapHost = (u) => (typeof u === 'string' && u.indexOf(MEDIA_WAS) === 0)
+  ? MEDIA_HOST + u.slice(MEDIA_WAS.length) : null;
+
+/* a hostname without the scheme or the trailing slash, for saying aloud */
+const hostOf = (u) => String(u || '').replace(/^https?:\/\//, '').replace(/\/$/, '');
+
+/* One walk over everything the magazine knows about. Called once to
+   count, so the question asked is the truth, and again to do it. */
+function hostSweep(apply){
+  let figs = 0, covers = 0, bases = 0, pdfs = 0;
+  const arts = new Set(), mags = new Set();
+  Object.values(State.magazines).forEach(m => {
+    let hit = false;
+    const c = m.coverSrc && swapHost(m.coverSrc.base);
+    if(c){ if(apply) m.coverSrc.base = c; covers++; hit = true; }
+    const b = swapHost(m.mediaBase);
+    if(b){ if(apply) m.mediaBase = b; bases++; hit = true; }
+    const d = swapHost(m.pdf);
+    if(d){ if(apply) m.pdf = d; pdfs++; hit = true; }
+    magArticles(m).forEach(a => {
+      let aHit = false;
+      arr(a.blocks).forEach(bl => {
+        if(bl.t !== 'fig' || !bl.src) return;
+        const nb = swapHost(bl.base);
+        if(nb){ if(apply) bl.base = nb; figs++; aHit = true; }
+      });
+      if(aHit){ arts.add(a); hit = true; }
+    });
+    if(hit) mags.add(m);
+  });
+  const pics = Object.values(State.images).filter(i => i && swapHost(i.base));
+  if(apply) pics.forEach(r => { r.base = swapHost(r.base); });
+  return { figs, covers, bases, pdfs, pics,
+           arts: [...arts], mags: [...mags],
+           tally: figs + covers + bases + pdfs + pics.length };
+}
+
+/* How much of the magazine still reads from the old address. */
+function stillAway(){ return hostSweep(false).tally; }
+
 async function moveHome(){
-  const from = MEDIA_WAS, to = MEDIA_HOST;
-  const mags = Object.values(State.magazines);
-  const figs = countPhotosAt(mags, from);
-  const pics = Object.values(State.images).filter(i => i && i.base === from);
-  const pdfs = mags.filter(m => typeof m.pdf === 'string' && m.pdf.indexOf(from) === 0);
-  const live = mags.filter(m => m.published);
-  const tally = figs + pics.length + pdfs.length;
-  if(!tally){ toast('Everything already reads from ' + hostOf(to) + '.'); return; }
+  const plan = hostSweep(false);
+  if(!plan.tally){ toast('Everything already reads from ' + hostOf(MEDIA_HOST) + '.'); return; }
+  const live = plan.mags.filter(m => m.published);
   if(!confirm(
-      `Move the whole magazine onto ${hostOf(to)}?\n\n`
-    + `${figs} photograph${figs === 1 ? '' : 's'} in articles and covers\n`
-    + `${pics.length} in the media library\n`
-    + `${pdfs.length} issue PDF${pdfs.length === 1 ? '' : 's'}\n\n`
+      `Move the whole magazine onto ${hostOf(MEDIA_HOST)}?\n\n`
+    + `${plan.figs} photograph${plan.figs === 1 ? '' : 's'} inside articles\n`
+    + `${plan.covers} cover${plan.covers === 1 ? '' : 's'}\n`
+    + `${plan.pics.length} in the media library\n`
+    + `${plan.pdfs} issue PDF${plan.pdfs === 1 ? '' : 's'}\n\n`
     + `Then ${live.length} published issue${live.length === 1 ? '' : 's'} go out again so readers `
     + `get the new address. The words are untouched, so nothing is marked as corrected.\n\n`
     + `The old address keeps working while this runs, so readers see no gap.`)) return;
 
   try{
-    /* the editor's own copy first: articles, covers, each magazine's base */
-    const r = await movePhotos(mags, from, to);
-
-    await busy('Rewriting the rest…');
-    for(const m of pdfs){
-      m.pdf = to + m.pdf.slice(from.length);
-      await dbSet('magazines/' + m.id, m);
-    }
-    for(const rec of pics){
-      rec.base = to;
-      await dbSet('images/' + rec.id, rec);
-    }
+    const done = hostSweep(true);
+    let n = 0;
+    const total = done.arts.length + done.mags.length + done.pics.length;
+    for(const a of done.arts){ await busy(`Rewriting ${++n} of ${total}\u2026`); await dbSet('articles/' + a.id, a); }
+    for(const m of done.mags){ await busy(`Rewriting ${++n} of ${total}\u2026`); await dbSet('magazines/' + m.id, m); }
+    for(const r of done.pics){ await busy(`Rewriting ${++n} of ${total}\u2026`); await dbSet('images/' + r.id, r); }
 
     /* then what readers actually hold */
-    let n = 0, failed = [];
+    let k = 0; const failed = [];
     for(const m of live){
-      await busy(`Publishing ${++n} of ${live.length}…`);
+      await busy(`Publishing ${++k} of ${live.length}\u2026`);
       try{ await doPublish(m, { quiet:true, sameWords:true }); }
-      catch(e){ failed.push((m.num || '—') + ': ' + e.message); }
+      catch(e){ failed.push((m.num || '\u2014') + ': ' + e.message); }
     }
     await publishGallery({ quiet:true });
 
@@ -13603,24 +13639,13 @@ async function moveHome(){
       alert(`Moved, but ${failed.length} issue${failed.length === 1 ? '' : 's'} did not go out:\n\n`
             + failed.join('\n') + '\n\nPublish those by hand.');
     }else{
-      toast(`${tally} address${tally === 1 ? '' : 'es'} moved to ${hostOf(to)}, `
+      toast(`${done.tally} address${done.tally === 1 ? '' : 'es'} moved to ${hostOf(MEDIA_HOST)}, `
             + `${live.length} issue${live.length === 1 ? '' : 's'} republished.`);
     }
   }catch(e){
     busy(null);
     toast('The move stopped: ' + e.message);
   }
-}
-
-/* a hostname without the scheme or the trailing slash, for saying aloud */
-const hostOf = (u) => String(u || '').replace(/^https?:\/\//, '').replace(/\/$/, '');
-
-/* How much of the magazine still reads from the old address. */
-function stillAway(){
-  const mags = Object.values(State.magazines);
-  return countPhotosAt(mags, MEDIA_WAS)
-       + Object.values(State.images).filter(i => i && i.base === MEDIA_WAS).length
-       + mags.filter(m => typeof m.pdf === 'string' && m.pdf.indexOf(MEDIA_WAS) === 0).length;
 }
 
 /* ---------------------------------------------------------------------
