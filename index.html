@@ -2569,7 +2569,7 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
    when the file changes. It is unrelated to the database's own VERSION,
    which governs schema upgrades and must not be moved for a cosmetic
    change. */
-const APP_VERSION = '1.59';
+const APP_VERSION = '1.60';
 
 /* Nothing is imported at the top any more. The Firebase libraries are
    several hundred kilobytes and, loaded this way, the browser must fetch
@@ -7902,9 +7902,13 @@ const SPANE_LABEL = [
   ['gallery','Media library'],
   ['about','About page'],
   ['links','Links page'],
-  /* the plumbing: the site as a whole, and where its photographs live */
-  ['web','Web settings'],
-  ['account','Account & settings']
+  ['account','Account & settings'],
+  /* Last on purpose. The plumbing — the site as a whole, and where its
+     photographs are served from — is touched once a year at most, and
+     putting it under the things that are used daily is the point: it
+     should take a moment to find, not be the neighbour of a button
+     somebody presses every morning. */
+  ['web','Web settings']
 ];
 
 /* ---------- the icon set, and what stays out of the gallery ----------
