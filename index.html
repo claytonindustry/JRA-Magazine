@@ -808,7 +808,10 @@ body{background:var(--paper)}
   padding:.18rem .5rem;white-space:nowrap;line-height:1.1;
 }
 #editor .brand:hover{border-color:var(--e-line);background:var(--e-bg)}
-#editor .brand[aria-expanded="true"]{border-color:var(--e-accent);background:var(--e-bg)}
+/* lit the same way as the tabs beside it, because it is one */
+#editor .brand[aria-selected="true"]{background:var(--e-accent);border-color:var(--e-accent)}
+#editor .brand[aria-selected="true"] .brand-name,
+#editor .brand[aria-selected="true"] .brand-sub{color:var(--e-on-accent)}
 #editor .brand-name{font-weight:700;letter-spacing:.02em;font-size:.95rem}
 #editor .brand-sub{font-size:.62rem;letter-spacing:.14em;text-transform:uppercase;color:var(--e-muted)}
 #editor .brand:hover .brand-sub{color:var(--e-accent)}
@@ -2142,8 +2145,6 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
     <button class="btn primary" id="btnCorrect" hidden>Publish correction</button>
   </header>
 
-  <div class="menu" id="brandMenu" role="menu" hidden></div>
-
   <aside class="side" id="side"></aside>
 
   <!-- The article on the left and what it will look like on the right,
@@ -2568,7 +2569,7 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
    when the file changes. It is unrelated to the database's own VERSION,
    which governs schema upgrades and must not be moved for a cosmetic
    change. */
-const APP_VERSION = '1.58';
+const APP_VERSION = '1.59';
 
 /* Nothing is imported at the top any more. The Firebase libraries are
    several hundred kilobytes and, loaded this way, the browser must fetch
@@ -2670,7 +2671,6 @@ const MEDIA_BASE = 'https://jramag.org/wp-content/uploads/';
    -limits and never caches, and it is still answering for anything
    published before the move. */
 const MEDIA_HOST   = 'https://media.jramagazine.com/';
-const MEDIA_WAS    = 'https://pub-252614a0987d48d7a2f16c57236caa0b.r2.dev/';
 const UPLOAD_URL   = 'https://jra-magazine.colinjamesclayton.workers.dev/upload';
 
 /* Photographs are filed by the month they were uploaded, never by the
@@ -3928,7 +3928,7 @@ const State = {
   articles: {}, magazines: {}, images: {},
   pages: null,
   curArticle: null, curMag: null,
-  etab: 'write', spane: 'gallery', menuOpen: false,
+  etab: 'write', spane: 'gallery',
   icons: [], hidden: [], gallery: [], galleryAt: null, galMigrated: false,
   legacyLoose: [],
   /* the gallery screen's own two filters: which issue, and which kind */
@@ -5904,7 +5904,7 @@ function setPreviewing(on){
    what is. An address for the wrong one is not an error — it is sent to
    the tab the article actually lives in. */
 const ETABS = ['write','issue','settings'];
-const SPANES = ['gallery','icons','about','links','account'];
+const SPANES = ['gallery','icons','about','links','web','account'];
 const MVIEWS = ['edit','web','pdf'];
 /* the two whole-screen views are addresses of their own, which is what
    #editor/web and #editor/pdf used to be and are again */
@@ -5983,12 +5983,12 @@ function routeEditor(raw){
      and handed back everywhere else. */
   setPreviewing(PREVIEWING_TAB());
   setMode('edit');
-  closeMenu();
   ETABS.forEach(t => document.body.classList.toggle('etab-' + t, t === tab));
   MVIEWS.forEach(v => document.body.classList.toggle('mview-' + v,
     tab === 'issue' && State.mview === v));
   SPANES.forEach(s => document.body.classList.toggle('spane-' + s, tab === 'settings' && State.spane === s));
   $('#tabWrite').setAttribute('aria-selected', String(tab === 'write'));
+  $('#brandBtn').setAttribute('aria-selected', String(tab === 'settings'));
   $$('#editor .mviews button').forEach(b =>
     b.setAttribute('aria-selected', String(tab === 'issue' && b.dataset.mv === State.mview)));
 
@@ -6500,6 +6500,8 @@ function markChatDot(){
   const n = State.admin ? chatUnread() : 0;
   const dot = $('#chatDot');
   if(dot){ dot.hidden = !n; dot.textContent = n > 9 ? '9+' : String(n); }
+  /* the same count again on the way into chat, for anyone already
+     looking at the settings panel rather than at the masthead */
   const item = $('#chatItem');
   if(item) item.textContent = n ? `Web chat (${n})` : 'Web chat';
 }
@@ -7123,46 +7125,7 @@ function designFor(a){
   return (m && m.design) || DEFAULT_DESIGN;
 }
 
-/* ---------- the masthead menu ---------- */
-function closeMenu(){
-  State.menuOpen = false;
-  $('#brandMenu').hidden = true;
-  $('#brandBtn').setAttribute('aria-expanded', 'false');
-}
-function toggleMenu(){
-  if(State.menuOpen){ closeMenu(); return; }
-  const menu = $('#brandMenu');
-  menu.textContent = '';
-  menu.append(h('p', { class:'mhead', text:'Signed in' }));
-  menu.append(h('p', { class:'who', text: (State.user && State.user.email) || 'nobody' }));
-  menu.append(h('hr'));
-  SPANE_LABEL.forEach(([k, label]) => {
-    menu.append(h('button', {
-      role:'menuitem',
-      'aria-current': String(State.etab === 'settings' && State.spane === k),
-      onclick: () => { location.hash = '#editor/settings/' + k; }
-    }, label));
-  });
-  /* The PDF and the magazine's own settings used to be here. They are
-     both about the magazine rather than about the editor, so they live
-     with it: the settings under its name in the side panel, and the PDF
-     inside that window. Importing a library and looking at the live
-     site went the same way, to Account & settings, which is where the
-     things that are about the whole site already are. What is left in
-     this menu is the four places to go and the way out. */
-  menu.append(h('hr'));
-  /* Beside signing out, because it is the same kind of thing: about you
-     and the people you work with rather than about the magazine. */
-  menu.append(h('button', { role:'menuitem', id:'chatItem',
-    onclick: () => { closeMenu(); openChat(true); } }, 'Web chat'));
-  menu.append(h('button', { role:'menuitem',
-    onclick: async () => { closeMenu(); await signOutNow(); location.hash = '#/'; } }, 'Sign out'));
-  menu.append(h('hr'));
-  menu.append(h('p', { class:'ver', text:'Version ' + APP_VERSION }));
-  menu.hidden = false;
-  State.menuOpen = true;
-  $('#brandBtn').setAttribute('aria-expanded', 'true');
-}
+
 
 function openImport(){
   const dlg = $('#dlgImport');
@@ -7923,6 +7886,12 @@ function sideSettings(side){
         label)));
   });
   card.append(list);
+  /* It used to sit by Sign out at the foot of the masthead menu. That
+     menu is gone, so it comes here, under the places it belongs with:
+     about you and the people you work with, not about the magazine. */
+  card.append(h('div', { class:'fp-row' },
+    h('button', { class:'btn small', id:'chatItem', type:'button',
+      onclick: () => openChat(true) }, 'Web chat')));
   side.append(card);
   side.append(h('section', { class:'card' },
     h('div', { class:'fp-row' },
@@ -7933,6 +7902,8 @@ const SPANE_LABEL = [
   ['gallery','Media library'],
   ['about','About page'],
   ['links','Links page'],
+  /* the plumbing: the site as a whole, and where its photographs live */
+  ['web','Web settings'],
   ['account','Account & settings']
 ];
 
@@ -8100,6 +8071,7 @@ function renderWork(){
   else if(State.etab === 'settings'){
     if(State.spane === 'about' || State.spane === 'links') workPage(work);
     else if(State.spane === 'account') workAccount(work);
+    else if(State.spane === 'web') workWeb(work);
   }
 }
 
@@ -8428,11 +8400,12 @@ function peopleCard(){
   card.append(h('div', { class:'fp-row peopleadd' }, mail, role, add));
   card.append(said);
   card.append(h('p', { class:'hint', text:
-    'Adding somebody makes their login and gives them permission in one press. '
-    + 'They are emailed a link to set their own password \u2014 nobody here invents one '
-    + 'for them. Removing them takes away everything they can do, at once, but it '
-    + 'does not delete their login; that is done in the Firebase console if they '
-    + 'are gone for good.' }));
+    'Adding somebody puts their address on the list and nothing else. They set '
+    + 'themselves up from the sign-in box with their own name and their own '
+    + 'password, prove the address by the link that is sent to it, and only then '
+    + 'can they get in. Nobody here invents a password for anyone. Removing them '
+    + 'takes away everything they can do, at once, but it does not delete their '
+    + 'login; that is done in the Firebase console if they are gone for good.' }));
   return card;
 }
 
@@ -8511,6 +8484,11 @@ function favLangsCard(){
   return card;
 }
 
+/* ---------- the two settings sheets ----------
+   What is about you and the people you work with, and what is about
+   the site itself. They were one sheet, which meant the live site had
+   two buttons, importing a library had two, and the photographs were
+   described twice under different headings. */
 function workAccount(work){
   const s = sheet();
   s.append(h('h2', { style:'margin:0 0 .2rem', text:'Account & settings' }));
@@ -8521,7 +8499,6 @@ function workAccount(work){
     h('b', { text: (State.role && State.role.name) || me }),
     ' \u00b7 ' + me + ' \u00b7 ' + (isOwner() ? 'owner' : 'editor')));
   acc.append(h('div', { class:'fp-row' },
-    h('button', { class:'btn small', onclick: () => window.open(location.pathname + location.search, '_blank', 'noopener') }, 'View the live site'),
     h('button', { class:'btn small', title:'Sends a link to set a new one',
       onclick: async () => {
         try{ await sendResetEmail(me); toast('A link to set a new password is on its way to ' + me + '.'); }
@@ -8529,80 +8506,83 @@ function workAccount(work){
       } }, 'Change my password'),
     h('button', { class:'btn small ghost',
       onclick: async () => { await signOutNow(); location.hash = '#/'; } }, 'Sign out')));
+  /* it used to be at the foot of the menu that is no longer there */
+  acc.append(h('p', { class:'hint', text:'Version ' + APP_VERSION }));
   s.append(acc);
+
+  s.append(peopleCard());
+  s.append(favLangsCard());
+
+  work.append(s);
+}
+
+function workWeb(work){
+  const s = sheet();
+  s.append(h('h2', { style:'margin:0 0 .2rem', text:'Web settings' }));
+
+  const mags = Object.values(State.magazines);
+  const arts = Object.values(State.articles);
+  const figs = arts.reduce((n, a) => n + arr(a.blocks).filter(b => b.t === 'fig').length, 0);
+
+  /* The site and the archive were two cards saying the same thing with
+     the same buttons on both. They are one. */
   const site = h('section', { class:'card' }, h('h2', { text:'The site' }));
-  site.append(h('p', { class:'hint', text:
-    'The magazine as a reader meets it, and the way a whole archive comes in.' }));
-  const siteRow = h('div', { class:'fp-row' });
-  siteRow.append(h('button', { class:'btn small', type:'button',
+  site.append(h('p', { class:'hint',
+    text: `${mags.length} issue${mags.length === 1 ? '' : 's'} \u00b7 ${arts.length} article`
+        + `${arts.length === 1 ? '' : 's'} \u00b7 ${figs.toLocaleString()} photograph`
+        + `${figs === 1 ? '' : 's'}.` }));
+  const row = h('div', { class:'fp-row' });
+  row.append(h('button', { class:'btn small', type:'button',
     onclick: () => window.open(location.pathname + location.search, '_blank', 'noopener') },
     'View the live site'));
   /* An import makes magazines, and making a magazine is an owner's. An
      editor pressing this would be refused by the database halfway
      through, which is a worse way to find out. */
-  if(isOwner()){
-    siteRow.append(h('button', { class:'btn small', type:'button',
-      onclick: () => openImport() }, 'Import a library\u2026'));
-  }
-  site.append(siteRow);
+  if(isOwner()) row.append(h('button', { class:'btn small', type:'button',
+    onclick: openImport }, 'Import a library\u2026'));
+  row.append(mayPublish()
+    ? h('button', { class:'btn small', type:'button', onclick: publishPages }, 'Publish the written pages')
+    : h('span', { class:'hint', text:'An owner publishes the written pages.' }));
+  site.append(row);
   if(isOwner()) site.append(h('p', { class:'hint', text:
     'An import overwrites any issue whose number it carries, and makes the '
     + 'rest. The photographs it names are expected to be on the host already.' }));
   s.append(site);
 
-  s.append(peopleCard());
-  s.append(favLangsCard());
-
-  const pics0 = h('section', { class:'card' }, h('h2', { text:'Photographs' }));
+  /* One card for the photographs: how many have reached the host, how
+     many are still only here, and what addresses the archive reads
+     from. Those were three separate accounts of the same thing. */
+  const pics = h('section', { class:'card' }, h('h2', { text:'Photographs' }));
   const waiting = pendingImages();
   const onHost = Object.values(State.images).filter(i => i.base === MEDIA_HOST).length;
-  pics0.append(h('p', { class:'hint',
-    text: `${onHost} on the host · ${waiting.length} still only in this browser.` }));
+  pics.append(h('p', { class:'hint',
+    text: `${onHost} on ${hostOf(MEDIA_HOST)} \u00b7 ${waiting.length} still only in this browser.` }));
   if(waiting.length){
-    pics0.append(h('p', { class:'hint', text:'A photograph that has not been sent shows for you and is blank for everyone else. Nothing is lost — the file is still here.' }));
-    pics0.append(h('button', { class:'btn small primary', onclick: pushPending },
+    pics.append(h('p', { class:'hint', text:'A photograph that has not been sent shows for you and is blank for everyone else. Nothing is lost \u2014 the file is still here.' }));
+    pics.append(h('button', { class:'btn small primary', onclick: pushPending },
       `Send ${waiting.length} photograph${waiting.length === 1 ? '' : 's'}`));
   }
-  s.append(pics0);
 
-  /* The archive's photographs, and where they are being served from. */
-  const mags = Object.values(State.magazines);
-  const where = h('section', { class:'card' }, h('h2', { text:'Where the photographs are served from' }));
   const bases = basesInUse(mags);
-  if(!bases.length) where.append(h('p', { class:'hint', text:'No issue has photographs on a host yet.' }));
+  pics.append(h('h3', { class:'subhead', text:'Where they are served from' }));
+  if(!bases.length) pics.append(h('p', { class:'hint', text:'No issue has photographs on a host yet.' }));
   const list = h('ul', { class:'baselist' });
   bases.forEach(([b, count]) => {
     const label = b === LOCAL ? 'only in this browser'
-                : b === '' ? 'no address — beside the page itself'
+                : b === '' ? 'no address \u2014 beside the page itself'
                 : b;
     list.append(h('li', {},
       h('code', { text: label }),
-      h('small', { text: ` — ${count} photograph${count === 1 ? '' : 's'}` })));
+      h('small', { text: ` \u2014 ${count} photograph${count === 1 ? '' : 's'}` })));
   });
-  where.append(list);
-
-  /* The one that matters: everything still on the development address,
-     moved and republished in a single press. Publishing is an owner's,
-     so the button is too. */
-  const away = stillAway();
-  if(away && isOwner()){
-    where.append(h('p', { class:'hint', text:
-      `${away} address${away === 1 ? '' : 'es'} still read from the old development `
-      + 'address, which is never cached and is rate-limited. Moving them rewrites '
-      + 'the articles, the covers, the media library and the PDFs, then republishes '
-      + 'every issue so readers get them. Nothing is marked as corrected.' }));
-    where.append(h('div', { class:'fp-row' },
-      h('button', { class:'btn small primary', type:'button', onclick: moveHome },
-        'Move everything to ' + hostOf(MEDIA_HOST))));
-  }
-
-  where.append(h('p', { class:'hint', text:'Moving them rewrites every figure, cover and issue setting at that address. Upload the files to the new place first — this changes where the magazine looks, not where the pictures are.' }));
+  pics.append(list);
+  pics.append(h('p', { class:'hint', text:'Moving them rewrites every figure, cover and issue setting at that address. Upload the files to the new place first \u2014 this changes where the magazine looks, not where the pictures are. Republish each issue afterwards for readers to see it.' }));
   const fromI = h('input', { value: (bases[0] && bases[0][0] !== LOCAL ? bases[0][0] : '') });
   const toI = h('input', {});
-  where.append(h('label', { text:'From' }, fromI));
-  where.append(h('label', { text:'To' }, toI));
-  where.append(h('div', { class:'fp-row' },
-    h('button', { class:'btn small primary', onclick: async () => {
+  pics.append(h('label', { text:'From' }, fromI));
+  pics.append(h('label', { text:'To' }, toI));
+  pics.append(h('div', { class:'fp-row' },
+    h('button', { class:'btn small', type:'button', onclick: async () => {
       const from = fromI.value.trim(), to = toI.value.trim();
       if(from === to){ toast('Those are the same address.'); return; }
       const hits = countPhotosAt(mags, from);
@@ -8612,19 +8592,7 @@ function workAccount(work){
       renderWork();
       toast(`Moved ${r.figs + r.covers} across ${r.mags} issue${r.mags === 1 ? '' : 's'}. Republish them to put it live.`);
     } }, 'Move them')));
-  s.append(where);
-
-  const arch = h('section', { class:'card' }, h('h2', { text:'The archive' }));
-  const arts = Object.values(State.articles);
-  const pics = arts.reduce((n, a) => n + arr(a.blocks).filter(b => b.t === 'fig').length, 0);
-  arch.append(h('p', { class:'hint',
-    text: `${mags.length} issues · ${arts.length} articles · ${pics.toLocaleString()} photographs.` }));
-  arch.append(h('div', { class:'fp-row' },
-    h('button', { class:'btn small', onclick: openImport }, 'Import a library…'),
-    mayPublish()
-      ? h('button', { class:'btn small', onclick: publishPages }, 'Publish the written pages')
-      : h('span', { class:'hint', text:'An owner publishes these.' })));
-  s.append(arch);
+  s.append(pics);
 
   work.append(s);
 }
@@ -13556,97 +13524,8 @@ async function movePhotos(mags, from, to){
 
    The old address keeps answering throughout, so there is no moment when
    the magazine is half-moved and broken for a reader. */
-/* Any address under the old host, with whatever folder follows it kept
-   as it is. The folder matters: the back catalogue sits under media/,
-   anything uploaded since sits under photos/, and a few records name
-   the host alone and carry the folder in the filename instead. Matching
-   the host exactly, as the From/To box does, would have moved only that
-   last kind and walked past four thousand of the others. */
-const swapHost = (u) => (typeof u === 'string' && u.indexOf(MEDIA_WAS) === 0)
-  ? MEDIA_HOST + u.slice(MEDIA_WAS.length) : null;
-
 /* a hostname without the scheme or the trailing slash, for saying aloud */
 const hostOf = (u) => String(u || '').replace(/^https?:\/\//, '').replace(/\/$/, '');
-
-/* One walk over everything the magazine knows about. Called once to
-   count, so the question asked is the truth, and again to do it. */
-function hostSweep(apply){
-  let figs = 0, covers = 0, bases = 0, pdfs = 0;
-  const arts = new Set(), mags = new Set();
-  Object.values(State.magazines).forEach(m => {
-    let hit = false;
-    const c = m.coverSrc && swapHost(m.coverSrc.base);
-    if(c){ if(apply) m.coverSrc.base = c; covers++; hit = true; }
-    const b = swapHost(m.mediaBase);
-    if(b){ if(apply) m.mediaBase = b; bases++; hit = true; }
-    const d = swapHost(m.pdf);
-    if(d){ if(apply) m.pdf = d; pdfs++; hit = true; }
-    magArticles(m).forEach(a => {
-      let aHit = false;
-      arr(a.blocks).forEach(bl => {
-        if(bl.t !== 'fig' || !bl.src) return;
-        const nb = swapHost(bl.base);
-        if(nb){ if(apply) bl.base = nb; figs++; aHit = true; }
-      });
-      if(aHit){ arts.add(a); hit = true; }
-    });
-    if(hit) mags.add(m);
-  });
-  const pics = Object.values(State.images).filter(i => i && swapHost(i.base));
-  if(apply) pics.forEach(r => { r.base = swapHost(r.base); });
-  return { figs, covers, bases, pdfs, pics,
-           arts: [...arts], mags: [...mags],
-           tally: figs + covers + bases + pdfs + pics.length };
-}
-
-/* How much of the magazine still reads from the old address. */
-function stillAway(){ return hostSweep(false).tally; }
-
-async function moveHome(){
-  const plan = hostSweep(false);
-  if(!plan.tally){ toast('Everything already reads from ' + hostOf(MEDIA_HOST) + '.'); return; }
-  const live = plan.mags.filter(m => m.published);
-  if(!confirm(
-      `Move the whole magazine onto ${hostOf(MEDIA_HOST)}?\n\n`
-    + `${plan.figs} photograph${plan.figs === 1 ? '' : 's'} inside articles\n`
-    + `${plan.covers} cover${plan.covers === 1 ? '' : 's'}\n`
-    + `${plan.pics.length} in the media library\n`
-    + `${plan.pdfs} issue PDF${plan.pdfs === 1 ? '' : 's'}\n\n`
-    + `Then ${live.length} published issue${live.length === 1 ? '' : 's'} go out again so readers `
-    + `get the new address. The words are untouched, so nothing is marked as corrected.\n\n`
-    + `The old address keeps working while this runs, so readers see no gap.`)) return;
-
-  try{
-    const done = hostSweep(true);
-    let n = 0;
-    const total = done.arts.length + done.mags.length + done.pics.length;
-    for(const a of done.arts){ await busy(`Rewriting ${++n} of ${total}\u2026`); await dbSet('articles/' + a.id, a); }
-    for(const m of done.mags){ await busy(`Rewriting ${++n} of ${total}\u2026`); await dbSet('magazines/' + m.id, m); }
-    for(const r of done.pics){ await busy(`Rewriting ${++n} of ${total}\u2026`); await dbSet('images/' + r.id, r); }
-
-    /* then what readers actually hold */
-    let k = 0; const failed = [];
-    for(const m of live){
-      await busy(`Publishing ${++k} of ${live.length}\u2026`);
-      try{ await doPublish(m, { quiet:true, sameWords:true }); }
-      catch(e){ failed.push((m.num || '\u2014') + ': ' + e.message); }
-    }
-    await publishGallery({ quiet:true });
-
-    busy(null);
-    renderSide(); renderWork(); renderEditorChrome();
-    if(failed.length){
-      alert(`Moved, but ${failed.length} issue${failed.length === 1 ? '' : 's'} did not go out:\n\n`
-            + failed.join('\n') + '\n\nPublish those by hand.');
-    }else{
-      toast(`${done.tally} address${done.tally === 1 ? '' : 'es'} moved to ${hostOf(MEDIA_HOST)}, `
-            + `${live.length} issue${live.length === 1 ? '' : 's'} republished.`);
-    }
-  }catch(e){
-    busy(null);
-    toast('The move stopped: ' + e.message);
-  }
-}
 
 /* ---------------------------------------------------------------------
    Bringing an issue's photographs home
@@ -13849,14 +13728,9 @@ function openPublish(){
   dlg.onclose = () => { if(dlg.returnValue === 'ok') doPublish(m); };
 }
 
-async function doPublish(m, opts){
-  /* quiet: one of many, so the issue does not announce itself.
-     sameWords: the words are untouched and only an address has moved,
-     so nothing in here is a correction and no reader should be told it
-     was. */
-  const quiet = !!(opts && opts.quiet), sameWords = !!(opts && opts.sameWords);
+async function doPublish(m){
   try{
-    if(!quiet) await busy('Publishing…');
+    await busy('Publishing…');
     const now = Date.now();
     /* An article that has been out before and reads differently now is
        a correction, and readers are told the date of it. This is worked
@@ -13868,7 +13742,7 @@ async function doPublish(m, opts){
     magArticles(m).forEach(a => {
       const was = a.publishedStamp;
       const now_ = artStamp(a, m);
-      if(!sameWords && was && was !== now_ && String(a.publishedIn || '') === prevNum && prevNum)
+      if(was && was !== now_ && String(a.publishedIn || '') === prevNum && prevNum)
         a.correctedAt = now;
       a.pendingStamp = now_;
     });
@@ -13922,15 +13796,10 @@ async function doPublish(m, opts){
     }
 
     forgetReader();
-    if(quiet) return num;
     busy(null);
     renderSide(); renderWork(); renderEditorChrome();
     toast(`Issue ${num} is published.`, 'See it', () => { location.hash = '#/' + num; });
   }catch(e){
-    /* in a run of many, the caller says what went wrong and where it
-       stopped — swallowing it here would leave half the shelf moved and
-       nobody any the wiser */
-    if(quiet) throw e;
     busy(null);
     toast('Publishing failed: ' + e.message);
   }
@@ -14256,11 +14125,10 @@ function wire(){
     box.value = '';
     chatSay(said);
   });
-  $('#brandBtn').onclick = e => { e.stopPropagation(); toggleMenu(); };
-  document.addEventListener('mousedown', e => {
-    if(State.menuOpen && !e.target.closest('#brandMenu') && !e.target.closest('#brandBtn')) closeMenu();
-  });
-
+  /* The same kind of thing as the tabs beside it: it goes somewhere and
+     lights up to say you are there, rather than dropping a list down
+     over the page. Where it goes is wherever you were last in settings. */
+  $('#brandBtn').onclick = () => { goEditor('editor/settings/' + (State.spane || 'gallery')); };
   $('#btnPublish').onclick = openPublish;
   $('#btnCorrect').onclick = openPublish;
   $('#btnUnpublish').onclick = () => { const m = curMag(); if(m) unpublishMagazine(m); };
