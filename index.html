@@ -816,20 +816,24 @@ body{background:var(--paper)}
 #editor .brand-sub{font-size:.62rem;letter-spacing:.14em;text-transform:uppercase;color:var(--e-muted)}
 #editor .brand:hover .brand-sub{color:var(--e-accent)}
 
-/* The same disclosure the reader uses for its search options, in the
-   editor's colours: a chevron that turns when it opens. */
-#editor .fold{margin-top:.2rem}
-#editor .foldbtn{
-  display:flex;align-items:center;gap:.4rem;
-  font:inherit;font-size:.82rem;letter-spacing:.02em;
-  background:none;border:0;padding:.35rem .2rem;color:var(--e-muted);cursor:pointer;
+/* A section that folds away, where part of a panel is wanted rarely.
+   The heading is the button, so it reads as the headings around it do
+   and carries the reader's own chevron. Unscoped on purpose: the
+   settings sheets are inside #editor and the magazine's window is a
+   dialog outside it, and both want this. */
+.fold{margin:.9rem 0 .2rem}
+.foldbtn{
+  display:flex;align-items:center;gap:.4rem;width:100%;
+  font-family:inherit;font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;
+  font-weight:600;color:var(--e-muted);text-align:start;
+  background:none;border:0;padding:.2rem 0;cursor:pointer;
 }
-#editor .foldbtn:hover{color:var(--e-accent)}
-#editor .foldbtn::before{content:"";width:.42rem;height:.42rem;flex:none;
+.foldbtn:hover{color:var(--e-accent)}
+.foldbtn::before{content:"";width:.42rem;height:.42rem;flex:none;
   border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;
   transform:rotate(-45deg) translate(-.06rem,-.06rem);transition:transform .15s}
-#editor .foldbtn[aria-expanded="true"]::before{transform:rotate(45deg) translate(-.02rem,-.1rem)}
-#editor .foldbox{margin-top:.2rem}
+.foldbtn[aria-expanded="true"]::before{transform:rotate(45deg) translate(-.02rem,-.1rem)}
+.foldbox{margin-top:.3rem}
 
 #editor .menu{
   position:absolute;top:3rem;inset-inline-start:.8rem;z-index:60;
@@ -2584,7 +2588,7 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
    when the file changes. It is unrelated to the database's own VERSION,
    which governs schema upgrades and must not be moved for a cosmetic
    change. */
-const APP_VERSION = '1.63';
+const APP_VERSION = '1.64';
 
 /* Nothing is imported at the top any more. The Firebase libraries are
    several hundred kilobytes and, loaded this way, the browser must fetch
@@ -7539,7 +7543,16 @@ function openMagSettings(existing){
         onclick: () => { dlg.close(); openCoverSettings(m); } }, 'Cover settings…'))));
 
   /* ---- the page ---- */
-  body.append(h('h3', { class:'subhead', text:'Page design' }));
+  /* Set once when a magazine is made and rarely looked at again, so it
+     is folded away rather than sat between the cover and the printed
+     edition taking up half the window. */
+  const dBox = h('div', { class:'foldbox', hidden:true });
+  const dBtn = h('button', { class:'foldbtn', type:'button', 'aria-expanded':'false' }, 'Page design');
+  dBtn.onclick = () => {
+    dBox.hidden = !dBox.hidden;
+    dBtn.setAttribute('aria-expanded', String(!dBox.hidden));
+  };
+  body.append(h('div', { class:'fold' }, dBtn, dBox));
   const faces = h('div', { class:'grid2' });
   [['bodyFace','Text face'], ['headFace','Heading face']].forEach(([k, label]) => {
     const sel = h('select');
@@ -7548,7 +7561,7 @@ function openMagSettings(existing){
     sel.onchange = () => { m.design[k] = sel.value; saveMagazine(m); redrawPreview(120); };
     faces.append(h('label', { text: label }, sel));
   });
-  body.append(faces);
+  dBox.append(faces);
   const grid = h('div', { class:'grid2' });
   DESIGN_FIELDS.forEach(([k, label, min, max, step]) => {
     const inp = h('input', { type:'number', min, max, step, value: m.design[k] });
@@ -7562,7 +7575,7 @@ function openMagSettings(existing){
     };
     grid.append(h('label', { text: label }, inp));
   });
-  body.append(grid);
+  dBox.append(grid);
 
   /* ---- photographs still on somebody else's server ---- */
   const away = basesInUse([m]).filter(([b]) => b && b !== LOCAL && b.indexOf(MEDIA_HOST) !== 0);
