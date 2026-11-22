@@ -2584,7 +2584,7 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
    when the file changes. It is unrelated to the database's own VERSION,
    which governs schema upgrades and must not be moved for a cosmetic
    change. */
-const APP_VERSION = '1.61';
+const APP_VERSION = '1.62';
 
 /* Nothing is imported at the top any more. The Firebase libraries are
    several hundred kilobytes and, loaded this way, the browser must fetch
@@ -4125,6 +4125,9 @@ async function loadEditorData(){
   ['about','links'].forEach(k => { State.pages[k].blocks = arr(State.pages[k].blocks); });
   for(const img of Object.values(State.images)) await warmLocal(img);
   migrateGallery();
+  /* after the archive is all here, so there is something to match
+     against; written back only when it actually found something */
+  if(healCuration()) saveCuration();
   State.loaded = true;
 }
 
@@ -7985,6 +7988,56 @@ function curationNode(){
 /* Normally this waits a moment, so that typing a caption is one write
    rather than twenty. Publishing cannot wait: the stamp it has just set
    has to be on the record before the toast says the gallery has gone. */
+/* ---------- curation keeps up with a photograph that has moved ----------
+   The gallery and the icon set are both kept by a photograph's address,
+   and an address can move: the whole archive's did, the day the bucket
+   got a hostname of its own. Publishing a gallery looks each entry up
+   by the block it was taken from, so readers never saw anything wrong.
+   The editor's own gallery matches on the address, so it quietly
+   stopped recognising its own entries — eleven photographs out there,
+   four of them visible here, and the four were the ones with no article
+   to move.
+
+   So an entry whose address no longer names anything in the archive is
+   matched up again: by the block it came from, failing that by its
+   filename, and then only when that filename belongs to exactly one
+   photograph. Anything still unrecognised is left exactly as it is
+   rather than guessed at. */
+function healCuration(){
+  const live = new Set(), bySrc = new Map();
+  archivePhotos().forEach(p => {
+    live.add(p.key);
+    const src = String((p.f && p.f.src) || '');
+    if(!src) return;
+    /* null marks a filename that more than one photograph answers to,
+       which is no use for recognising one of them */
+    bySrc.set(src, bySrc.has(src) ? null : p);
+  });
+
+  const again = (e) => {
+    if(!e || !e.key || live.has(e.key)) return false;
+    let found = null;
+    if(e.block){
+      const home = galleryHome(e);
+      if(home.b){
+        const f = resolveFig(home.b, home.m && home.m.mediaBase);
+        if(f) found = { key: photoKey(f), f };
+      }
+    }
+    if(!found && e.src) found = bySrc.get(String(e.src)) || null;
+    if(!found || !found.key || found.key === e.key) return false;
+    e.key = found.key;
+    /* the address it falls back to when there is no block to ask */
+    if(e.base && found.f && found.f.base) e.base = found.f.base;
+    return true;
+  };
+
+  let n = 0;
+  arr(State.gallery).forEach(e => { if(again(e)) n++; });
+  arr(State.icons).forEach(e => { if(again(e)) n++; });
+  return n;
+}
+
 function saveCuration(opts){
   setStatus('Saving…');
   if(opts && opts.now){
@@ -8975,8 +9028,14 @@ function workArticle(work){
     bar.append(copy);
     bar.append(h('button', { class:'btn small', type:'button',
       onclick: () => { State.tongue = 'en'; renderWork(); } }, 'Back to the English'));
-    bar.append(h('button', { class:'btn small primary', type:'button',
-      onclick: () => goEditor('editor/translate') }, 'Translations'));
+    /* It pointed at #editor/translate, which stopped being an address
+       the day translating moved into the magazine's own settings. The
+       route falls through to the pool, so this button quietly took you
+       to the Article Pool instead of to the translations. It opens the
+       window it was always meant to. */
+    const mag = curMag();
+    if(mag) bar.append(h('button', { class:'btn small primary', type:'button',
+      onclick: () => openMagTranslations(mag) }, 'Translations\u2026'));
     s.append(bar);
     if(trBehind(a, lang)) s.append(h('p', { class:'hint trbehind' },
       h('b', { text:'The English has changed since this was copied. ' }),
@@ -13529,6 +13588,8 @@ async function movePhotos(mags, from, to){
   await busy(`Moving ${figs + covers} photograph${figs + covers === 1 ? '' : 's'}…`);
   for(const a of arts) await dbSet('articles/' + a.id, a);
   for(const m of touched) await dbSet('magazines/' + m.id, m);
+  /* the gallery and the icon set are filed by address too */
+  if(healCuration()) await saveCuration({ now:true });
   busy(null);
   return { figs, covers, mags: touched.size };
 }
@@ -13850,9 +13911,20 @@ async function unpublishMagazine(m){
     'you like.')) return;
   try{
     await busy('Unpublishing…');
+    /* An issue goes out as the English page and one page per language
+       beside it. Taking it down used to remove the four nodes below and
+       leave the languages where they were, so a reader with the address
+       of the French one still had the issue — 007~fr outlived the issue
+       it belonged to by months. Publishing already clears the languages
+       an issue no longer has; this clears all of them. */
     await Promise.all([
       dbDel('issues/' + num), dbDel('library/issues/' + num),
-      dbDel('gallery/' + num), dbDel('searchindex/' + num)
+      dbDel('gallery/' + num), dbDel('searchindex/' + num),
+      /* what the issue recorded going out in, together with every
+         language the magazine knows now — a language dropped from the
+         list since publication would otherwise be the one left behind */
+      ...[...new Set([...arr(m.publishedLangs), ...tongues().map(t => t.code)])]
+        .map(c => dbDel('issues/' + num + '~' + c).catch(() => {}))
     ]);
     /* publishedAt is left where it is. The day an issue first reached
        readers is a fact about it, and publishing it again should not
