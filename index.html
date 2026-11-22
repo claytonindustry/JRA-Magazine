@@ -2584,7 +2584,7 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
    when the file changes. It is unrelated to the database's own VERSION,
    which governs schema upgrades and must not be moved for a cosmetic
    change. */
-const APP_VERSION = '1.62';
+const APP_VERSION = '1.63';
 
 /* Nothing is imported at the top any more. The Firebase libraries are
    several hundred kilobytes and, loaded this way, the browser must fetch
@@ -3278,6 +3278,14 @@ function figUrl(f, want){
   const pick = pairs.find(([w]) => w >= (want || 700)) || pairs[pairs.length - 1];
   return f.base + encodeURI(pick ? pick[1] : f.src);
 }
+
+/* What a picture drawn this wide actually needs in pixels. A retina
+   screen draws two device pixels for every one the layout talks in, so
+   a 300-pixel card wants a 600-pixel file; asking for 300 is how a
+   thumbnail ends up soft on a good screen while the big view, which
+   asks for plenty, looks right. Capped at three, past which nobody can
+   tell and the file is simply larger. */
+const forScreen = (css) => Math.round(css * Math.min(window.devicePixelRatio || 1, 3));
 
 function extFor(type){
   return type === 'image/png' ? 'png' : type === 'image/webp' ? 'webp' : 'jpg';
@@ -4827,7 +4835,11 @@ function shotOfPhoto(p, base){
 /* Build a srcset from the sizes that travel with each photograph, so a
    phone downloads a 300px file where the original page sent it 2560px.
    `want` is the width it will actually be drawn at. */
-function hydrateImages(root, base, want){
+/* `told` overrides what the page says a picture is drawn at. A layout
+   that settles its own widths — the gallery's columns do — only knows
+   after it has been laid out, and a guess written into the markup is
+   a guess the browser then believes. */
+function hydrateImages(root, base, want, told){
   if(typeof base !== 'string') base = MEDIA_BASE;
   const target = want || 700;
   const fallback = base;
@@ -4863,6 +4875,9 @@ function hydrateImages(root, base, want){
       })
       .filter(([w, p]) => w > 0 && p);
 
+    /* before the srcset, so the choice is made against the truth */
+    if(told) img.sizes = told;
+
     if(sizes.length){
       img.srcset = sizes.map(([w, p]) => b + encodeURI(p) + ' ' + w + 'w').join(', ');
       const widest = sizes[sizes.length - 1];
@@ -4873,6 +4888,7 @@ function hydrateImages(root, base, want){
     }
 
     const wide = !!img.closest('figure.wide');
+    if(told) return;
     if(px && px < 700) img.sizes = px + 'px';
     else if(pct > 0 && pct < 100)
       img.sizes = `(max-width: ${wide ? '64rem' : '40rem'}) ${Math.round(pct * 0.92)}vw, ` +
@@ -5561,10 +5577,17 @@ async function renderGallery(params, token){
       </a></li>`;
     }).join('')}</ul>`;
 
-    // a picture is drawn at about 15rem, so ask for a file that size
-    hydrateImages(wrap, null, 460);
+    /* How wide a tile really is. `columns:15rem` is a floor, not a
+       width: the columns stretch to fill, so on a wide screen a picture
+       said to be 15rem is drawn at nearer 18, and the browser, believing
+       what it was told, fetched a file too small for the space and drew
+       it soft. Measured once, after the tiles are laid out and before
+       any of them is fetched — they are all lazy. */
+    const tile = wrap.querySelector('.gal .frame') || wrap.querySelector('.gal li');
+    const drawn = tile ? Math.ceil(tile.getBoundingClientRect().width) : 240;
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
+    hydrateImages(wrap, null, Math.round(drawn * dpr), drawn + 'px');
     wrap.querySelectorAll('.gal img').forEach(img => {
-      img.sizes = '(max-width: 40rem) 45vw, 15rem';
       img.style.removeProperty('--w');     // the column decides the width
     });
 
@@ -10941,7 +10964,7 @@ function paneHere(pane, dlg, after){
     all.slice(0, 300).forEach(p => {
       const name = (p.rec && p.rec.name) || String(p.f.src || '').split('/').pop();
       const cell = h('button', { class:'libcell', type:'button', title: name });
-      cell.append(h('img', { src: figUrl(p.f, 240), alt:'', loading:'lazy' }));
+      cell.append(h('img', { src: figUrl(p.f, forScreen(120)), alt:'', loading:'lazy' }));
       cell.append(h('small', { text: `${name} · ${p.f.w || '?'}px` }));
       if(p.f.local) cell.append(h('span', { class:'pend', text:'not sent yet' }));
       cell.onclick = () => { dlg.close(); openPlaceSheet([candidateOfArchive(p)], after); };
@@ -11739,7 +11762,7 @@ function photoCard(p, n){
   const inGal = photoIsFeatured(p);
   const card = h('li', { class:'cu-card' + (on ? ' on' : '') + (inGal ? ' ingal' : '') });
 
-  const pic = h('div', { class:'cu-pic' }, h('img', { src: figUrl(p.f, 480), alt:'', loading:'lazy' }));
+  const pic = h('div', { class:'cu-pic' }, h('img', { src: figUrl(p.f, forScreen(300)), alt:'', loading:'lazy' }));
   if(on) pic.append(h('span', { class:'cu-no', text:String(n) }));
   else if(inGal) pic.append(h('span', { class:'cu-tag', text:'In the gallery' }));
   /* the picture opens the picture — the same screen the reader gets */
