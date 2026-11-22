@@ -816,6 +816,21 @@ body{background:var(--paper)}
 #editor .brand-sub{font-size:.62rem;letter-spacing:.14em;text-transform:uppercase;color:var(--e-muted)}
 #editor .brand:hover .brand-sub{color:var(--e-accent)}
 
+/* The same disclosure the reader uses for its search options, in the
+   editor's colours: a chevron that turns when it opens. */
+#editor .fold{margin-top:.2rem}
+#editor .foldbtn{
+  display:flex;align-items:center;gap:.4rem;
+  font:inherit;font-size:.82rem;letter-spacing:.02em;
+  background:none;border:0;padding:.35rem .2rem;color:var(--e-muted);cursor:pointer;
+}
+#editor .foldbtn:hover{color:var(--e-accent)}
+#editor .foldbtn::before{content:"";width:.42rem;height:.42rem;flex:none;
+  border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;
+  transform:rotate(-45deg) translate(-.06rem,-.06rem);transition:transform .15s}
+#editor .foldbtn[aria-expanded="true"]::before{transform:rotate(45deg) translate(-.02rem,-.1rem)}
+#editor .foldbox{margin-top:.2rem}
+
 #editor .menu{
   position:absolute;top:3rem;inset-inline-start:.8rem;z-index:60;
   min-width:14rem;padding:.3rem;
@@ -2569,7 +2584,7 @@ dialog .hint{color:var(--e-muted);font-size:.8rem}
    when the file changes. It is unrelated to the database's own VERSION,
    which governs schema upgrades and must not be moved for a cosmetic
    change. */
-const APP_VERSION = '1.59';
+const APP_VERSION = '1.61';
 
 /* Nothing is imported at the top any more. The Firebase libraries are
    several hundred kilobytes and, loaded this way, the browser must fetch
@@ -5904,7 +5919,7 @@ function setPreviewing(on){
    what is. An address for the wrong one is not an error — it is sent to
    the tab the article actually lives in. */
 const ETABS = ['write','issue','settings'];
-const SPANES = ['gallery','icons','about','links','web','account'];
+const SPANES = ['gallery','icons','about','links','account'];
 const MVIEWS = ['edit','web','pdf'];
 /* the two whole-screen views are addresses of their own, which is what
    #editor/web and #editor/pdf used to be and are again */
@@ -5972,6 +5987,10 @@ function routeEditor(raw){
   /* the icon set used to be a view of the library and is now kept in
      the picker; an old link to it lands on the library itself */
   if(tab === 'settings' && id === 'icons'){ State.spane = 'gallery'; State.galKind = 'all'; }
+  /* Web settings was a pane of its own for a day. It is a fold at the
+     foot of the account sheet now, so an address pointing at it goes
+     there rather than dropping somebody on the media library. */
+  else if(tab === 'settings' && id === 'web') State.spane = 'account';
   else if(tab === 'settings') State.spane = SPANES.includes(id) ? id : 'gallery';
   if(tab === 'settings' && (State.spane === 'about' || State.spane === 'links')) State.curPage = State.spane;
 
@@ -7902,8 +7921,6 @@ const SPANE_LABEL = [
   ['gallery','Media library'],
   ['about','About page'],
   ['links','Links page'],
-  /* the plumbing: the site as a whole, and where its photographs live */
-  ['web','Web settings'],
   ['account','Account & settings']
 ];
 
@@ -8071,7 +8088,6 @@ function renderWork(){
   else if(State.etab === 'settings'){
     if(State.spane === 'about' || State.spane === 'links') workPage(work);
     else if(State.spane === 'account') workAccount(work);
-    else if(State.spane === 'web') workWeb(work);
   }
 }
 
@@ -8513,13 +8529,25 @@ function workAccount(work){
   s.append(peopleCard());
   s.append(favLangsCard());
 
+  /* Shut every time this sheet is opened. Nobody comes to Account &
+     settings looking for the archive's addresses. */
+  const box = h('div', { class:'foldbox', id:'webFold', hidden:true });
+  const btn = h('button', { class:'foldbtn', type:'button',
+    'aria-expanded':'false', 'aria-controls':'webFold' }, 'Web settings');
+  btn.onclick = () => {
+    box.hidden = !box.hidden;
+    btn.setAttribute('aria-expanded', String(!box.hidden));
+    if(!box.hidden && !box.childElementCount) webCards().forEach(c => box.append(c));
+  };
+  s.append(h('div', { class:'fold' }, btn, box));
+
   work.append(s);
 }
 
-function workWeb(work){
-  const s = sheet();
-  s.append(h('h2', { style:'margin:0 0 .2rem', text:'Web settings' }));
-
+/* The plumbing, as two cards. Folded away at the foot of the account
+   sheet: it is touched once a year, and a moment spent finding it is
+   the right price for keeping the daily things at the top. */
+function webCards(){
   const mags = Object.values(State.magazines);
   const arts = Object.values(State.articles);
   const figs = arts.reduce((n, a) => n + arr(a.blocks).filter(b => b.t === 'fig').length, 0);
@@ -8547,7 +8575,6 @@ function workWeb(work){
   if(isOwner()) site.append(h('p', { class:'hint', text:
     'An import overwrites any issue whose number it carries, and makes the '
     + 'rest. The photographs it names are expected to be on the host already.' }));
-  s.append(site);
 
   /* One card for the photographs: how many have reached the host, how
      many are still only here, and what addresses the archive reads
@@ -8592,9 +8619,8 @@ function workWeb(work){
       renderWork();
       toast(`Moved ${r.figs + r.covers} across ${r.mags} issue${r.mags === 1 ? '' : 's'}. Republish them to put it live.`);
     } }, 'Move them')));
-  s.append(pics);
 
-  work.append(s);
+  return [site, pics];
 }
 
 function sheet(){ return h('div', { class:'sheet' }); }
